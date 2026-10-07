@@ -93,6 +93,18 @@ def test_timed_render_long_cue_and_hour_fractional_precision():
     )
 
 
+def test_timed_render_uses_latest_end_of_overlapping_cues():
+    cues = (
+        Cue(0, 10000, "long"),
+        Cue(1000, 2000, "inside"),
+        Cue(12000, 13000, "edge"),
+        Cue(15001, 16000, "gap"),
+    )
+    assert render_timed_text(cues, source_indices=(0, 1, 2, 3)) == (
+        "[00:00 - 00:13] long inside edge\n\n[00:15.001 - 00:16] gap"
+    )
+
+
 def test_timed_render_breaks_removed_and_backward_gaps():
     cues = (Cue(0, 1000, "a"), Cue(2000, 3000, "b"), Cue(1000, 4000, "c"))
     text = render_timed_text(cues, source_indices=(0, 2, 3))

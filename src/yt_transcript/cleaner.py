@@ -67,6 +67,8 @@ def parse_vtt(vtt: str) -> list[Cue]:
             )
         try:
             start, end = _time(match[1]), _time(match[2])
+            if end < start:
+                raise ValueError
         except ValueError:
             raise TranscriptError(
                 ErrorInfo(
@@ -75,14 +77,6 @@ def parse_vtt(vtt: str) -> list[Cue]:
                     phase="vtt_parse",
                 )
             ) from None
-        if end < start:
-            raise TranscriptError(
-                ErrorInfo(
-                    "SUBTITLE_INVALID",
-                    f"Invalid timing in block {index}.",
-                    phase="vtt_parse",
-                )
-            )
         payload = "\n".join(lines[timing_index + 1 :])
         payload = " ".join(html.unescape(TAGS.sub("", payload)).split())
         cues.append(Cue(start, end, payload))

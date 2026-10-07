@@ -91,6 +91,18 @@ def test_rolling(automatic, second, start, expected):
     assert clean_vtt(vtt, automatic=automatic) == expected
 
 
+@pytest.mark.parametrize(
+    "start,end", [("00:02.000", "00:01.000"), ("9" * 5000 + ":00:00.000", "00:01.000")]
+)
+def test_invalid_timing_has_consistent_error(start, end):
+    with pytest.raises(TranscriptError) as exc:
+        parse_vtt(make_vtt([(start, end, "text")]))
+    assert exc.value.info.code == "SUBTITLE_INVALID"
+    assert exc.value.info.message == "Invalid timing in block 1."
+    assert exc.value.info.phase == "vtt_parse"
+    assert exc.value.info.hint is None
+
+
 def test_three_cues():
     vtt = make_vtt(
         [

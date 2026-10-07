@@ -188,11 +188,12 @@ def render_timed_text(
             group.clear()
 
     for cue, index in zip(fragments, source_indices, strict=True):
+        group_end = max((c.end_ms for c in group), default=0)
         if group and (
             index != previous_index + 1
             or cue.start_ms < group[-1].start_ms
-            or cue.start_ms > max(c.end_ms for c in group) + 2000
-            or max(cue.end_ms, max(c.end_ms for c in group)) - group[0].start_ms > 15000
+            or cue.start_ms > group_end + 2000
+            or max(cue.end_ms, group_end) - group[0].start_ms > 15000
         ):
             flush()
         group.append(cue)
