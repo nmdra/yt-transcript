@@ -17,6 +17,36 @@ def test_parser():
     assert parse_vtt(text) == [Cue(60000, 62100, "Hello & <literal> 42 NOTE 😀")]
 
 
+@pytest.mark.parametrize("whitespace", [" ", "\t", " \t "])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_whitespace_only_payload_lines_are_not_cue_boundaries(whitespace, newline):
+    text = newline.join(
+        [
+            "WEBVTT",
+            "Kind: captions",
+            "Language: en",
+            "",
+            "00:00:01.000 --> 00:00:02.000 align:start position:0%",
+            whitespace,
+            "Hello<00:00:01.500><c> world</c>",
+            whitespace,
+            "",
+            "",
+            "",
+            "00:00:02.000 --> 00:00:03.000",
+            "Hello world",
+            whitespace,
+            "",
+        ]
+    )
+    assert parse_vtt(text) == [
+        Cue(1000, 2000, "Hello world"),
+        Cue(2000, 3000, "Hello world"),
+    ]
+    assert clean_vtt(text, automatic=False) == "Hello world Hello world"
+    assert clean_vtt(text, automatic=True) == "Hello world"
+
+
 @pytest.mark.parametrize(
     "text",
     [

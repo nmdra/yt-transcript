@@ -33,7 +33,9 @@ def _time(value: str) -> int:
 
 def parse_vtt(vtt: str) -> list[Cue]:
     text = vtt.removeprefix("\ufeff").replace("\r\n", "\n")
-    blocks = re.split(r"\n[ \t]*\n", text.strip())
+    # YouTube cues can contain space-only payload lines. Only empty lines
+    # separate blocks; treating spaces as separators detaches caption text.
+    blocks = re.split(r"\n{2,}", text.strip())
     if not blocks or not re.fullmatch(r"WEBVTT(?:[ \t].*)?", blocks[0].split("\n")[0]):
         raise TranscriptError(
             ErrorInfo(
