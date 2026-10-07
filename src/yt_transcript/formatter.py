@@ -9,6 +9,7 @@ import signal
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -323,8 +324,10 @@ def plan_formatting(
     )
 
 
-def terminate_child(process: subprocess.Popen) -> None:
-    if os.name == "posix" and process.poll() is not None:
+def terminate_child(
+    process: subprocess.Popen, *, own_process_group: bool = True
+) -> None:
+    if os.name == "posix" and own_process_group and process.poll() is not None:
         # A descendant can retain a pipe after the direct child exits.
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -332,7 +335,7 @@ def terminate_child(process: subprocess.Popen) -> None:
             pass
     if process.poll() is None:
         try:
-            if os.name == "posix":
+            if os.name == "posix" and own_process_group:
                 os.killpg(process.pid, signal.SIGTERM)
             else:
                 process.terminate()
@@ -341,7 +344,7 @@ def terminate_child(process: subprocess.Popen) -> None:
         try:
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
-            if os.name == "posix":
+            if os.name == "posix" and own_process_group:
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
@@ -362,6 +365,7 @@ def _run_chunk(
     editorial_mode: str = "standard",
     chapter_mode: bool = False,
     contextual: bool = False,
+    own_process_group: bool = True,
 ) -> str:
     parser = PiEventParser()
     failures: queue.SimpleQueue[BaseException] = queue.SimpleQueue()
@@ -399,7 +403,7 @@ def _run_chunk(
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                start_new_session=os.name == "posix",
+                start_new_session=os.name == "posix" and own_process_group,
             )
         except OSError:
             raise classify_pi_failure(
@@ -472,7 +476,7 @@ def _run_chunk(
                 raise classify_pi_failure(code="PI_OUTPUT_INVALID")
             return result
         finally:
-            terminate_child(process)
+            terminate_child(process, own_process_group=own_process_group)
             for thread in threads:
                 thread.join(timeout=2)
             stderr.clear()
@@ -487,6 +491,8 @@ def format_with_pi(
     max_chunks: int | None = None,
     sections: tuple[ChapterSection, ...] | None = None,
     editorial_mode: str = "standard",
+    on_progress: Callable[[int, int], None] | None = None,
+    own_process_group: bool = True,
 ) -> str:
     get_editorial_prompt(editorial_mode)
     plan = plan_transcript_formatting(
@@ -503,6 +509,8 @@ def format_with_pi(
     bodies: list[str] = []
     retained_runs: list[ContextRun] = []
     emitted: set[int] = set()
+    if on_progress is not None:
+        on_progress(0, len(plan.chunks))
     for index, chunk in enumerate(plan.chunks, 1):
         runs = (
             plan.context_chunks[index - 1].runs
@@ -521,12 +529,15 @@ def format_with_pi(
                 editorial_mode=editorial_mode,
                 chapter_mode=chapter_mode,
                 contextual=isinstance(plan, ContextFormattingPlan),
+                own_process_group=own_process_group,
             )
-            if OMISSION_MARKER in result:
-                if editorial_mode == "focused" and result == OMISSION_MARKER:
-                    continue
+            if OMISSION_MARKER in result and not (
+                editorial_mode == "focused" and result == OMISSION_MARKER
+            ):
                 raise classify_pi_failure(code="PI_OUTPUT_INVALID")
-            if chapter_mode:
+            if result == OMISSION_MARKER:
+                pass
+            elif chapter_mode:
                 for run, text in _chapter_parts(result, runs):
                     if not text:
                         if editorial_mode == "focused":
@@ -545,6 +556,8 @@ def format_with_pi(
                 exc.info, chunk_index=index, chunk_total=len(plan.chunks)
             )
             raise
+        if on_progress is not None:
+            on_progress(index, len(plan.chunks))
     if not bodies:
         raise classify_pi_failure(code="PI_OUTPUT_INVALID")
     result = "\n\n".join(bodies)

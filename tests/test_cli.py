@@ -166,3 +166,28 @@ def test_failed_format_preserves_file(pipeline, monkeypatch, tmp_path, capsys):
     assert path.read_text() == "old"
     captured = capsys.readouterr()
     assert not captured.out and "PI_OUTPUT_INCOMPLETE" in captured.err
+
+
+def test_terminal_progress_stays_off_stdout(pipeline, monkeypatch, capsys):
+    import io
+
+    from yt_transcript import cli
+
+    stream = io.StringIO()
+    monkeypatch.setattr(stream, "isatty", lambda: True)
+    monkeypatch.setenv("TERM", "xterm")
+    monkeypatch.setattr(cli.sys, "stderr", stream)
+
+    def edit(body, **kwargs):
+        callback = kwargs["on_progress"]
+        callback(0, 2)
+        callback(1, 2)
+        callback(2, 2)
+        return "## Edited\n\nhello world"
+
+    monkeypatch.setattr(formatter, "format_with_pi", edit)
+    assert main([URL, "--no-config"]) == 0
+    assert capsys.readouterr().out == "## Edited\n\nhello world\n"
+    assert "Pi chunks 1/2" in stream.getvalue()
+    assert "Pi chunks 2/2" in stream.getvalue()
+    assert "hello world" not in stream.getvalue()

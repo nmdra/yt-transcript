@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import NoReturn
 
 from . import __version__
-from .config import load_config, resolve_config
+from .config import AppConfig, load_config, resolve_config
 from .errors import AppError, ErrorInfo, render_cli_error, render_diagnostics
+from .progress import TerminalProgress
 
 
 class SafeArgumentParser(argparse.ArgumentParser):
@@ -73,6 +74,115 @@ def _broken_pipe_exit() -> int:
     return 1
 
 
+def _transcribe(
+    args: argparse.Namespace, config: AppConfig, progress: TerminalProgress
+) -> None:
+    verbose = config.verbose
+    if not args.url:
+        raise _invalid("A YouTube video URL is required.")
+    from .downloader import download_english_vtt, validate_youtube_url
+    from .formatter import ensure_pi, format_with_pi, plan_transcript_formatting
+    from .output import validate_output, write_output
+    from .service import fetch_clean_transcript
+
+    canonical = validate_youtube_url(args.url)
+    if args.no_clobber and args.output is None:
+        raise _invalid("--no-clobber requires --output.")
+    if config.mode != "markdown" and (
+        args.model is not None
+        or args.max_chunks is not None
+        or args.editorial_mode is not None
+    ):
+        raise _invalid("Explicit formatter flags require Markdown mode.")
+    if args.preview and (
+        config.mode != "markdown" or args.output is not None or args.no_clobber
+    ):
+        raise _invalid("--preview requires Markdown mode and no output path.")
+    if args.output:
+        validate_output(args.output, no_clobber=args.no_clobber)
+    if config.mode == "markdown" and not args.preview:
+        ensure_pi()
+    if config.mode == "raw-vtt" and args.sponsorblock:
+        raise _invalid("--sponsorblock cannot be used with --raw-vtt.")
+    progress.stage("fetch")
+    if config.mode == "raw-vtt":
+        raw_download = download_english_vtt(canonical, verbose=verbose)
+        data = raw_download.vtt
+        if verbose:
+            progress.write_line(
+                "caption: selected English VTT; source="
+                + ("automatic" if raw_download.automatic else "manual")
+            )
+    else:
+        downloaded = fetch_clean_transcript(
+            canonical, sponsorblock=config.sponsorblock.resolved()
+        )
+        effective = config.mode == "markdown"
+        body = downloaded.effective_body if effective else downloaded.body
+        lookup = (
+            downloaded.projection.lookup
+            if effective and downloaded.projection
+            else downloaded.metadata.sponsorblock
+        )
+        if lookup.warning:
+            progress.write_line(lookup.warning)
+        if verbose:
+            progress.write_line(
+                "caption: selected English VTT; source="
+                + ("automatic" if downloaded.automatic else "manual")
+            )
+        if args.preview:
+            plan = plan_transcript_formatting(
+                body,
+                sections=downloaded.effective_sections,
+                chunk_chars=config.chunk_chars,
+                max_chunks=config.max_chunks,
+            )
+            lines = [
+                f"canonical URL: {canonical}",
+                f"cleaned characters: {len(downloaded.body)}",
+                f"retained input characters: {len(body)}",
+                f"SponsorBlock status: {lookup.status}",
+                f"removed cues: {downloaded.projection.receipt.removed_cue_count if downloaded.projection else 0}",
+                f"planned formatter invocations: {len(plan.chunks)}",
+                f"largest chunk characters: {max(plan.character_counts, default=0)}",
+                f"configured chunk limit: {config.chunk_chars}",
+                f"maximum chunks: {config.max_chunks if config.max_chunks is not None else 'unlimited'}",
+                f"cap result: {'within limit' if plan.within_cap else 'exceeds limit'}",
+                f"model selection: {config.model or 'Pi configured default'}",
+                f"editorial mode: {config.editorial_mode}",
+            ]
+            progress.close()
+            _emit(("\n".join(lines) + "\n").encode("utf-8"))
+            return
+        if config.mode == "markdown":
+            progress.stage("format")
+            body = format_with_pi(
+                body,
+                model=config.model,
+                chunk_chars=config.chunk_chars,
+                timeout_seconds=config.timeout_seconds,
+                max_chunks=config.max_chunks,
+                sections=downloaded.effective_sections,
+                editorial_mode=config.editorial_mode,
+                on_progress=progress.chunks if progress.enabled else None,
+            )
+        document = (
+            downloaded.document(body, effective=effective)
+            if args.output
+            else body.rstrip() + "\n"
+        )
+        data = document.encode("utf-8")
+    if args.output:
+        progress.stage("output")
+        write_output(args.output, data, no_clobber=args.no_clobber)
+    else:
+        progress.close()
+        _emit(data)
+    progress.close()
+    return
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     try:
@@ -87,6 +197,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except BrokenPipeError:
         return _broken_pipe_exit()
     verbose = bool(args.verbose)
+    progress = TerminalProgress(
+        sys.stderr, enabled=False if args.mcp or args.doctor else None
+    )
     try:
         restricted = (
             args.url is not None
@@ -146,117 +259,28 @@ def main(argv: Sequence[str] | None = None) -> int:
                     ) from None
                 raise
             return 0
-        if not args.url:
-            raise _invalid("A YouTube video URL is required.")
-        from .downloader import download_english_vtt, validate_youtube_url
-        from .formatter import ensure_pi, format_with_pi, plan_transcript_formatting
-        from .output import validate_output, write_output
-        from .service import fetch_clean_transcript
-
-        canonical = validate_youtube_url(args.url)
-        if args.no_clobber and args.output is None:
-            raise _invalid("--no-clobber requires --output.")
-        if config.mode != "markdown" and (
-            args.model is not None
-            or args.max_chunks is not None
-            or args.editorial_mode is not None
-        ):
-            raise _invalid("Explicit formatter flags require Markdown mode.")
-        if args.preview and (
-            config.mode != "markdown" or args.output is not None or args.no_clobber
-        ):
-            raise _invalid("--preview requires Markdown mode and no output path.")
-        if args.output:
-            validate_output(args.output, no_clobber=args.no_clobber)
-        if config.mode == "markdown" and not args.preview:
-            ensure_pi()
-        if config.mode == "raw-vtt":
-            if args.sponsorblock:
-                raise _invalid("--sponsorblock cannot be used with --raw-vtt.")
-            raw_download = download_english_vtt(canonical, verbose=verbose)
-            data = raw_download.vtt
-            if verbose:
-                sys.stderr.write(
-                    "caption: selected English VTT; source="
-                    + ("automatic" if raw_download.automatic else "manual")
-                    + "\n"
-                )
-        else:
-            downloaded = fetch_clean_transcript(
-                canonical, sponsorblock=config.sponsorblock.resolved()
-            )
-            effective = config.mode == "markdown"
-            body = downloaded.effective_body if effective else downloaded.body
-            lookup = (
-                downloaded.projection.lookup
-                if effective and downloaded.projection
-                else downloaded.metadata.sponsorblock
-            )
-            if lookup.warning:
-                sys.stderr.write(lookup.warning + "\n")
-            if verbose:
-                sys.stderr.write(
-                    "caption: selected English VTT; source="
-                    + ("automatic" if downloaded.automatic else "manual")
-                    + "\n"
-                )
-            if args.preview:
-                plan = plan_transcript_formatting(
-                    body,
-                    sections=downloaded.effective_sections,
-                    chunk_chars=config.chunk_chars,
-                    max_chunks=config.max_chunks,
-                )
-                lines = [
-                    f"canonical URL: {canonical}",
-                    f"cleaned characters: {len(downloaded.body)}",
-                    f"retained input characters: {len(body)}",
-                    f"SponsorBlock status: {lookup.status}",
-                    f"removed cues: {downloaded.projection.receipt.removed_cue_count if downloaded.projection else 0}",
-                    f"planned formatter invocations: {len(plan.chunks)}",
-                    f"largest chunk characters: {max(plan.character_counts, default=0)}",
-                    f"configured chunk limit: {config.chunk_chars}",
-                    f"maximum chunks: {config.max_chunks if config.max_chunks is not None else 'unlimited'}",
-                    f"cap result: {'within limit' if plan.within_cap else 'exceeds limit'}",
-                    f"model selection: {config.model or 'Pi configured default'}",
-                    f"editorial mode: {config.editorial_mode}",
-                ]
-                _emit(("\n".join(lines) + "\n").encode("utf-8"))
-                return 0
-            if config.mode == "markdown":
-                body = format_with_pi(
-                    body,
-                    model=config.model,
-                    chunk_chars=config.chunk_chars,
-                    timeout_seconds=config.timeout_seconds,
-                    max_chunks=config.max_chunks,
-                    sections=downloaded.effective_sections,
-                    editorial_mode=config.editorial_mode,
-                )
-            document = (
-                downloaded.document(body, effective=effective)
-                if args.output
-                else body.rstrip() + "\n"
-            )
-            data = document.encode("utf-8")
-        if args.output:
-            write_output(args.output, data, no_clobber=args.no_clobber)
-        else:
-            _emit(data)
+        _transcribe(args, config, progress)
         return 0
     except AppError as exc:
+        progress.close()
         sys.stderr.write(render_cli_error(exc))
         if verbose:
             sys.stderr.write(render_diagnostics(exc))
         return 2 if exc.info.code in ("INVALID_URL", "CONFIG_INVALID") else 1
     except KeyboardInterrupt:
+        progress.close()
         sys.stderr.write("error[INTERRUPTED]: Operation interrupted.\n")
         return 130
     except BrokenPipeError:
+        progress.close()
         return _broken_pipe_exit()
     except OSError:
+        progress.close()
         sys.stderr.write("error[OUTPUT_FAILED]: Output could not be written.\n")
         return 1
     except Exception:
+        progress.close()
         sys.stderr.write("error[INTERNAL_ERROR]: Operation failed unexpectedly.\n")
         return 1
+    finally:
+        progress.close()

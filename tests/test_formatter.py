@@ -162,3 +162,32 @@ def test_chunking_and_cap(monkeypatch):
     assert exc.value.info.code == "CHUNK_LIMIT_EXCEEDED"
     with pytest.raises(FormattingError):
         formatter.split_transcript("a" * 21, max_chars=20)
+
+
+def test_progress_counts_only_validated_chunks(tmp_path, monkeypatch):
+    fake_pi(tmp_path, monkeypatch)
+    progress = []
+    text = "One two three. Four five six. Seven eight nine."
+    total = len(formatter.plan_formatting(text, chunk_chars=20).chunks)
+    formatter.format_with_pi(
+        text, chunk_chars=20, on_progress=lambda n, total: progress.append((n, total))
+    )
+    assert progress == [(n, total) for n in range(total + 1)]
+
+
+def test_failed_chunk_does_not_increment_progress(tmp_path, monkeypatch):
+    fake_pi(tmp_path, monkeypatch, reason="length")
+    progress = []
+    with pytest.raises(FormattingError):
+        formatter.format_with_pi(
+            "source", on_progress=lambda n, total: progress.append((n, total))
+        )
+    assert progress == [(0, 1)]
+
+
+def test_inherited_process_group_timeout_reaps_direct_child(tmp_path, monkeypatch):
+    _, processes = fake_pi(tmp_path, monkeypatch, sleep=True)
+    with pytest.raises(FormattingError) as exc:
+        formatter.format_with_pi("source", timeout_seconds=1, own_process_group=False)
+    assert exc.value.info.code == "PI_TIMEOUT"
+    assert processes[0].poll() is not None

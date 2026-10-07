@@ -22,6 +22,11 @@ yt-transcript 'https://youtu.be/YE7VzlLtp-4' --no-config --model provider/model-
 
 Stdout contains only the body. File output leaves stdout empty. All non-VTT bodies end with one newline.
 
+Terminal stderr shows a spinner during caption retrieval/filtering, then a bar
+with completed Pi chunks and elapsed time. It does not estimate download bytes,
+tokens, cost, or completion time. Progress is disabled for redirected stderr,
+`TERM=dumb`, help/version, doctor, and MCP. It never enters transcripts or files.
+
 Use `-o` for Python-generated YAML metadata. Shell redirection receives the body only:
 
 ```sh

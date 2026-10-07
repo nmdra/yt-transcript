@@ -1,7 +1,8 @@
-"""SDK-independent deterministic service results shared by CLI and MCP."""
+"""SDK-independent transcript services shared by CLI and MCP."""
 
 import math
-from dataclasses import dataclass, replace
+import os
+from dataclasses import asdict, dataclass, replace
 from types import UnionType
 from typing import (
     Any,
@@ -23,6 +24,7 @@ from .chapters import (
 from .cleaner import Cue, clean_vtt_timed
 from .downloader import download_english_vtt
 from .errors import ErrorInfo, TranscriptError
+from .mcp_policy import MCPFormattingPolicy, validate_formatting_policy
 from .metadata import VideoMetadata, format_transcript_file, metadata_mapping
 from .sponsorblock import (
     CaptionProjection,
@@ -35,6 +37,7 @@ from .sponsorblock import (
 )
 
 TranscriptMode = Literal["filtered", "full"]
+TranscriptFormat = Literal["plain_text", "markdown"]
 
 
 class ChapterResult(TypedDict):
@@ -60,7 +63,7 @@ class MetadataResult(TypedDict):
 
 
 class TranscriptResult(TypedDict):
-    format: Literal["plain_text"]
+    format: TranscriptFormat
     document: str
     metadata: MetadataResult
     character_count: int
@@ -270,24 +273,60 @@ def fetch_transcript_document(
     mode: TranscriptMode = "filtered",
     *,
     sponsorblock: SponsorBlockConfig | None = None,
+    output_format: TranscriptFormat = "plain_text",
+    formatting: MCPFormattingPolicy | None = None,
+    supervised: bool = False,
 ) -> TranscriptResult:
     if mode not in ("filtered", "full"):
         raise ValueError("Invalid transcript mode.")
+    if output_format not in ("plain_text", "markdown"):
+        raise ValueError("Invalid transcript format.")
+    if output_format == "markdown":
+        if supervised and os.name != "posix":
+            raise TranscriptError(
+                ErrorInfo(
+                    "RUNTIME_INCOMPATIBLE",
+                    "MCP Markdown output requires POSIX process supervision.",
+                    "Use plain_text output on this platform.",
+                    "runtime_check",
+                )
+            )
+        from .formatter import ensure_pi
+
+        formatting = validate_formatting_policy(
+            asdict(formatting or MCPFormattingPolicy())
+        )
+        ensure_pi()
     policy = (sponsorblock or SponsorBlockConfig()).resolved(default=True)
     if mode == "full":
         policy = replace(policy, enabled=False)
     cleaned = fetch_clean_transcript(url, sponsorblock=policy)
     projection = cleaned.projection
     assert projection is not None
-    body = (
-        render_chapter_text(cleaned.effective_sections)
-        if cleaned.metadata.chapters
-        else render_timed_text(
-            projection.fragments, source_indices=projection.source_indices
+    if output_format == "markdown":
+        from .formatter import format_with_pi
+
+        assert formatting is not None
+        body = format_with_pi(
+            cleaned.effective_body,
+            sections=cleaned.effective_sections,
+            model=formatting.model,
+            chunk_chars=formatting.chunk_chars,
+            timeout_seconds=formatting.timeout_seconds,
+            max_chunks=formatting.max_chunks,
+            editorial_mode=formatting.editorial_mode,
+            own_process_group=not supervised,
         )
-    )
+    else:
+        body = (
+            render_chapter_text(cleaned.effective_sections)
+            if cleaned.metadata.chapters
+            else render_timed_text(
+                projection.fragments, source_indices=projection.source_indices
+            )
+        )
     return {
-        "format": "plain_text",
+        "format": output_format,
         "document": cleaned.document(body, effective=True),
         "metadata": cleaned.mapping(effective=True),
         "character_count": len(body),

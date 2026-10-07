@@ -7,6 +7,14 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.2.0-dev.2] - 2026-10-07
+
+### Added
+
+- Automatic terminal-only CLI progress with a fetch spinner, completed Pi chunk bar, and elapsed time on stderr
+- Explicit MCP `output_format="markdown"` for bounded Pi editing; plain text remains the no-model default
+- POSIX worker-group supervision for MCP Pi calls, with safe cancellation and no silent formatting fallback
+
 ## [0.2.0-dev.1] - 2026-10-07
 
 ### Added
@@ -29,5 +37,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.1...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.2...HEAD
+[0.2.0-dev.2]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.1...v0.2.0-dev.2
 [0.2.0-dev.1]: https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.1

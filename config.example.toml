@@ -24,7 +24,8 @@ verbose = false
 [pi]
 # Default: "standard". Allowed: "standard", "focused".
 # Focused removes clearly separable non-substantive material, not a summary.
-# CLI --editorial-mode overrides this. Raw and MCP ignore saved Pi settings.
+# CLI --editorial-mode overrides this. Raw and MCP plain_text ignore this.
+# Explicit MCP markdown uses the server-configured editorial mode.
 editorial_mode = "standard"
 
 # Default: 12000. Allowed: integers from 1000 through 50000.
@@ -52,7 +53,9 @@ timeout_seconds = 600
 # model = "provider/model-id"
 
 # Raw modes ignore Pi settings after validating the complete TOML file.
-# MCP never calls Pi and ignores all settings in this table.
+# MCP plain_text ignores Pi settings. Explicit markdown uses these settings.
+# MCP defaults to max_chunks=3 when omitted; Pi timeout is at most 120 seconds.
+# Its 300-second total operation deadline still applies.
 # Help, version, and CLI doctor bypass TOML loading.
 # URL, output path, preview, doctor, no-clobber, and MCP startup are CLI-only.
 

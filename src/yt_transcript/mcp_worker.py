@@ -24,7 +24,11 @@ def validate_request(request: object) -> dict:
     if (
         not isinstance(operation, str)
         or operation not in allowed
-        or set(request) != allowed[operation]
+        or set(request)
+        not in (
+            allowed[operation],
+            allowed[operation] | {"output_format", "formatting"},
+        )
     ):
         raise ValueError
     from .downloader import validate_youtube_url
@@ -40,10 +44,17 @@ def validate_request(request: object) -> dict:
     ):
         raise ValueError
     validate_policy(request["sponsorblock"])
+    if "output_format" in request:
+        from .mcp_policy import validate_formatting_policy
+
+        if request["output_format"] != "markdown":
+            raise ValueError
+        validate_formatting_policy(request["formatting"])
     return request
 
 
 def dispatch(request: dict) -> Mapping[str, Any]:
+    from .mcp_policy import validate_formatting_policy
     from .service import fetch_transcript_document
     from .sponsorblock import validate_policy
 
@@ -51,6 +62,15 @@ def dispatch(request: dict) -> Mapping[str, Any]:
         request["url"],
         request["mode"],
         sponsorblock=validate_policy(request["sponsorblock"]),
+        **(
+            {
+                "output_format": "markdown",
+                "formatting": validate_formatting_policy(request["formatting"]),
+                "supervised": True,
+            }
+            if request.get("output_format") == "markdown"
+            else {}
+        ),
     )
 
 

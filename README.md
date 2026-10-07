@@ -4,10 +4,10 @@ Get English YouTube video transcripts with chapter and timestamp context.
 Use the CLI for raw captions or Pi-edited Markdown, or connect the MCP server to
 an AI agent. No audio/video downloads or FFmpeg are required.
 
-- MCP exposes `get_transcript(url, mode="filtered")`, with optional `full` mode.
+- MCP exposes `get_transcript`, with filtered/full modes and optional Pi Markdown output.
 - MCP keeps supplied chapters or adds original-video timestamp blocks.
 - SponsorBlock filtering is default for MCP and opt-in for CLI, with full-caption fallback.
-- Raw output and MCP do not call a model. Markdown uses Pi and can incur charges.
+- Raw output and MCP plain text call no model. Explicit Markdown uses Pi and can incur charges.
 
 ## Install
 
@@ -18,12 +18,12 @@ Authenticate your Git client for this private repository, then run:
 
 ```sh
 uv tool install --python 3.14.7 \
-  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.1'
+  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.2'
 yt-transcript --version
 yt-transcript --doctor
 ```
 
-This pins the application to **0.2.0.dev1**. For verified release assets and exact
+This pins the application to **0.2.0.dev2**. For verified release assets and exact
 dependency versions, see [installation details](docs/installation.md).
 **Bare `uvx yt-transcript` runs an unrelated PyPI project.**
 
@@ -43,14 +43,15 @@ planned call count before Markdown editing. `-o` adds YAML metadata; stdout is
 body-only. Focused editing removes separable non-substantive passages.
 
 For Pi, follow [MCP setup](docs/mcp.md). Its default `filtered` mode attempts
-SponsorBlock; `full` skips it. Both return deterministic captions without Pi calls.
+SponsorBlock; `full` skips it. Default plain text calls no model; explicitly set
+`output_format="markdown"` for Pi editing. CLI progress appears on terminal stderr.
 
 ## Install with an AI agent
 
 Copy this prompt into an agent with local shell and file access:
 
 ```text
-Install nmdra/yt-transcript v0.2.0-dev.1 for my user account with the MCP extra
+Install nmdra/yt-transcript v0.2.0-dev.2 for my user account with the MCP extra
 and Python 3.14.7. Use the private GitHub release wheel, verify SHA256SUMS,
 and constrain dependencies to its source archive's uv.lock. Use an isolated
 uv tool installation, not the unrelated PyPI package named yt-transcript.
