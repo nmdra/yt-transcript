@@ -1,3 +1,5 @@
+from importlib.metadata import version
+
 import pytest
 
 from yt_transcript import downloader, formatter, service
@@ -39,7 +41,7 @@ def test_help(capsys):
 
 def test_version(capsys):
     assert main(["--version"]) == 0
-    assert capsys.readouterr().out == "0.1.0\n"
+    assert capsys.readouterr().out == version("yt-transcript") + "\n"
 
 
 @pytest.mark.parametrize(

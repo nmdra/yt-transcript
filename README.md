@@ -6,7 +6,34 @@ The project requires Python 3.14.7 or newer. Local development uses the installe
 
 It does not download video or audio. It does not require FFmpeg.
 
-**Bare `uvx yt-transcript` runs an unrelated PyPI project.** This project retains that name for Git-first delivery only. Publication is not approved.
+**Bare `uvx yt-transcript` runs an unrelated PyPI project.** This project retains that name for Git-first delivery only. Private GitHub releases are supported; public/PyPI publication is not approved.
+
+## Private releases
+
+The first development release is `v0.2.0-dev.1`. Its Python package version is
+`0.2.0.dev1`. Authenticate your Git client to use the private repository:
+
+```sh
+uvx --from 'git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.1' yt-transcript --version
+```
+
+GitHub releases attach a wheel, source archive, and `SHA256SUMS`. They do not bundle
+Python, Deno, Pi, or provider credentials. Releases inherit repository privacy;
+GitHub authentication is required to download assets. Nothing goes to PyPI.
+
+The tag-triggered `.github/workflows/release.yml` accepts `vX.Y.Z` for stable
+releases and `vX.Y.Z-dev.N` for development prereleases, with `N` greater than zero.
+Before tagging, set the matching `pyproject.toml` version (`X.Y.Z` or `X.Y.Z.devN`),
+update the root project version in `uv.lock`, and add a dated `CHANGELOG.md` entry
+under the tag version without `v`. Commit and push those changes, then push the
+tag. The workflow rejects version or changelog mismatches, runs only offline
+checks, builds packages, and publishes only after checks pass. Development
+releases do not replace the latest stable release. Existing releases/assets are
+not overwritten. The publish job refuses to run if the repository is public.
+
+CI uses the pinned Python version in `.python-version`, uv 0.8.13, Hatchling
+1.32.4, Pyright 1.1.412, and locked project dependencies. GitHub Actions are pinned
+to commit hashes. No live YouTube, SponsorBlock, or Pi validation runs in CI.
 
 ## Local setup
 
