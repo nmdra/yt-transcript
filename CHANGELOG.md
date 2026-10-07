@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.2.0-dev.4] - 2026-10-07
+
+### Changed
+
+- Raise the default MCP Markdown chunk cap from 3 to 20; explicit Markdown requests can make up to 20 sequential Pi calls
+
 ## [0.2.0-dev.3] - 2026-10-07
 
 ### Changed
@@ -49,7 +55,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.3...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.4...HEAD
+[0.2.0-dev.4]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.3...v0.2.0-dev.4
 [0.2.0-dev.3]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.2...v0.2.0-dev.3
 [0.2.0-dev.2]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.1...v0.2.0-dev.2
 [0.2.0-dev.1]: https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.1

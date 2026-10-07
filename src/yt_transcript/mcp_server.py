@@ -350,7 +350,7 @@ def create_server(config: AppConfig, *, runner: Runner | None = None):
                         model=config.model,
                         chunk_chars=config.chunk_chars,
                         timeout_seconds=min(config.timeout_seconds, 120),
-                        max_chunks=config.max_chunks or 3,
+                        max_chunks=config.max_chunks or 20,
                         editorial_mode=config.editorial_mode,
                     )
                 ),

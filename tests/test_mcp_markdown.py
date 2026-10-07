@@ -71,7 +71,7 @@ def test_markdown_uses_shared_formatter_and_python_yaml(source, monkeypatch):
     assert result["document"].endswith("## Edited\n\nHello world.\n")
     assert result["character_count"] == len("## Edited\n\nHello world.")
     assert calls[0][0] == "hello world"
-    assert calls[0][1]["max_chunks"] == 3
+    assert calls[0][1]["max_chunks"] == 20
     assert calls[0][1]["timeout_seconds"] == 120
     assert calls[0][1]["model"] is None
     assert calls[0][1]["own_process_group"] is False
@@ -180,6 +180,35 @@ def test_plain_worker_cannot_carry_formatting_policy():
     payload["output_format"] = "plain_text"
     with pytest.raises(ValueError):
         validate_request(payload)
+
+
+def test_server_default_chunk_cap_is_20(source, monkeypatch):
+    class Runner:
+        def __init__(self):
+            self.calls = []
+
+        async def close(self):
+            pass
+
+        async def run(self, payload):
+            self.calls.append(payload)
+            return dict(dispatch(validate_request(payload)))
+
+    monkeypatch.setattr(
+        formatter, "_run_chunk", lambda *a, **kw: "## Edited\\n\\nHello world."
+    )
+
+    async def check():
+        runner = Runner()
+        async with Client(create_server(AppConfig(), runner=runner)) as client:
+            result = await client.call_tool(
+                "get_transcript",
+                {"url": URL, "mode": "full", "output_format": "markdown"},
+            )
+            assert not result.is_error
+            assert runner.calls[0]["formatting"]["max_chunks"] == 20
+
+    asyncio.run(check())
 
 
 def test_sdk_schema_and_server_controls(source, monkeypatch):

@@ -8,7 +8,7 @@ class MCPFormattingPolicy:
     model: str | None = None
     chunk_chars: int = 12000
     timeout_seconds: int = 120
-    max_chunks: int = 3
+    max_chunks: int = 20
     editorial_mode: str = "standard"
 
 

@@ -59,7 +59,7 @@ specific to plain-text output. Model fidelity is not guaranteed.
 
 MCP Markdown currently requires POSIX process supervision. Pi uses its configured
 default model unless server TOML supplies `pi.model`. Server `pi.chunk_chars` and
-`pi.editorial_mode` apply. `pi.max_chunks` is finite, defaulting to 3 when omitted;
+`pi.editorial_mode` apply. `pi.max_chunks` is finite, defaulting to 20 when omitted;
 `pi.timeout_seconds` is capped at 120 seconds per call. The 300-second total worker
 deadline still applies across extraction, filtering, and all Pi calls. These limits
 are not a hard billing cap because provider-internal retries can add requests.
