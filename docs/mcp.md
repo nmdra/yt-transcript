@@ -72,9 +72,24 @@ is disabled for MCP so stdout remains JSON-RPC only.
 
 ## Other clients and local development
 
-Clients with the standard `mcpServers` format can use the same command and args.
-Pi-specific exposure and descriptions may not apply; set the client's request
-timeout separately. The installed server does not depend on the source checkout.
+Use a local stdio connection with the installed executable's absolute path and
+args `["--mcp", "--no-config"]`. The installed server does not depend on the source
+checkout. Back up the selected client's configuration and preserve existing entries.
+
+Use that client's native configuration format or setup command. Do not copy Pi's
+`exposure`, `description`, or `timeout` fields into another client's configuration.
+Where supported, allow a 330-second tool-call timeout. Configuration locations,
+scope, field names, timeout units, and reload steps are client-specific:
+
+- [Claude Code](https://code.claude.com/docs/en/mcp)
+- [Codex configuration](https://developers.openai.com/codex/config-reference)
+- [Cursor](https://www.cursor.com/docs/context/mcp)
+- [VS Code](https://code.visualstudio.com/docs/agent-customization/mcp-servers)
+- [Claude Desktop and local MCP connections](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers)
+
+For Pi, use [Configure Pi](#configure-pi) above and the installed Pi documentation.
+For another MCP client, read its official local-server setup guide before editing.
+Initialization and tool listing are sufficient for an offline connection check.
 
 For a development checkout, use an absolute project path:
 

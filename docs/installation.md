@@ -10,7 +10,7 @@ require sudo or change the project's development environment.
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - Python 3.14.7 for the commands below; the package accepts Python 3.14.7 or newer
 - [Deno](https://docs.deno.com/runtime/getting_started/installation/) 2.3.0 or newer on `PATH`
-- Authenticated access to the private `nmdra/yt-transcript` repository
+- Access to the `nmdra/yt-transcript` repository and release assets
 - [Pi](https://pi.dev) 1.0.4 or a newer compatible release for Markdown editing or Pi MCP integration
 
 Raw captions and MCP plain-text extraction do not need Pi to process captions.
@@ -34,7 +34,7 @@ call. Keep credentials out of URLs, shell arguments, and project files.
 
 ## Quick Git-source install
 
-Authenticate your Git client first, then run:
+Install from the pinned source tag:
 
 ```sh
 uv tool install --python 3.14.7 \
@@ -55,8 +55,9 @@ PyPI project. Always supply this repository or its verified release wheel.
 ## Verified wheel with release-matched dependencies
 
 Use this method for the copy-paste agent prompt in the README. It needs the
-[GitHub CLI](https://cli.github.com/) authenticated for the private repository.
-If access is missing, ask the operator to authenticate. Do not place tokens in
+[GitHub CLI](https://cli.github.com/). This repository and the approved
+`v0.2.0-dev.2` release are public. Authenticate if the CLI requests it or access
+is unavailable. Do not place tokens in
 commands or download URLs.
 
 The following POSIX-shell example stores assets under your user data directory.
