@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yt-transcript"
-version = "0.2.0.dev5"
+version = "0.2.0.dev6"
 description = "English YouTube captions with deterministic cleanup and isolated Pi editing"
 readme = "README.md"
 requires-python = ">=3.14.7"

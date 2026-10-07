@@ -7,9 +7,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.2.0-dev.6] - 2026-10-07
+
 ### Changed
 
 - Publish normal public GitHub releases after CI checks and checksum verification, without a private-repository guard or manual exception
+- Rewrite the README and guides using Simplified Technical English principles, with technical requirements, commands, and limits unchanged
+- Simplify caption processing and MCP internals without changing public APIs, output, filtering, or process cleanup
 
 ## [0.2.0-dev.5] - 2026-10-07
 
@@ -75,7 +79,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.5...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.6...HEAD
+[0.2.0-dev.6]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.5...v0.2.0-dev.6
 [0.2.0-dev.5]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.4...v0.2.0-dev.5
 [0.2.0-dev.4]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.3...v0.2.0-dev.4
 [0.2.0-dev.3]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.2...v0.2.0-dev.3
