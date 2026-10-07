@@ -95,19 +95,16 @@ def select_english_track(info: Mapping[str, Any]) -> CaptionTrack:
             )
             if not vtt:
                 continue
-            rank = (
-                (0 if key == "en" else 1)
-                if not automatic
-                else (
-                    2
-                    if key == "en-orig"
-                    else 3
-                    if key.endswith("-orig")
-                    else 4
-                    if key == "en"
-                    else 5
-                )
-            )
+            if not automatic:
+                rank = 0 if key == "en" else 1
+            elif key == "en-orig":
+                rank = 2
+            elif key.endswith("-orig"):
+                rank = 3
+            elif key == "en":
+                rank = 4
+            else:
+                rank = 5
             candidates.append(
                 (rank, key, language, CaptionTrack(language, automatic, vtt))
             )

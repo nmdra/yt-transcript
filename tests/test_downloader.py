@@ -38,6 +38,39 @@ def test_bad_urls(url):
         validate_youtube_url(url)
 
 
+@pytest.mark.parametrize("first_available", range(6))
+def test_caption_priority_order(first_available):
+    ordered = [
+        ("subtitles", "en"),
+        ("subtitles", "en-GB"),
+        ("automatic_captions", "en-orig"),
+        ("automatic_captions", "en-GB-orig"),
+        ("automatic_captions", "en"),
+        ("automatic_captions", "en-GB"),
+    ]
+    info = {"subtitles": {}, "automatic_captions": {}}
+    for source, language in reversed(ordered[first_available:]):
+        info[source][language] = [{"ext": "vtt"}]
+    track = select_english_track(info)
+    source, language = ordered[first_available]
+    assert track.language == language
+    assert track.automatic == (source == "automatic_captions")
+
+
+def test_caption_priority_preserves_case_and_lexical_ties():
+    formats = [{"ext": "vtt"}]
+    assert (
+        select_english_track(
+            {"subtitles": {"en-US": formats, "en-GB": formats}}
+        ).language
+        == "en-GB"
+    )
+    assert (
+        select_english_track({"subtitles": {"en": formats, "EN": formats}}).language
+        == "EN"
+    )
+
+
 def test_real_upstream_selection():
     from typing import Any, cast
 
