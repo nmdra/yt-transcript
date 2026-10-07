@@ -81,6 +81,7 @@ Unknown keys, invalid types, malformed TOML, and files larger than 64 KiB are er
 | `pi.timeout_seconds` | Integer 1 through 3,600, per chunk |
 | `pi.max_chunks` | Integer 1 through 1,000, or omit for unlimited |
 | `pi.editorial_mode` | `standard` (default) or `focused` |
+| `mcp.markdown_timeout_seconds` | Integer 300 through 3,600; total MCP Markdown deadline, default 300; ignored by CLI |
 | `sponsorblock.enabled` | Optional boolean; unset means CLI off, MCP filtered on |
 | `sponsorblock.categories` | Nonempty unique list: `sponsor`, `selfpromo`, `interaction`, `intro`, `outro`, `preview` |
 | `sponsorblock.timeout_seconds` | Integer 1 through 30, per socket operation |
@@ -129,6 +130,11 @@ A single token larger than the chunk limit fails rather than truncates. Characte
 **Default Markdown sends caption text to the configured model/provider.** It can incur one paid call per chunk, plus Pi/provider-internal retries.
 
 A repeated run can incur new charges. A timeout or cancellation cannot undo provider work or billing. No wrapper-level model retries occur.
+
+Pi-processing failures print a warning on stderr suggesting `--raw` for plain
+text without Pi. No partial processed document or automatic fallback is written.
+MCP uses `output_format="plain_text"` for the same explicit recovery. Its total
+Markdown deadline is separate from CLI per-chunk timeouts.
 
 `--no-session` prevents local Pi session persistence. It does not prevent provider-side logging or retention.
 

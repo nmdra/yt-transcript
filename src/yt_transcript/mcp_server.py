@@ -33,8 +33,14 @@ class Runner(Protocol):
 
 
 class WorkerRunner:
-    def __init__(self, *, timeout_seconds: float = 300):
+    def __init__(
+        self,
+        *,
+        timeout_seconds: float = 300,
+        markdown_timeout_seconds: float | None = None,
+    ):
         self.timeout_seconds = timeout_seconds
+        self.markdown_timeout_seconds = markdown_timeout_seconds
         self._busy = False
         self._process: asyncio.subprocess.Process | None = None
 
@@ -90,6 +96,12 @@ class WorkerRunner:
 
     async def run(self, request: dict[str, Any]) -> dict[str, Any]:
         validate_request(request)
+        timeout_seconds = (
+            self.markdown_timeout_seconds
+            if request.get("output_format") == "markdown"
+            and self.markdown_timeout_seconds is not None
+            else self.timeout_seconds
+        )
         raw = json.dumps(request).encode("utf-8")
         if len(raw) > REQUEST_LIMIT:
             raise AppError(
@@ -111,7 +123,7 @@ class WorkerRunner:
         self._busy = True
         tasks: list[asyncio.Task] = []
         try:
-            async with asyncio.timeout(self.timeout_seconds):
+            async with asyncio.timeout(timeout_seconds):
                 process = await asyncio.create_subprocess_exec(
                     sys.executable,
                     "-m",
@@ -189,7 +201,9 @@ class WorkerRunner:
                 ErrorInfo(
                     "MCP_TIMEOUT",
                     "Worker operation timed out.",
-                    "Use the deterministic CLI or try later.",
+                    "The total worker deadline includes fetching and all Pi calls. "
+                    "For Markdown, review mcp.markdown_timeout_seconds and the client timeout, "
+                    'or retry with output_format="plain_text".',
                     "mcp_worker",
                 )
             ) from None
@@ -285,7 +299,9 @@ def create_server(config: AppConfig, *, runner: Runner | None = None):
                 # validation string because it includes raw argument input values.
                 raise ToolError(render_mcp_error(info)) from None
 
-    worker = runner or WorkerRunner()
+    worker = runner or WorkerRunner(
+        markdown_timeout_seconds=config.mcp.markdown_timeout_seconds
+    )
 
     @asynccontextmanager
     async def lifespan(server):

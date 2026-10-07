@@ -62,13 +62,10 @@ def test_default_filtered_full_override_and_raw_receipts(source):
         filtered["metadata"]["sponsorblock"]["segments"][0]["removal_status"]
         == "partial"
     )
-    body = filtered["document"].split("---\n", 2)[2].strip()
+    body = filtered["document"]
     assert "promo" not in body and "cross useful" in body and "[00:08 - 00:09]" in body
     assert filtered["character_count"] == len(body)
-    assert (
-        yaml.safe_load(filtered["document"].split("---\n", 2)[1])
-        == filtered["metadata"]
-    )
+    assert not body.startswith("---\n")
     calls.clear()
     full = service.fetch_transcript_document(URL, "full")
     assert calls == ["download"] and "promo" in full["document"]
@@ -76,6 +73,7 @@ def test_default_filtered_full_override_and_raw_receipts(source):
     cleaned = service.fetch_clean_transcript(
         URL, sponsorblock=SponsorBlockConfig(enabled=True)
     )
+    assert yaml.safe_load(cleaned.document().split("---\n", 2)[1]) == cleaned.mapping()
     raw = cleaned.mapping()
     assert raw["sponsorblock"]["segments"][0]["removal_status"] == "not_applied"
     assert raw["sponsorblock"]["retained_overlap_cue_count"] == 2
@@ -157,7 +155,7 @@ def test_sdk_two_mode_schema_and_omitted_equivalence():
             )
             return {
                 "format": "plain_text",
-                "document": cleaned.document(),
+                "document": cleaned.body,
                 "metadata": cleaned.mapping(),
                 "character_count": 2,
             }

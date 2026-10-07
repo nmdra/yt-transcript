@@ -327,7 +327,7 @@ def fetch_transcript_document(
         )
     return {
         "format": output_format,
-        "document": cleaned.document(body, effective=True),
+        "document": body,
         "metadata": cleaned.mapping(effective=True),
         "character_count": len(body),
     }

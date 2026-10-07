@@ -19,6 +19,7 @@ def test_shared_document_and_plan(monkeypatch):
     result = service.fetch_transcript_document(metadata.url)
     assert len(calls) == 1
     assert result["character_count"] == 27
-    assert result["document"].endswith("\n\n[00:00 - 00:01] hello world\n")
+    assert result["document"] == "[00:00 - 00:01] hello world"
+    assert result["character_count"] == len(result["document"])
     assert result["metadata"]["caption_source"] == "manual"
     assert len(result["metadata"]) == 13

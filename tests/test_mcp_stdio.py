@@ -208,7 +208,7 @@ class Runner:
     async def close(self): pass
     async def run(self, payload):
         cleaned=CleanedTranscript("hello world",VideoMetadata("https://www.youtube.com/watch?v=abcdefghijk","abcdefghijk"),"en",False)
-        return {"format":"plain_text","document":cleaned.document(),"metadata":cleaned.mapping(),"character_count":11}
+        return {"format":"plain_text","document":cleaned.body,"metadata":cleaned.mapping(),"character_count":11}
 create_server(AppConfig(),runner=Runner()).run(transport="stdio")
 """)
 
@@ -220,7 +220,7 @@ create_server(AppConfig(),runner=Runner()).run(transport="stdio")
             result = await client.call_tool(
                 "get_transcript", {"url": "https://youtu.be/abcdefghijk"}
             )
-            assert result.structured_content["document"].endswith("\n\nhello world\n")
+            assert result.structured_content["document"] == "hello world"
             assert json.loads(text_content(result)) == result.structured_content
 
     asyncio.run(check())

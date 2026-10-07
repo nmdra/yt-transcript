@@ -78,8 +78,11 @@ def test_invalid(data):
 @pytest.mark.parametrize(
     "kind,code",
     [
-        ("compaction_start", "PI_CONTEXT_LIMIT"),
-        ("summarization_retry_scheduled", "PI_CONTEXT_LIMIT"),
+        ("compaction_start", "PI_CONTEXT_MUTATED"),
+        ("compaction_end", "PI_CONTEXT_MUTATED"),
+        ("summarization_retry_attempt_start", "PI_CONTEXT_MUTATED"),
+        ("summarization_retry_finished", "PI_CONTEXT_MUTATED"),
+        ("summarization_retry_scheduled", "PI_CONTEXT_MUTATED"),
         ("tool_execution_start", "PI_PROTOCOL_INVALID"),
     ],
 )
@@ -93,6 +96,58 @@ def test_forbidden(kind, code):
             + b"\n"
         )
     assert exc.value.info.code == code
+
+
+@pytest.mark.parametrize("entry_type", ["context_edit", "compaction", "branch_summary"])
+def test_context_entries_are_mutation(entry_type):
+    parser = PiEventParser()
+    parser.feed(b'{"type":"session"}\n')
+    with pytest.raises(FormattingError) as exc:
+        parser.feed(
+            json.dumps(
+                {
+                    "type": "entry_appended",
+                    "entry": {"type": entry_type, "summary": "private"},
+                }
+            ).encode()
+            + b"\n"
+        )
+    assert exc.value.info.code == "PI_CONTEXT_MUTATED"
+    assert "private" not in str(exc.value)
+
+
+@pytest.mark.parametrize("role", ["compactionSummary", "branchSummary"])
+def test_summary_messages_are_mutation(role):
+    parser = PiEventParser()
+    parser.feed(b'{"type":"session"}\n')
+    with pytest.raises(FormattingError) as exc:
+        parser.feed(
+            json.dumps({"type": "message_end", "message": {"role": role}}).encode()
+            + b"\n"
+        )
+    assert exc.value.info.code == "PI_CONTEXT_MUTATED"
+
+
+def test_provider_overflow_is_not_mutation():
+    parser = PiEventParser()
+    events = [
+        {"type": "session"},
+        {
+            "type": "message_end",
+            "message": {
+                "role": "assistant",
+                "content": [],
+                "stopReason": "error",
+                "errorMessage": "context_length_exceeded private",
+            },
+        },
+        {"type": "agent_settled"},
+    ]
+    parser.feed(b"".join(json.dumps(e).encode() + b"\n" for e in events))
+    with pytest.raises(FormattingError) as exc:
+        parser.finish()
+    assert exc.value.info.code == "PI_CONTEXT_LIMIT"
+    assert "private" not in str(exc.value)
 
 
 def test_retry_final_only():

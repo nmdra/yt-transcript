@@ -76,9 +76,9 @@ class PiEventParser:
             and isinstance(entry, dict)
             and entry.get("type") in ("context_edit", "compaction", "branch_summary")
         ):
-            self._fail("PI_CONTEXT_LIMIT")
+            self._fail("PI_CONTEXT_MUTATED")
         if kind.startswith(("compaction_", "summarization_retry_")):
-            self._fail("PI_CONTEXT_LIMIT")
+            self._fail("PI_CONTEXT_MUTATED")
         if kind.startswith("tool_execution_") or kind == "bash_execution_update":
             self._fail()
         if kind == "message_update":
@@ -100,7 +100,7 @@ class PiEventParser:
                 "bashExecution",
             ):
                 self._fail(
-                    "PI_CONTEXT_LIMIT"
+                    "PI_CONTEXT_MUTATED"
                     if message.get("role") in ("compactionSummary", "branchSummary")
                     else "PI_PROTOCOL_INVALID"
                 )

@@ -7,6 +7,20 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Server-only `mcp.markdown_timeout_seconds` setting for a bounded total Markdown deadline from 300 through 3600 seconds, retaining the 300-second default
+- CLI and MCP recovery warnings suggest raw/plain-text requests when Pi processing fails, without automatic fallback or retry
+
+### Changed
+
+- **Breaking:** MCP `document` contains only the transcript body; metadata remains in `metadata`, and CLI file output retains YAML frontmatter
+- Distinguish forbidden Pi context changes as `PI_CONTEXT_MUTATED` from provider or planning limits as `PI_CONTEXT_LIMIT`
+
+### Fixed
+
+- Include validated chunk positions in MCP formatting errors and explain total worker timeout recovery
+
 ## [0.2.0-dev.4] - 2026-10-07
 
 ### Changed

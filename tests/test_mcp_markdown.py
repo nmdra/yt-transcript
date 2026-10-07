@@ -3,6 +3,7 @@ from dataclasses import asdict, replace
 
 import pytest
 from mcp import Client
+from mcp.types import TextContent
 
 from yt_transcript import formatter, service
 from yt_transcript.chapters import Chapter
@@ -57,7 +58,7 @@ def test_plain_text_never_calls_pi(source, monkeypatch):
     assert "[00:00 - 00:01] hello world" in result["document"]
 
 
-def test_markdown_uses_shared_formatter_and_python_yaml(source, monkeypatch):
+def test_markdown_returns_body_and_structured_metadata(source, monkeypatch):
     calls = []
 
     def edit(body, **kwargs):
@@ -67,8 +68,9 @@ def test_markdown_uses_shared_formatter_and_python_yaml(source, monkeypatch):
     monkeypatch.setattr(formatter, "format_with_pi", edit)
     result = dispatch(validate_request(request()))
     assert result["format"] == "markdown"
-    assert result["document"].startswith("---\n")
-    assert result["document"].endswith("## Edited\n\nHello world.\n")
+    assert result["document"] == "## Edited\n\nHello world."
+    assert result["metadata"]["video_id"] == "abcdefghijk"
+    assert result["metadata"]["caption_source"] == "manual"
     assert result["character_count"] == len("## Edited\n\nHello world.")
     assert calls[0][0] == "hello world"
     assert calls[0][1]["max_chunks"] == 20
@@ -128,6 +130,50 @@ def test_cap_rejects_before_model(source, monkeypatch):
             formatting=MCPFormattingPolicy(chunk_chars=1000, max_chunks=1),
         )
     assert exc.value.info.code == "CHUNK_LIMIT_EXCEEDED"
+
+
+@pytest.mark.parametrize(
+    "code",
+    ["PI_CONTEXT_MUTATED", "PI_CONTEXT_LIMIT", "PI_TIMEOUT", "PI_OUTPUT_INVALID"],
+)
+def test_sdk_formatting_failure_advises_plain_text(source, monkeypatch, code):
+    class Runner:
+        async def close(self):
+            pass
+
+        async def run(self, payload):
+            return dict(dispatch(validate_request(payload)))
+
+    calls = []
+
+    def fail(*args, **kwargs):
+        calls.append(1)
+        raise classify_pi_failure(code=code, chunk_index=2, chunk_total=3)
+
+    monkeypatch.setattr(formatter, "format_with_pi", fail)
+
+    async def check():
+        async with Client(create_server(AppConfig(), runner=Runner())) as client:
+            result = await client.call_tool(
+                "get_transcript",
+                {"url": URL, "mode": "full", "output_format": "markdown"},
+            )
+            assert result.is_error
+            assert result.structured_content is None
+            content = result.content[0]
+            assert isinstance(content, TextContent)
+            text = content.text
+            assert code in text and "(chunk 2/3)" in text
+            assert 'output_format="plain_text"' in text
+            assert "warning: No Pi-processed transcript was returned." in text
+            plain = await client.call_tool(
+                "get_transcript",
+                {"url": URL, "mode": "full", "output_format": "plain_text"},
+            )
+            assert not plain.is_error
+        assert len(calls) == 1
+
+    asyncio.run(check())
 
 
 def test_pi_failure_has_no_raw_fallback(source, monkeypatch):

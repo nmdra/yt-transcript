@@ -55,9 +55,17 @@ timeout_seconds = 600
 # Raw modes ignore Pi settings after validating the complete TOML file.
 # MCP plain_text ignores Pi settings. Explicit markdown uses these settings.
 # MCP defaults to max_chunks=20 when omitted; Pi timeout is at most 120 seconds.
-# Its 300-second total operation deadline still applies.
+# The total MCP deadline is separate; see [mcp] below.
 # Help, version, and CLI doctor bypass TOML loading.
 # URL, output path, preview, doctor, no-clobber, and MCP startup are CLI-only.
+
+[mcp]
+# Default: 300. Allowed: integers from 300 through 3600.
+# Total Markdown worker deadline, including caption fetching and all Pi calls.
+# Plain text always uses 300 seconds. CLI ignores this setting after validation.
+# Opt in to 1800 for longer work and set a supported client timeout to 1830.
+# Longer work can incur more charges; completion is not guaranteed.
+markdown_timeout_seconds = 300
 
 [sponsorblock]
 # Optional strict boolean. Unset: CLI off; MCP filtered mode on.

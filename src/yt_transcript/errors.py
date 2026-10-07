@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 CODES = frozenset(
-    "INVALID_URL CONFIG_INVALID RUNTIME_MISSING RUNTIME_INCOMPATIBLE NO_ENGLISH_CAPTIONS NO_ENGLISH_VTT YOUTUBE_ACCESS_LIMITED VIDEO_UNAVAILABLE AUTH_REQUIRED AGE_RESTRICTED GEO_RESTRICTED UNSUPPORTED_LIVESTREAM REMOTE_RATE_LIMITED REMOTE_ACCESS_DENIED NETWORK_FAILED YOUTUBE_EXTRACT_FAILED SUBTITLE_DOWNLOAD_FAILED SUBTITLE_INVALID EMPTY_TRANSCRIPT PI_NOT_FOUND PI_LAUNCH_FAILED PI_INCOMPATIBLE PI_AUTH_FAILED PI_MODEL_UNAVAILABLE PI_RATE_LIMITED PI_QUOTA_EXCEEDED PI_CONTEXT_LIMIT PI_OUTPUT_INCOMPLETE PI_TIMEOUT PI_ABORTED PI_FAILED PI_PROTOCOL_INVALID PI_OUTPUT_INVALID PI_OUTPUT_LIMIT CHUNK_LIMIT_EXCEEDED OUTPUT_EXISTS OUTPUT_FAILED MCP_BUSY MCP_TIMEOUT MCP_RESPONSE_LIMIT INTERNAL_ERROR".split()
+    "INVALID_URL CONFIG_INVALID RUNTIME_MISSING RUNTIME_INCOMPATIBLE NO_ENGLISH_CAPTIONS NO_ENGLISH_VTT YOUTUBE_ACCESS_LIMITED VIDEO_UNAVAILABLE AUTH_REQUIRED AGE_RESTRICTED GEO_RESTRICTED UNSUPPORTED_LIVESTREAM REMOTE_RATE_LIMITED REMOTE_ACCESS_DENIED NETWORK_FAILED YOUTUBE_EXTRACT_FAILED SUBTITLE_DOWNLOAD_FAILED SUBTITLE_INVALID EMPTY_TRANSCRIPT PI_NOT_FOUND PI_LAUNCH_FAILED PI_INCOMPATIBLE PI_AUTH_FAILED PI_MODEL_UNAVAILABLE PI_RATE_LIMITED PI_QUOTA_EXCEEDED PI_CONTEXT_LIMIT PI_CONTEXT_MUTATED PI_OUTPUT_INCOMPLETE PI_TIMEOUT PI_ABORTED PI_FAILED PI_PROTOCOL_INVALID PI_OUTPUT_INVALID PI_OUTPUT_LIMIT CHUNK_LIMIT_EXCEEDED OUTPUT_EXISTS OUTPUT_FAILED MCP_BUSY MCP_TIMEOUT MCP_RESPONSE_LIMIT INTERNAL_ERROR".split()
 )
 PHASES = frozenset(
     "config runtime_check metadata_extract caption_select subtitle_download vtt_parse pi_start pi_response output mcp_worker".split()
@@ -202,7 +202,8 @@ def classify_pi_failure(
         "PI_ABORTED": "Pi formatting was aborted.",
         "PI_TIMEOUT": "Pi formatting exceeded the chunk deadline.",
         "PI_OUTPUT_INCOMPLETE": "Pi output stopped before completion.",
-        "PI_CONTEXT_LIMIT": "Pi context limit or source compaction prevented formatting.",
+        "PI_CONTEXT_LIMIT": "Pi input exceeded a context or chunk-planning limit.",
+        "PI_CONTEXT_MUTATED": "Pi attempted to change or summarize source context; complete formatting cannot be verified.",
         "PI_PROTOCOL_INVALID": "Pi did not return a valid settled JSON completion.",
         "PI_OUTPUT_INVALID": "Pi returned an invalid Markdown body.",
         "PI_OUTPUT_LIMIT": "Pi output exceeded the configured safety bound.",
@@ -216,7 +217,8 @@ def classify_pi_failure(
         "PI_MODEL_UNAVAILABLE": "Check the selected or saved default model in Pi or use --raw.",
         "PI_RATE_LIMITED": "Wait before another attempt or use --raw.",
         "PI_QUOTA_EXCEEDED": "Check provider billing and quota or use --raw.",
-        "PI_CONTEXT_LIMIT": "Reduce pi.chunk_chars in TOML, review the model choice, or use --raw.",
+        "PI_CONTEXT_LIMIT": "Smaller pi.chunk_chars or a suitable model may help; smaller chunks increase calls. Or use --raw.",
+        "PI_CONTEXT_MUTATED": "Review Pi/model compatibility. Smaller pi.chunk_chars may help but increase calls. Or use --raw.",
         "PI_OUTPUT_INCOMPLETE": "Reduce pi.chunk_chars in TOML, review the model choice, or use --raw.",
         "CHUNK_LIMIT_EXCEEDED": "Raise the chunk cap explicitly, or use raw/plain-text output.",
     }
@@ -267,13 +269,36 @@ def render_cli_error(exc: AppError) -> str:
     result = f"error[{info.code}]: {info.message}{position}\n"
     if info.hint:
         result += f"hint: {info.hint}\n"
+    if info.code.startswith("PI_") or info.code == "CHUNK_LIMIT_EXCEEDED":
+        result += "warning: No Pi-processed transcript was returned. Retry with --raw for plain text without Pi.\n"
     return result
 
 
 def render_mcp_error(info: ErrorInfo) -> str:
-    return f"[{info.code}] {info.message}" + (
-        f"; hint: {info.hint}" if info.hint else ""
+    position = ""
+    if (
+        type(info.chunk_index) is int
+        and type(info.chunk_total) is int
+        and 1 <= info.chunk_index <= info.chunk_total <= 100000
+    ):
+        position = f" (chunk {info.chunk_index}/{info.chunk_total})"
+    # Adapt only trusted Pi recovery text, not unrelated hints such as --raw-vtt.
+    formatting_failure = (
+        info.code.startswith("PI_") or info.code == "CHUNK_LIMIT_EXCEEDED"
     )
+    hint, message = info.hint, info.message
+    if formatting_failure:
+        hint = hint.replace("--raw", 'output_format="plain_text"') if hint else None
+        message = message.replace("--raw", 'output_format="plain_text"')
+    if info.code == "CHUNK_LIMIT_EXCEEDED":
+        message = message.split("; use --preview", 1)[0]
+        hint = 'Raise server pi.max_chunks explicitly, or request output_format="plain_text".'
+    result = f"[{info.code}] {message}{position}" + (f"; hint: {hint}" if hint else "")
+    if formatting_failure:
+        result += '; warning: No Pi-processed transcript was returned. Retry get_transcript with output_format="plain_text" for plain text without Pi.'
+    elif info.code == "MCP_TIMEOUT":
+        result += '; warning: No transcript was returned. If Markdown was requested, retry with output_format="plain_text" to skip Pi.'
+    return result
 
 
 def decode_worker_error(payload: object) -> ErrorInfo:
@@ -288,6 +313,9 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         value = payload[key]
         if value is not None and (type(value) is not int or not 1 <= value <= 100000):
             raise ValueError("Invalid worker chunk position")
+    index, total = payload["chunk_index"], payload["chunk_total"]
+    if (index is None) != (total is None) or (index is not None and index > total):
+        raise ValueError("Invalid worker chunk position")
     if type(payload["retryable"]) is not bool:
         raise ValueError("Invalid worker retry flag")
     messages = {

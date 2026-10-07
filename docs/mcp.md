@@ -51,8 +51,8 @@ Request model editing explicitly:
 ```
 
 Replace `VIDEO_ID` with an 11-character video ID. This request authorizes Pi calls
-and can incur charges. The result has `format="markdown"`, a Python-generated
-YAML header plus Markdown body, and a character count excluding YAML. It uses
+and can incur charges. The result has `format="markdown"`, a body-only Markdown
+document, structured metadata, and a character count equal to the document length. It uses
 the shared CLI formatter, source chapter context, and the selected SponsorBlock
 projection. Chapter headings are validated; inline fallback timestamp blocks are
 specific to plain-text output. Model fidelity is not guaranteed.
@@ -60,15 +60,38 @@ specific to plain-text output. Model fidelity is not guaranteed.
 MCP Markdown currently requires POSIX process supervision. Pi uses its configured
 default model unless server TOML supplies `pi.model`. Server `pi.chunk_chars` and
 `pi.editorial_mode` apply. `pi.max_chunks` is finite, defaulting to 20 when omitted;
-`pi.timeout_seconds` is capped at 120 seconds per call. The 300-second total worker
-deadline still applies across extraction, filtering, and all Pi calls. These limits
+`pi.timeout_seconds` is capped at 120 seconds per call. The total Markdown worker
+deadline defaults to 300 seconds and is configurable through
+`mcp.markdown_timeout_seconds` (300–3600). It covers extraction, filtering, and
+all sequential Pi calls. Plain text keeps its 300-second deadline. These limits
 are not a hard billing cap because provider-internal retries can add requests.
+
+For longer Markdown work, explicitly load TOML (omit `--no-config`) and set:
+
+```toml
+[mcp]
+markdown_timeout_seconds = 1800
+```
+
+Use a client timeout of at least 1830 seconds where supported, then reconnect the
+server. In Pi, update its `timeout` field; other clients use their own settings.
+A client that disconnects earlier still cancels the work. This setting does not
+extend the individual Pi-call deadline or guarantee completion. A larger chunk
+cap permits more calls but does not extend any deadline. Smaller `pi.chunk_chars`
+can help model context limits, but increase calls, latency, and possible cost.
 
 Cap checks occur before model calls. Formatting failure returns an error, never
 raw-caption fallback or partial Markdown. SponsorBlock fallback still keeps source
 captions before editing. Removal receipts describe source filtering, not later Pi
 deletions. Cancellation stops the supervised worker/Pi group. CLI terminal progress
 is disabled for MCP so stdout remains JSON-RPC only.
+
+Pi failures include a warning that no processed transcript was returned and
+suggest an explicit new request with `output_format="plain_text"`. There is no
+automatic retry. `PI_CONTEXT_LIMIT` indicates a provider context or local planning
+limit; `PI_CONTEXT_MUTATED` indicates forbidden Pi compaction/context changes,
+not proof of provider overflow. Errors include `(chunk i/n)` when available.
+`MCP_TIMEOUT` identifies the total worker deadline, not a per-call Pi timeout.
 
 ## Other clients and local development
 
@@ -120,9 +143,11 @@ URL is the only required argument. Omitted mode equals `filtered`: try SponsorBl
 
 **Breaking change:** MCP `preview_transcript` and `doctor` are removed. Use CLI `--preview` and `--doctor` instead.
 
-Plain-text requests return `format='plain_text'`. Their document contains the complete Python-generated YAML header and deterministic body. Supplied chapters produce title/time headings. Missing or invalid chapters produce inline time ranges in short blocks, targeting 15 seconds. Unassigned runs also use timed blocks. Original cue times remain unchanged after removal, and blocks break across removed gaps. These are cue ranges, not exact word times. Character count includes labels but excludes YAML. No second transcript array is returned.
+**Contract change:** `document` contains only the transcript body for both output formats. Metadata is returned only in `metadata`, not as YAML frontmatter in `document`. CLI file output still includes YAML frontmatter.
 
-Clients that save files must save `structuredContent.document` verbatim. Do not add a second header. The SDK also returns serialized JSON text for compatibility.
+Plain-text requests return `format='plain_text'`. Their document contains the deterministic body. Supplied chapters produce title/time headings. Missing or invalid chapters produce inline time ranges in short blocks, targeting 15 seconds. Unassigned runs also use timed blocks. Original cue times remain unchanged after removal, and blocks break across removed gaps. These are cue ranges, not exact word times. Character count equals the length of `document`, including labels. No second transcript array is returned.
+
+Clients can save `structuredContent.document` verbatim as a body-only file. To save provenance with the transcript, serialize `structuredContent.metadata` as YAML frontmatter before the body. Preserve SponsorBlock attribution, license, and removal receipts when exporting metadata. The SDK also returns serialized JSON text for compatibility; this protocol representation remains unchanged.
 
 `get_transcript` accesses YouTube and, by default, may contact SponsorBlock. Missing Pi does not affect initialization, tool listing, or plain-text extraction. The four result fields remain `format`, `document`, `metadata`, and `character_count`.
 
@@ -144,7 +169,8 @@ The server permits one active worker. A second request receives `MCP_BUSY`. The 
 |---|---|
 | URL length | 4,096 characters |
 | Private request | 16 KiB |
-| Operation deadline | 300 seconds |
+| Plain-text operation deadline | 300 seconds |
+| Markdown operation deadline | 300 seconds by default; server-configurable up to 3600 |
 | Document | 256 KiB in UTF-8 |
 | Serialized tool result, including compatibility text | 1 MiB |
 | Retained private stderr | 64 KiB |

@@ -6,6 +6,7 @@ import pytest
 
 from yt_transcript.config import (
     AppConfig,
+    MCPConfig,
     SponsorBlockConfig,
     default_config_path,
     load_config,
@@ -34,6 +35,13 @@ def test_discovery(monkeypatch, tmp_path, xdg):
         "[pi]\ntimeout_seconds=3601",
         "[pi]\nother=1",
         "[other]",
+        "mcp = 2",
+        "[mcp]\nunknown=300",
+        "[mcp]\nmarkdown_timeout_seconds=true",
+        "[mcp]\nmarkdown_timeout_seconds=299",
+        "[mcp]\nmarkdown_timeout_seconds=3601",
+        "[mcp]\nmarkdown_timeout_seconds=300.0",
+        '[mcp]\nmarkdown_timeout_seconds="1800"',
         "[output]\nverbose=1",
         '[output]\nmode="other"',
         "invalid = [",
@@ -74,11 +82,12 @@ def test_example_documents_all_supported_settings(tmp_path):
     text = example.read_text(encoding="utf-8")
     complete = re.sub(r"^# (?=(?:max_chunks|model|enabled) =)", "", text, flags=re.M)
     tables = tomllib.loads(complete)
-    assert set(tables) == {"output", "pi", "sponsorblock"}
+    assert set(tables) == {"output", "pi", "sponsorblock", "mcp"}
     assert set(tables["output"]) | set(tables["pi"]) == set(
         AppConfig.__dataclass_fields__
-    ) - {"sponsorblock"}
+    ) - {"sponsorblock", "mcp"}
     assert set(tables["sponsorblock"]) == set(SponsorBlockConfig.__dataclass_fields__)
+    assert set(tables["mcp"]) == set(MCPConfig.__dataclass_fields__)
     selected = tmp_path / "complete.toml"
     selected.write_text(complete, encoding="utf-8")
     config = load_config(selected)
@@ -87,6 +96,17 @@ def test_example_documents_all_supported_settings(tmp_path):
         model="provider/model-id",
         sponsorblock=SponsorBlockConfig(enabled=False),
     )
+
+
+@pytest.mark.parametrize("seconds", [300, 1800, 3600])
+def test_mcp_timeout_config(tmp_path, seconds):
+    path = tmp_path / "config.toml"
+    path.write_text(f"[mcp]\nmarkdown_timeout_seconds={seconds}")
+    config = load_config(path)
+    assert config.mcp == MCPConfig(seconds)
+    assert resolve_config(config, mode="raw").mcp == config.mcp
+    assert load_config(path, disabled=True).mcp == MCPConfig()
+    assert config.timeout_seconds == 600
 
 
 def test_files(tmp_path):

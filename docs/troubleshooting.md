@@ -24,12 +24,20 @@ Expected CLI failures use `error[CODE]: MESSAGE` and an optional safe hint. Verb
 | `PI_NOT_FOUND`, `PI_LAUNCH_FAILED`, `PI_INCOMPATIBLE` | Install compatible Pi or use `--raw`. |
 | `PI_AUTH_FAILED`, `PI_MODEL_UNAVAILABLE` | Configure the provider or the chosen/default model directly in Pi. |
 | `PI_RATE_LIMITED`, `PI_QUOTA_EXCEEDED` | Wait or check provider quota. Rate limits and quota are distinct. |
-| `PI_CONTEXT_LIMIT`, `PI_OUTPUT_INCOMPLETE` | Reduce chunk size, review the model choice, or use `--raw`. |
+| `PI_CONTEXT_LIMIT`, `PI_OUTPUT_INCOMPLETE` | Smaller chunks or a suitable model may help. Smaller chunks increase calls and latency. Use CLI `--raw` or MCP `output_format="plain_text"` to avoid Pi. |
+| `PI_CONTEXT_MUTATED` | Pi attempted compaction or context changes. Complete formatting cannot be verified. Review Pi/model compatibility or request plain text; do not accept summarized source as a complete transcript. |
 | `PI_TIMEOUT`, `PI_ABORTED`, `PI_FAILED` | Check provider/model setup or use deterministic output. |
 | `PI_PROTOCOL_INVALID`, `PI_OUTPUT_INVALID`, `PI_OUTPUT_LIMIT` | Check compatible Pi setup. Buffered output is discarded. |
 | `CHUNK_LIMIT_EXCEEDED` | Preview the plan or explicitly change the cap. No text is truncated. |
 | `OUTPUT_EXISTS`, `OUTPUT_FAILED` | Choose a usable path and check filesystem support. |
-| `MCP_BUSY`, `MCP_TIMEOUT`, `MCP_RESPONSE_LIMIT`, `INTERNAL_ERROR` | Wait or use the deterministic CLI. |
+| `MCP_TIMEOUT` | The whole worker deadline expired, including fetching and Pi calls. Review `mcp.markdown_timeout_seconds` and the client timeout, or explicitly request `output_format="plain_text"`. |
+| `MCP_BUSY`, `MCP_RESPONSE_LIMIT`, `INTERNAL_ERROR` | Wait or use the deterministic CLI. |
+
+Pi-processing failures include a recovery warning: CLI suggests `--raw`, and MCP
+suggests `output_format="plain_text"`. No partial document or automatic fallback
+is returned. MCP errors show the failing chunk when available. A new plain-text
+request fetches captions again but does not call Pi. It can still fail on network
+or caption errors. Timeouts do not undo model charges already incurred.
 
 Unknown upstream wording receives a generic error, not a guessed authentication or billing cause. Private causes and raw warnings never enter CLI or MCP errors.
 

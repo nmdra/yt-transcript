@@ -153,11 +153,21 @@ def test_focused_preview_does_not_call_pi(pipeline, capsys):
     assert "editorial mode: focused" in capsys.readouterr().out
 
 
-def test_failed_format_preserves_file(pipeline, monkeypatch, tmp_path, capsys):
+@pytest.mark.parametrize(
+    "code",
+    [
+        "PI_OUTPUT_INCOMPLETE",
+        "PI_CONTEXT_MUTATED",
+        "PI_CONTEXT_LIMIT",
+        "PI_TIMEOUT",
+        "PI_OUTPUT_INVALID",
+    ],
+)
+def test_failed_format_preserves_file(pipeline, monkeypatch, tmp_path, capsys, code):
     from yt_transcript.errors import classify_pi_failure
 
     def fail(*args, **kwargs):
-        raise classify_pi_failure(code="PI_OUTPUT_INCOMPLETE")
+        raise classify_pi_failure(code=code, chunk_index=2, chunk_total=3)
 
     monkeypatch.setattr(formatter, "format_with_pi", fail)
     path = tmp_path / "existing"
@@ -165,7 +175,15 @@ def test_failed_format_preserves_file(pipeline, monkeypatch, tmp_path, capsys):
     assert main([URL, "--no-config", "-o", str(path)]) == 1
     assert path.read_text() == "old"
     captured = capsys.readouterr()
-    assert not captured.out and "PI_OUTPUT_INCOMPLETE" in captured.err
+    assert not captured.out and code in captured.err
+    assert "(chunk 2/3)" in captured.err
+    assert "warning: No Pi-processed transcript was returned." in captured.err
+    assert "Retry with --raw" in captured.err
+    pipeline.clear()
+    assert main([URL, "--no-config", "--raw"]) == 0
+    assert pipeline == ["download"]
+    recovery = capsys.readouterr()
+    assert recovery.out == "hello world\n" and recovery.err == ""
 
 
 def test_terminal_progress_stays_off_stdout(pipeline, monkeypatch, capsys):

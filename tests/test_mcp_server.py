@@ -40,7 +40,7 @@ class Runner:
         )
         return {
             "format": "plain_text",
-            "document": cleaned.document(),
+            "document": cleaned.body,
             "metadata": cleaned.mapping(),
             "character_count": 11,
         }
@@ -65,7 +65,7 @@ def test_tools_schemas_and_success():
                 "get_transcript", {"url": "https://youtu.be/abcdefghijk"}
             )
             assert result.structured_content["character_count"] == 11
-            assert result.structured_content["document"].endswith("hello world\n")
+            assert result.structured_content["document"] == "hello world"
             assert json.loads(text_content(result)) == result.structured_content
             import jsonschema
 
@@ -74,6 +74,26 @@ def test_tools_schemas_and_success():
             assert not (await client.list_prompts()).prompts
 
     asyncio.run(check())
+
+
+def test_server_configures_markdown_deadline(monkeypatch):
+    from yt_transcript import mcp_server
+    from yt_transcript.config import MCPConfig
+
+    created = []
+
+    class CapturingRunner(Runner):
+        def __init__(self, **kwargs):
+            super().__init__()
+            created.append(kwargs)
+
+    monkeypatch.setattr(mcp_server, "WorkerRunner", CapturingRunner)
+    create_server(AppConfig(mcp=MCPConfig(1800)))
+    create_server(AppConfig())
+    assert created == [
+        {"markdown_timeout_seconds": 1800},
+        {"markdown_timeout_seconds": 300},
+    ]
 
 
 def test_schema_errors_never_echo_arguments(caplog):

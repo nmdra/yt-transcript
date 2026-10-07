@@ -10,6 +10,11 @@ from .sponsorblock import CATEGORIES, SponsorBlockConfig
 
 
 @dataclass(frozen=True)
+class MCPConfig:
+    markdown_timeout_seconds: int = 300
+
+
+@dataclass(frozen=True)
 class AppConfig:
     mode: str = "markdown"
     verbose: bool = False
@@ -19,6 +24,7 @@ class AppConfig:
     max_chunks: int | None = None
     editorial_mode: str = "standard"
     sponsorblock: SponsorBlockConfig = SponsorBlockConfig()
+    mcp: MCPConfig = MCPConfig()
 
 
 def default_config_path() -> Path:
@@ -55,7 +61,7 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
         raise invalid("configuration file") from None
     except OSError, UnicodeError, tomllib.TOMLDecodeError:
         raise invalid("configuration file") from None
-    if set(data) - {"output", "pi", "sponsorblock"}:
+    if set(data) - {"output", "pi", "sponsorblock", "mcp"}:
         raise invalid("configuration table")
     values = {}
     for table, allowed in (
@@ -93,6 +99,13 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
             if not valid:
                 raise invalid(f"{table}.{key}")
             values[key] = value
+    mcp = data.get("mcp", {})
+    if not isinstance(mcp, dict) or set(mcp) - {"markdown_timeout_seconds"}:
+        raise invalid("mcp")
+    markdown_timeout = mcp.get("markdown_timeout_seconds", 300)
+    if type(markdown_timeout) is not int or not 300 <= markdown_timeout <= 3600:
+        raise invalid("mcp.markdown_timeout_seconds")
+    values["mcp"] = MCPConfig(markdown_timeout)
     sponsor = data.get("sponsorblock", {})
     if not isinstance(sponsor, dict) or set(sponsor) - {
         "enabled",

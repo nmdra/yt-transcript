@@ -168,7 +168,9 @@ def test_worker_error_allowlist():
     assert safe.code == "NETWORK_FAILED"
 
 
-@pytest.mark.parametrize("code", ["PI_NOT_FOUND", "PI_AUTH_FAILED", "PI_TIMEOUT"])
+@pytest.mark.parametrize(
+    "code", ["PI_NOT_FOUND", "PI_AUTH_FAILED", "PI_TIMEOUT", "PI_CONTEXT_MUTATED"]
+)
 def test_worker_pi_errors_rebuild_trusted_messages(code):
     from dataclasses import asdict, replace
 
@@ -209,8 +211,55 @@ def test_worker_chunk_limit_details_are_bounded(required, cap, accepted):
     assert decoded.hint == expected.hint
 
 
+@pytest.mark.parametrize(
+    "index,total", [(None, 2), (1, None), (3, 2), (True, 2), (0, 2)]
+)
+def test_worker_rejects_invalid_chunk_pairs(index, total):
+    from dataclasses import asdict
+
+    from yt_transcript.errors import decode_worker_error
+
+    payload = asdict(classify_pi_failure(code="PI_CONTEXT_MUTATED").info)
+    payload.update(chunk_index=index, chunk_total=total)
+    with pytest.raises(ValueError):
+        decode_worker_error(payload)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "PI_CONTEXT_MUTATED",
+        "PI_CONTEXT_LIMIT",
+        "PI_OUTPUT_INVALID",
+        "PI_TIMEOUT",
+        "PI_NOT_FOUND",
+        "CHUNK_LIMIT_EXCEEDED",
+    ],
+)
+def test_formatting_recovery_is_interface_specific(code):
+    from yt_transcript.errors import render_mcp_error
+
+    exc = classify_pi_failure(code=code, chunk_index=2, chunk_total=3)
+    cli = render_cli_error(exc)
+    mcp = render_mcp_error(exc.info)
+    assert "(chunk 2/3)" in cli and "(chunk 2/3)" in mcp
+    assert "warning: No Pi-processed transcript was returned." in cli
+    assert "Retry with --raw" in cli
+    assert 'output_format="plain_text"' in mcp
+    assert "--raw" not in mcp
+    assert "warning: No Pi-processed transcript was returned." in mcp
+
+
+def test_nonformatting_errors_have_no_pi_warning():
+    from yt_transcript.errors import render_mcp_error
+
+    info = ErrorInfo("INVALID_URL", "Expected a YouTube video URL.")
+    assert "warning:" not in render_mcp_error(info)
+    assert "warning:" not in render_cli_error(AppError(info))
+
+
 def test_safe_rendering():
-    secret = "Bearer key cookie Authorization signed?token=value /home/private transcript \x1b[31m"
+    secret = "Bearer key cookie Authorization signed?token=value /home/private transcript caption-secret \x1b[31m"
     exc = AppError(
         ErrorInfo("PI_FAILED", "Pi formatting failed.", phase="pi_response"),
         cause=Exception(secret),
@@ -229,7 +278,7 @@ def test_safe_rendering():
         "Authorization",
         "token=value",
         "private",
-        "transcript",
+        "transcript caption-secret",
         "\x1b",
     ):
         assert value not in rendered

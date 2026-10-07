@@ -178,6 +178,54 @@ def test_markdown_cap_error_survives_worker_transport(tmp_path, monkeypatch):
     asyncio.run(check())
 
 
+@pytest.mark.parametrize(
+    "markdown,limit,fails",
+    [(False, 2, True), (True, 2, False), (True, 0.05, True), (True, None, True)],
+)
+def test_format_specific_deadline(tmp_path, monkeypatch, markdown, limit, fails):
+    from dataclasses import asdict
+
+    from yt_transcript.mcp_policy import MCPFormattingPolicy
+
+    processes = install_child(
+        tmp_path,
+        monkeypatch,
+        "import json,sys,time\nrequest=json.load(sys.stdin)\ntime.sleep(0.2)\nprint(json.dumps({'result':{'document':'body'}}))\n",
+    )
+    request = {
+        "operation": "get_transcript",
+        "url": "https://youtu.be/abcdefghijk",
+        "mode": "full",
+        "sponsorblock": {
+            "enabled": False,
+            "categories": ["sponsor"],
+            "timeout_seconds": 10,
+        },
+    }
+    if markdown:
+        request.update(
+            output_format="markdown", formatting=asdict(MCPFormattingPolicy())
+        )
+
+    async def check():
+        runner = WorkerRunner(timeout_seconds=0.05, markdown_timeout_seconds=limit)
+        if fails:
+            with pytest.raises(AppError) as exc:
+                await runner.run(request)
+            assert exc.value.info.code == "MCP_TIMEOUT"
+            assert exc.value.info.hint is not None
+            assert "total worker deadline" in exc.value.info.hint
+        else:
+            assert await runner.run(request) == {"document": "body"}
+        assert all(p.returncode is not None for p in processes)
+        assert not runner._busy
+        runner.timeout_seconds = 2
+        runner.markdown_timeout_seconds = 2
+        assert await runner.run(request) == {"document": "body"}
+
+    asyncio.run(check())
+
+
 def test_response_limit_reaps(tmp_path, monkeypatch):
     processes = install_child(
         tmp_path,
