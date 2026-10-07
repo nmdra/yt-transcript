@@ -97,4 +97,4 @@ Code is licensed under [MIT](LICENSE).
 
 SponsorBlock data is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) unless separate permission is granted.
 
-Future public releases and PyPI publication require separate approval.
+GitHub releases use the tag-triggered public release workflow. PyPI publication requires separate approval.

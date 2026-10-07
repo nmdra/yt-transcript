@@ -148,6 +148,10 @@ def test_workflow_release_boundaries():
     assert release["env"]["RELEASE_TAG"] == "${{ github.ref_name }}"
     assert "--verify-tag" in release["run"]
     assert "--prerelease --latest=false" in release["run"]
-    assert '--jq .private)" = true' in release["run"]
+    assert publish["name"] == "Publish GitHub release"
+    assert ".private" not in release["run"]
+    checksum_step = publish["steps"][-2]
+    assert checksum_step["run"] == "sha256sum --check SHA256SUMS"
+    assert checksum_step["working-directory"] == "dist"
     assert "--clobber" not in release["run"]
     assert "pypi" not in release["run"].lower()

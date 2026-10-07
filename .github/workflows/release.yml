@@ -67,7 +67,7 @@ jobs:
           retention-days: 7
 
   publish:
-    name: Publish private GitHub release
+    name: Publish GitHub release
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -89,7 +89,6 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
           IS_PRERELEASE: ${{ needs.build.outputs.prerelease }}
         run: |
-          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
           case "$IS_PRERELEASE" in
             true) flags=(--prerelease --latest=false) ;;
             false) flags=(--latest) ;;

@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Publish normal public GitHub releases after CI checks and checksum verification, without a private-repository guard or manual exception
+
 ## [0.2.0-dev.5] - 2026-10-07
 
 ### Added
