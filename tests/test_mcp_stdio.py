@@ -24,8 +24,6 @@ def test_real_stdio_outside_repository(tmp_path):
             tools = (await client.list_tools()).tools
             assert {tool.name for tool in tools} == {
                 "get_transcript",
-                "preview_transcript",
-                "doctor",
             }
             result = await client.call_tool(
                 "get_transcript",
@@ -34,7 +32,7 @@ def test_real_stdio_outside_repository(tmp_path):
             assert result.is_error
             assert "INVALID_URL" in text_content(result)
             assert "secret" not in text_content(result)
-            assert len((await client.list_tools()).tools) == 3
+            assert len((await client.list_tools()).tools) == 1
 
     asyncio.run(check())
 
@@ -81,7 +79,7 @@ def test_stdout_contains_only_jsonrpc(tmp_path):
                 {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
             )
             listing = await asyncio.wait_for(process.stdout.readline(), 10)
-            assert len(json.loads(listing)["result"]["tools"]) == 3
+            assert len(json.loads(listing)["result"]["tools"]) == 1
             process.stdin.close()
             tail = await asyncio.wait_for(process.stdout.read(), 10)
             assert await asyncio.wait_for(process.wait(), 10) == 0
@@ -164,7 +162,7 @@ create_server(AppConfig(),runner=WorkerRunner()).run(transport="stdio")
                     break
                 await asyncio.sleep(0.01)
             assert not root.exists()
-            assert len((await client.list_tools()).tools) == 3
+            assert len((await client.list_tools()).tools) == 1
             marker.unlink()
             task = asyncio.create_task(
                 client.call_tool(

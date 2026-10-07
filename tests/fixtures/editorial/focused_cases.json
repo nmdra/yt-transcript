@@ -1,0 +1,50 @@
+[
+  {
+    "name": "greeting_affiliation",
+    "source": "Hello everyone! I'm Dana, the engineer who built this database. Today we test failover.",
+    "keep": "I'm Dana, the engineer who built this database. Today we test failover.",
+    "remove": "Hello everyone!"
+  },
+  {
+    "name": "coupon_then_caveat",
+    "source": "Use my coupon SAVE20. The benchmark excludes network latency, so production results differ.",
+    "keep": "The benchmark excludes network latency, so production results differ.",
+    "remove": "Use my coupon SAVE20."
+  },
+  {
+    "name": "branded_subject",
+    "source": "This sponsored Acme database demo shows how quorum writes preserve consistency.",
+    "keep": "This sponsored Acme database demo shows how quorum writes preserve consistency.",
+    "remove": ""
+  },
+  {
+    "name": "cta_and_code",
+    "source": "Like and subscribe! Call subscribe(topic) to receive events.",
+    "keep": "Call subscribe(topic) to receive events.",
+    "remove": "Like and subscribe!"
+  },
+  {
+    "name": "housekeeping_and_setup",
+    "source": "Wait while I fix my microphone. Set timeout_seconds = 10 before connecting.",
+    "keep": "Set timeout_seconds = 10 before connecting.",
+    "remove": "Wait while I fix my microphone."
+  },
+  {
+    "name": "bias_disclosure",
+    "source": "The vendor funded this test. The sample is small, and these numbers may not generalize.",
+    "keep": "The vendor funded this test. The sample is small, and these numbers may not generalize.",
+    "remove": ""
+  },
+  {
+    "name": "informative_closing",
+    "source": "In conclusion, retries can duplicate writes unless the operation is idempotent. Thanks, goodbye!",
+    "keep": "In conclusion, retries can duplicate writes unless the operation is idempotent.",
+    "remove": "Thanks, goodbye!"
+  },
+  {
+    "name": "relevant_analogy",
+    "source": "Think of the queue as a waiting line: each item waits for a worker. My unrelated weekend trip was fun.",
+    "keep": "Think of the queue as a waiting line: each item waits for a worker.",
+    "remove": "My unrelated weekend trip was fun."
+  }
+]

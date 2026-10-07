@@ -1,6 +1,7 @@
 """SDK-independent deterministic service results shared by CLI and MCP."""
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, replace
 from types import UnionType
 from typing import (
     Any,
@@ -13,11 +14,33 @@ from typing import (
     get_type_hints,
 )
 
-from .cleaner import clean_vtt
+from .chapters import (
+    ChapterSection,
+    build_chapter_sections,
+    render_chapter_text,
+    render_timed_text,
+)
+from .cleaner import Cue, clean_vtt_timed
 from .downloader import download_english_vtt
 from .errors import ErrorInfo, TranscriptError
-from .formatter import plan_formatting
 from .metadata import VideoMetadata, format_transcript_file, metadata_mapping
+from .sponsorblock import (
+    CaptionProjection,
+    SponsorBlockConfig,
+    SponsorBlockRemovalReceipt,
+    SponsorBlockResult,
+    compute_receipt,
+    lookup_sponsorblock,
+    project_sponsorblock,
+)
+
+TranscriptMode = Literal["filtered", "full"]
+
+
+class ChapterResult(TypedDict):
+    title: str
+    start_seconds: int | float
+    end_seconds: int | float | None
 
 
 class MetadataResult(TypedDict):
@@ -31,6 +54,9 @@ class MetadataResult(TypedDict):
     duration_seconds: int | float | None
     caption_language: str
     caption_source: Literal["manual", "automatic"]
+    chapter_status: Literal["available", "unavailable", "invalid"]
+    chapters: list[ChapterResult]
+    sponsorblock: SponsorBlockResult
 
 
 class TranscriptResult(TypedDict):
@@ -40,35 +66,13 @@ class TranscriptResult(TypedDict):
     character_count: int
 
 
-class PreviewResult(TypedDict):
-    metadata: MetadataResult
-    character_count: int
-    planned_invocations: int
-    largest_chunk_chars: int
-    chunk_chars: int
-    max_chunks: int | None
-    within_cap: bool
-    model_selection: str
-
-
-class CheckResult(TypedDict):
-    name: str
-    status: str
-    detail: str
-
-
-class DoctorResult(TypedDict):
-    healthy: bool
-    checks: list[CheckResult]
-
-
 def validate_service_result(operation: str, value: object) -> None:
     """Reject malformed worker results before SDK conversion can log their contents."""
-    expected = {
-        "get_transcript": TranscriptResult,
-        "preview_transcript": PreviewResult,
-        "doctor": DoctorResult,
-    }[operation]
+    if operation != "get_transcript":
+        raise TranscriptError(
+            ErrorInfo("INTERNAL_ERROR", "Worker operation failed.", phase="mcp_worker")
+        )
+    expected = TranscriptResult
 
     def matches(item: object, annotation: Any) -> bool:
         origin = get_origin(annotation)
@@ -85,14 +89,83 @@ def validate_service_result(operation: str, value: object) -> None:
             )
         if hasattr(annotation, "__required_keys__"):
             fields = get_type_hints(annotation)
-            return (
+            if not (
                 isinstance(item, dict)
                 and set(item) == set(fields)
                 and all(matches(item[key], hint) for key, hint in fields.items())
-            )
+            ):
+                return False
+            if any(
+                v < 0
+                for k, v in item.items()
+                if k.endswith("_cue_count") or k == "character_count"
+            ):
+                return False
+            if "start_seconds" in item and (
+                item["start_seconds"] < 0
+                or (
+                    item["end_seconds"] is not None
+                    and item["end_seconds"] <= item["start_seconds"]
+                )
+            ):
+                return False
+            if "removal_status" in item:
+                dropped, kept = (
+                    item["removed_cue_count"],
+                    item["retained_overlap_cue_count"],
+                )
+                state = item["removal_status"]
+                if (
+                    (
+                        state in ("kept", "not_applied", "no_matching_captions")
+                        and dropped != 0
+                    )
+                    or (state == "removed" and (dropped == 0 or kept != 0))
+                    or (state == "partial" and (dropped == 0 or kept == 0))
+                    or (state == "kept" and kept == 0)
+                    or (state == "no_matching_captions" and kept != 0)
+                ):
+                    return False
+            if annotation is SponsorBlockResult:
+                state, segments = item["status"], item["segments"]
+                if state == "disabled" and (item["enabled"] or segments):
+                    return False
+                if state != "disabled" and not item["enabled"]:
+                    return False
+                if state in ("disabled", "not_found") and segments:
+                    return False
+                if state == "available" and not segments:
+                    return False
+                if (state == "lookup_failed") != (item["warning"] is not None) or (
+                    state == "lookup_failed"
+                ) != (item["reason_code"] is not None):
+                    return False
+                if (
+                    state == "lookup_failed"
+                    and segments
+                    and item["reason_code"] != "REMOVAL_WOULD_EMPTY"
+                ):
+                    return False
+                if any(
+                    (item[k] is not None) != bool(segments)
+                    for k in ("source", "license_url", "changes")
+                ):
+                    return False
+                count = item["removed_cue_count"]
+                if item["removal_applied"] != (count > 0) or item["removal_stage"] != (
+                    "source_filter" if count else "none"
+                ):
+                    return False
+                if count > sum(s["removed_cue_count"] for s in segments) or (
+                    count and state != "available"
+                ):
+                    return False
+            return True
         if annotation is type(None):
             return item is None
-        return type(item) is annotation
+        return type(item) is annotation and (
+            not isinstance(item, float) or math.isfinite(item)
+        )
 
     if not matches(value, expected):
         raise TranscriptError(
@@ -106,28 +179,64 @@ class CleanedTranscript:
     metadata: VideoMetadata
     language: str
     automatic: bool
+    fragments: tuple[Cue, ...] = ()
+    sections: tuple[ChapterSection, ...] = ()
+    projection: CaptionProjection | None = None
+    raw_receipt: SponsorBlockRemovalReceipt = SponsorBlockRemovalReceipt()
 
-    def mapping(self) -> MetadataResult:
+    @property
+    def effective_body(self) -> str:
+        return self.projection.body if self.projection else self.body
+
+    @property
+    def effective_sections(self) -> tuple[ChapterSection, ...]:
+        return (
+            build_chapter_sections(
+                self.projection.fragments,
+                self.metadata.chapters,
+                source_indices=self.projection.source_indices,
+            )
+            if self.projection
+            else self.sections
+        )
+
+    def mapping(self, *, effective: bool = False) -> MetadataResult:
         return cast(
             MetadataResult,
             metadata_mapping(
-                self.metadata, language=self.language, automatic=self.automatic
+                self.metadata,
+                language=self.language,
+                automatic=self.automatic,
+                sponsorblock_result=self.projection.lookup
+                if effective and self.projection
+                else self.metadata.sponsorblock,
+                removal_receipt=self.projection.receipt
+                if effective and self.projection
+                else self.raw_receipt,
             ),
         )
 
-    def document(self, body: str | None = None) -> str:
+    def document(self, body: str | None = None, *, effective: bool = False) -> str:
         return format_transcript_file(
             self.metadata,
-            self.body if body is None else body,
+            (self.effective_body if effective else self.body) if body is None else body,
             language=self.language,
             automatic=self.automatic,
+            sponsorblock_result=self.projection.lookup
+            if effective and self.projection
+            else self.metadata.sponsorblock,
+            removal_receipt=self.projection.receipt
+            if effective and self.projection
+            else self.raw_receipt,
         )
 
 
-def fetch_clean_transcript(url: str) -> CleanedTranscript:
+def fetch_clean_transcript(
+    url: str, *, sponsorblock: SponsorBlockConfig | None = None
+) -> CleanedTranscript:
     downloaded = download_english_vtt(url)
     try:
-        body = clean_vtt(
+        fragments = clean_vtt_timed(
             downloaded.vtt.decode("utf-8-sig"), automatic=downloaded.automatic
         )
     except UnicodeError:
@@ -136,46 +245,50 @@ def fetch_clean_transcript(url: str) -> CleanedTranscript:
                 "SUBTITLE_INVALID", "Captions are not valid UTF-8.", phase="vtt_parse"
             )
         ) from None
+    policy = (sponsorblock or SponsorBlockConfig()).resolved()
+    lookup = lookup_sponsorblock(
+        downloaded.metadata.video_id,
+        config=policy,
+        duration_seconds=downloaded.metadata.duration_seconds,
+    )
+    projection = project_sponsorblock(fragments, lookup)
+    metadata = replace(downloaded.metadata, sponsorblock=lookup)
     return CleanedTranscript(
-        body, downloaded.metadata, downloaded.language, downloaded.automatic
+        " ".join(c.text for c in fragments),
+        metadata,
+        downloaded.language,
+        downloaded.automatic,
+        fragments,
+        build_chapter_sections(fragments, downloaded.metadata.chapters),
+        projection,
+        compute_receipt(fragments, lookup),
     )
 
 
-def fetch_transcript_document(url: str) -> TranscriptResult:
-    cleaned = fetch_clean_transcript(url)
+def fetch_transcript_document(
+    url: str,
+    mode: TranscriptMode = "filtered",
+    *,
+    sponsorblock: SponsorBlockConfig | None = None,
+) -> TranscriptResult:
+    if mode not in ("filtered", "full"):
+        raise ValueError("Invalid transcript mode.")
+    policy = (sponsorblock or SponsorBlockConfig()).resolved(default=True)
+    if mode == "full":
+        policy = replace(policy, enabled=False)
+    cleaned = fetch_clean_transcript(url, sponsorblock=policy)
+    projection = cleaned.projection
+    assert projection is not None
+    body = (
+        render_chapter_text(cleaned.effective_sections)
+        if cleaned.metadata.chapters
+        else render_timed_text(
+            projection.fragments, source_indices=projection.source_indices
+        )
+    )
     return {
         "format": "plain_text",
-        "document": cleaned.document(),
-        "metadata": cleaned.mapping(),
-        "character_count": len(cleaned.body),
-    }
-
-
-def preview_transcript_data(
-    url: str, *, chunk_chars: int, max_chunks: int | None, model_description: str
-) -> PreviewResult:
-    cleaned = fetch_clean_transcript(url)
-    plan = plan_formatting(cleaned.body, chunk_chars=chunk_chars, max_chunks=max_chunks)
-    return {
-        "metadata": cleaned.mapping(),
-        "character_count": len(cleaned.body),
-        "planned_invocations": len(plan.chunks),
-        "largest_chunk_chars": max(plan.character_counts, default=0),
-        "chunk_chars": chunk_chars,
-        "max_chunks": max_chunks,
-        "within_cap": plan.within_cap,
-        "model_selection": model_description,
-    }
-
-
-def doctor_data() -> DoctorResult:
-    from .doctor import run_doctor
-
-    report = run_doctor(include_pi=False)
-    return {
-        "healthy": report.healthy,
-        "checks": [
-            {"name": check.name, "status": check.status, "detail": check.detail}
-            for check in report.checks
-        ],
+        "document": cleaned.document(body, effective=True),
+        "metadata": cleaned.mapping(effective=True),
+        "character_count": len(body),
     }

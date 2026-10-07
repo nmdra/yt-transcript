@@ -110,6 +110,47 @@ def test_config_raw(pipeline, tmp_path, capsys):
     assert capsys.readouterr().out == "hello world\n"
 
 
+@pytest.mark.parametrize(
+    "flags",
+    [
+        ["--raw", "--editorial-mode", "focused"],
+        ["--raw-vtt", "--sponsorblock"],
+        ["--mcp", "--sponsorblock"],
+        ["--doctor", "--editorial-mode", "standard"],
+    ],
+)
+def test_new_flag_conflicts_are_early(pipeline, capsys, flags):
+    assert main([URL, "--no-config", *flags]) == 2
+    assert pipeline == [] and capsys.readouterr().out == ""
+
+
+def test_focused_config_precedence_and_raw_ignore(pipeline, tmp_path, capsys):
+    path = tmp_path / "focused.toml"
+    path.write_text('[pi]\neditorial_mode="focused"')
+    assert main([URL, "--config", str(path)]) == 0
+    assert pipeline[-1][1]["editorial_mode"] == "focused"
+    pipeline.clear()
+    assert main([URL, "--config", str(path), "--editorial-mode", "standard"]) == 0
+    assert pipeline[-1][1]["editorial_mode"] == "standard"
+    pipeline.clear()
+    capsys.readouterr()
+    assert main([URL, "--config", str(path), "--raw"]) == 0
+    assert pipeline == ["download"] and capsys.readouterr().out == "hello world\n"
+
+
+def test_raw_vtt_ignores_saved_sponsorblock_and_focused(pipeline, tmp_path, capsys):
+    path = tmp_path / "saved.toml"
+    path.write_text('[sponsorblock]\nenabled=true\n[pi]\neditorial_mode="focused"')
+    assert main([URL, "--config", str(path), "--raw-vtt"]) == 0
+    assert pipeline == ["download"] and capsys.readouterr().out == VTT.decode()
+
+
+def test_focused_preview_does_not_call_pi(pipeline, capsys):
+    assert main([URL, "--no-config", "--editorial-mode", "focused", "--preview"]) == 0
+    assert pipeline == ["download"]
+    assert "editorial mode: focused" in capsys.readouterr().out
+
+
 def test_failed_format_preserves_file(pipeline, monkeypatch, tmp_path, capsys):
     from yt_transcript.errors import classify_pi_failure
 

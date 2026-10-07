@@ -19,15 +19,7 @@ def validate_request(request: object) -> dict:
         raise ValueError
     operation = request.get("operation")
     allowed = {
-        "get_transcript": {"operation", "url"},
-        "preview_transcript": {
-            "operation",
-            "url",
-            "chunk_chars",
-            "max_chunks",
-            "model_description",
-        },
-        "doctor": {"operation"},
+        "get_transcript": {"operation", "url", "mode", "sponsorblock"},
     }
     if (
         not isinstance(operation, str)
@@ -35,40 +27,30 @@ def validate_request(request: object) -> dict:
         or set(request) != allowed[operation]
     ):
         raise ValueError
-    if operation != "doctor":
-        from .downloader import validate_youtube_url
+    from .downloader import validate_youtube_url
 
-        if not isinstance(request["url"], str):
-            raise ValueError
-        validate_youtube_url(request["url"])
-    if operation == "preview_transcript":
-        if (
-            type(request["chunk_chars"]) is not int
-            or not 1000 <= request["chunk_chars"] <= 50000
-        ):
-            raise ValueError
-        cap = request["max_chunks"]
-        if cap is not None and (type(cap) is not int or not 1 <= cap <= 1000):
-            raise ValueError
-        description = request["model_description"]
-        if not isinstance(description, str) or len(description) > 4096:
-            raise ValueError
+    if not isinstance(request["url"], str):
+        raise ValueError
+    validate_youtube_url(request["url"])
+    from .sponsorblock import validate_policy
+
+    if not isinstance(request["mode"], str) or request["mode"] not in (
+        "filtered",
+        "full",
+    ):
+        raise ValueError
+    validate_policy(request["sponsorblock"])
     return request
 
 
 def dispatch(request: dict) -> Mapping[str, Any]:
-    from .service import doctor_data, fetch_transcript_document, preview_transcript_data
+    from .service import fetch_transcript_document
+    from .sponsorblock import validate_policy
 
-    operation = request["operation"]
-    if operation == "doctor":
-        return doctor_data()
-    if operation == "get_transcript":
-        return fetch_transcript_document(request["url"])
-    return preview_transcript_data(
+    return fetch_transcript_document(
         request["url"],
-        chunk_chars=request["chunk_chars"],
-        max_chunks=request["max_chunks"],
-        model_description=request["model_description"],
+        request["mode"],
+        sponsorblock=validate_policy(request["sponsorblock"]),
     )
 
 

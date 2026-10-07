@@ -79,17 +79,52 @@ except KeyboardInterrupt: pass
     async def check():
         runner = WorkerRunner(timeout_seconds=0.3)
         with pytest.raises(AppError) as exc:
-            await runner.run({"operation": "doctor"})
+            await runner.run(
+                {
+                    "operation": "get_transcript",
+                    "url": "https://youtu.be/abcdefghijk",
+                    "mode": "full",
+                    "sponsorblock": {
+                        "enabled": False,
+                        "categories": ["sponsor"],
+                        "timeout_seconds": 10,
+                    },
+                }
+            )
         assert exc.value.info.code == "MCP_TIMEOUT"
         assert processes[0].returncode is not None
         assert not Path(marker.read_text()).exists()
         runner.timeout_seconds = 10
-        task = asyncio.create_task(runner.run({"operation": "doctor"}))
+        task = asyncio.create_task(
+            runner.run(
+                {
+                    "operation": "get_transcript",
+                    "url": "https://youtu.be/abcdefghijk",
+                    "mode": "full",
+                    "sponsorblock": {
+                        "enabled": False,
+                        "categories": ["sponsor"],
+                        "timeout_seconds": 10,
+                    },
+                }
+            )
+        )
         while len(processes) < 2:
             await asyncio.sleep(0.01)
         await asyncio.sleep(0.1)
         with pytest.raises(AppError) as exc:
-            await runner.run({"operation": "doctor"})
+            await runner.run(
+                {
+                    "operation": "get_transcript",
+                    "url": "https://youtu.be/abcdefghijk",
+                    "mode": "full",
+                    "sponsorblock": {
+                        "enabled": False,
+                        "categories": ["sponsor"],
+                        "timeout_seconds": 10,
+                    },
+                }
+            )
         assert exc.value.info.code == "MCP_BUSY"
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
@@ -110,7 +145,18 @@ def test_response_limit_reaps(tmp_path, monkeypatch):
 
     async def check():
         with pytest.raises(AppError) as exc:
-            await WorkerRunner(timeout_seconds=5).run({"operation": "doctor"})
+            await WorkerRunner(timeout_seconds=5).run(
+                {
+                    "operation": "get_transcript",
+                    "url": "https://youtu.be/abcdefghijk",
+                    "mode": "full",
+                    "sponsorblock": {
+                        "enabled": False,
+                        "categories": ["sponsor"],
+                        "timeout_seconds": 10,
+                    },
+                }
+            )
         assert exc.value.info.code == "MCP_RESPONSE_LIMIT"
         assert processes[0].returncode is not None
 

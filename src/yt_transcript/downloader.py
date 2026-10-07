@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from yt_dlp import YoutubeDL
 
+from .chapters import snapshot_chapters
 from .errors import (
     AppError,
     ErrorInfo,
@@ -260,7 +261,9 @@ def download_english_vtt(url: str, *, verbose: bool = False) -> DownloadedCaptio
                             )
                         ) from None
                     raise
+                chapter_input = snapshot_chapters(info.get("chapters"))
                 narrowed = dict(info)
+                narrowed.pop("chapters", None)
                 narrowed["subtitles"] = (
                     {} if track.automatic else {track.language: list(track.formats)}
                 )
@@ -293,7 +296,9 @@ def download_english_vtt(url: str, *, verbose: bool = False) -> DownloadedCaptio
                 raw = resolved.read_bytes()
                 if not raw:
                     raise ValueError
-                metadata = extract_video_metadata(processed, canonical_url=canonical)
+                metadata = extract_video_metadata(
+                    processed, canonical_url=canonical, chapter_input=chapter_input
+                )
                 return DownloadedCaptions(
                     raw, track.language, track.automatic, metadata
                 )

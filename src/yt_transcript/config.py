@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .errors import ConfigError, ErrorInfo
+from .sponsorblock import CATEGORIES, SponsorBlockConfig
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,8 @@ class AppConfig:
     chunk_chars: int = 12000
     timeout_seconds: int = 600
     max_chunks: int | None = None
+    editorial_mode: str = "standard"
+    sponsorblock: SponsorBlockConfig = SponsorBlockConfig()
 
 
 def default_config_path() -> Path:
@@ -52,12 +55,15 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
         raise invalid("configuration file") from None
     except OSError, UnicodeError, tomllib.TOMLDecodeError:
         raise invalid("configuration file") from None
-    if set(data) - {"output", "pi"}:
+    if set(data) - {"output", "pi", "sponsorblock"}:
         raise invalid("configuration table")
     values = {}
     for table, allowed in (
         ("output", {"mode", "verbose"}),
-        ("pi", {"model", "chunk_chars", "timeout_seconds", "max_chunks"}),
+        (
+            "pi",
+            {"model", "chunk_chars", "timeout_seconds", "max_chunks", "editorial_mode"},
+        ),
     ):
         entries = data.get(table, {})
         if not isinstance(entries, dict) or set(entries) - allowed:
@@ -69,6 +75,8 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
                     "raw",
                     "raw-vtt",
                 )
+            elif key == "editorial_mode":
+                valid = isinstance(value, str) and value in ("standard", "focused")
             elif key == "verbose":
                 valid = type(value) is bool
             elif key == "model":
@@ -85,6 +93,28 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
             if not valid:
                 raise invalid(f"{table}.{key}")
             values[key] = value
+    sponsor = data.get("sponsorblock", {})
+    if not isinstance(sponsor, dict) or set(sponsor) - {
+        "enabled",
+        "categories",
+        "timeout_seconds",
+    }:
+        raise invalid("sponsorblock")
+    enabled = sponsor.get("enabled")
+    if "enabled" in sponsor and type(enabled) is not bool:
+        raise invalid("sponsorblock.enabled")
+    categories = sponsor.get("categories", ["sponsor", "selfpromo", "interaction"])
+    if (
+        not isinstance(categories, list)
+        or not categories
+        or any(not isinstance(c, str) or c not in CATEGORIES for c in categories)
+        or len(set(categories)) != len(categories)
+    ):
+        raise invalid("sponsorblock.categories")
+    timeout = sponsor.get("timeout_seconds", 10)
+    if type(timeout) is not int or not 1 <= timeout <= 30:
+        raise invalid("sponsorblock.timeout_seconds")
+    values["sponsorblock"] = SponsorBlockConfig(enabled, tuple(categories), timeout)
     return AppConfig(**values)
 
 
@@ -95,6 +125,8 @@ def resolve_config(
     verbose: bool | None = None,
     model: str | None = None,
     max_chunks: int | None = None,
+    sponsorblock: bool | None = None,
+    editorial_mode: str | None = None,
 ) -> AppConfig:
     values = {
         k: v
@@ -103,9 +135,12 @@ def resolve_config(
             "verbose": verbose,
             "model": model,
             "max_chunks": max_chunks,
+            "editorial_mode": editorial_mode,
         }.items()
         if v is not None
     }
+    if editorial_mode is not None and editorial_mode not in ("standard", "focused"):
+        raise invalid("editorial_mode")
     if model is not None:
         if not model.strip():
             raise invalid("model selector")
@@ -115,6 +150,10 @@ def resolve_config(
     ):
         raise invalid("max_chunks")
     result = replace(file_config, **values)
+    if sponsorblock is not None:
+        result = replace(
+            result, sponsorblock=replace(result.sponsorblock, enabled=sponsorblock)
+        )
     if result.mode != "markdown":
-        result = replace(result, model=None, max_chunks=None)
+        result = replace(result, model=None, max_chunks=None, editorial_mode="standard")
     return result

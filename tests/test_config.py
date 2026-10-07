@@ -1,9 +1,12 @@
+import re
+import tomllib
 from pathlib import Path
 
 import pytest
 
 from yt_transcript.config import (
     AppConfig,
+    SponsorBlockConfig,
     default_config_path,
     load_config,
     resolve_config,
@@ -35,6 +38,15 @@ def test_discovery(monkeypatch, tmp_path, xdg):
         '[output]\nmode="other"',
         "invalid = [",
         "output = 2",
+        '[pi]\neditorial_mode="unknown"',
+        '[sponsorblock]\nenabled="yes"',
+        "[sponsorblock]\ncategories=[]",
+        '[sponsorblock]\ncategories=["sponsor", "sponsor"]',
+        '[sponsorblock]\ncategories=["filler"]',
+        "[sponsorblock]\ncategories=[true]",
+        "[sponsorblock]\ntimeout_seconds=31",
+        "[sponsorblock]\ntimeout_seconds=true",
+        '[sponsorblock]\nendpoint="private"',
     ],
 )
 def test_invalid(tmp_path, text):
@@ -54,6 +66,27 @@ def test_partial_and_precedence(tmp_path):
     assert resolve_config(config, mode="raw").max_chunks is None
     assert resolve_config(config, model="new", max_chunks=3).model == "new"
     assert load_config(path, disabled=True) == AppConfig()
+
+
+def test_example_documents_all_supported_settings(tmp_path):
+    example = Path(__file__).resolve().parents[1] / "config.example.toml"
+    assert load_config(example) == AppConfig()
+    text = example.read_text(encoding="utf-8")
+    complete = re.sub(r"^# (?=(?:max_chunks|model|enabled) =)", "", text, flags=re.M)
+    tables = tomllib.loads(complete)
+    assert set(tables) == {"output", "pi", "sponsorblock"}
+    assert set(tables["output"]) | set(tables["pi"]) == set(
+        AppConfig.__dataclass_fields__
+    ) - {"sponsorblock"}
+    assert set(tables["sponsorblock"]) == set(SponsorBlockConfig.__dataclass_fields__)
+    selected = tmp_path / "complete.toml"
+    selected.write_text(complete, encoding="utf-8")
+    config = load_config(selected)
+    assert config == AppConfig(
+        max_chunks=20,
+        model="provider/model-id",
+        sponsorblock=SponsorBlockConfig(enabled=False),
+    )
 
 
 def test_files(tmp_path):

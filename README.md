@@ -81,9 +81,16 @@ verbose = false
 [pi]
 chunk_chars = 12000
 timeout_seconds = 600
+editorial_mode = "standard"  # "standard" or "focused"
 # max_chunks = 20
 # Omit model to use Pi's configured default.
 # model = "provider/model-id"
+
+[sponsorblock]
+# Omit enabled: CLI off, MCP filtered on. Explicit false disables both.
+# enabled = false
+categories = ["sponsor", "selfpromo", "interaction"]
+timeout_seconds = 10
 ```
 
 Unknown keys, invalid types, malformed TOML, and files larger than 64 KiB are errors. The wrapper does not create configuration files.
@@ -96,10 +103,14 @@ Unknown keys, invalid types, malformed TOML, and files larger than 64 KiB are er
 | `pi.chunk_chars` | Integer 1,000 through 50,000 |
 | `pi.timeout_seconds` | Integer 1 through 3,600, per chunk |
 | `pi.max_chunks` | Integer 1 through 1,000, or omit for unlimited |
+| `pi.editorial_mode` | `standard` (default) or `focused` |
+| `sponsorblock.enabled` | Optional boolean; unset means CLI off, MCP filtered on |
+| `sponsorblock.categories` | Nonempty unique list: `sponsor`, `selfpromo`, `interaction`, `intro`, `outro`, `preview` |
+| `sponsorblock.timeout_seconds` | Integer 1 through 30, per socket operation |
 
 `--raw`, `--raw-vtt`, `--model`, `--max-chunks`, and `-v` override their corresponding defaults. There is no `--markdown` or `--quiet` flag.
 
-Raw modes ignore saved Pi preferences after schema checks. An explicit CLI model or chunk cap conflicts with a raw mode.
+Raw modes ignore saved Pi preferences after schema checks. An explicit model, chunk cap, or editorial-mode flag conflicts with raw output. `--editorial-mode` and the mutually exclusive `--sponsorblock` / `--no-sponsorblock` flags override TOML. The existing CLI shape and defaults remain unchanged.
 
 Without an explicit model in TOML or CLI, every Pi call omits `--model`. Pi chooses its configured default. The wrapper never selects a fallback model.
 
@@ -115,13 +126,17 @@ uv run yt-transcript URL --no-config --max-chunks 10 -o transcript.md
 Preview downloads and cleans captions, but never calls Pi. It shows these fields in a fixed order:
 
 1. Canonical URL
-2. Cleaned character count
-3. Planned formatter invocations
-4. Largest chunk size
-5. Configured chunk limit
-6. Maximum chunks
-7. Cap result
-8. Model selection
+2. Full cleaned character count
+3. Retained input character count
+4. SponsorBlock status
+5. Removed cue count
+6. Planned formatter invocations
+7. Largest serialized stdin chunk size
+8. Configured chunk limit
+9. Maximum chunks
+10. Cap result
+11. Model selection
+12. Editorial mode
 
 Preview requires Markdown mode and no output path. A cap exceedance is a successful preview report. Actual formatting rejects the cap before any Pi call.
 
@@ -141,7 +156,7 @@ A repeated run can incur new charges. A timeout or cancellation cannot undo prov
 
 ## Pi isolation and completeness
 
-Pi receives cleaned source text through stdin. It receives neither YAML metadata nor the upstream metadata dictionary.
+Pi receives cleaned text through stdin. With chapter or SponsorBlock boundary context, stdin contains JSON with relevant titles, times, annotations, and retained text. Text occurs once in each plan, and the complete serialized input counts toward the chunk limit. Context overhead can increase calls. Pi receives neither YAML nor the upstream metadata dictionary.
 
 The wrapper replaces the coding prompt with editorial instructions. It supplies a fixed append prompt and disables tools, extensions, MCP, skills, templates, themes, and context files.
 
@@ -154,6 +169,30 @@ The wrapper reads bounded JSONL events internally. Success requires process exit
 Length stops, aborts, compaction, tool calls, missing completion, invalid JSON, and oversized output fail before publication. Events, thinking, and raw stderr never enter documents or diagnostics.
 
 A normal stop does not prove factual accuracy or semantic completeness. Offline structural tests do not prove faithful actual LLM edits.
+
+## Chapters, focused editing, and SponsorBlock
+
+Valid supplied chapters become canonical `## [time] title` Markdown headings. Cue-start alignment preserves caption order, crossings, gaps, and backward revisits. Python validates headings outside correctly closed code fences before removing duplicate continuation headings. Invalid output fails without a repair call or silent fallback.
+
+```sh
+uv run yt-transcript URL --no-config --editorial-mode focused --preview
+uv run yt-transcript URL --no-config --editorial-mode focused --max-chunks 3 -o focused.md
+uv run yt-transcript URL --no-config --sponsorblock --preview
+```
+
+Standard remains the CLI default. Focused is selective editing, not summarization. It removes separable greetings, ads, interaction requests, housekeeping, and unrelated tangents. It keeps substantive examples, technical product explanations, code, URLs, numbers, qualifications, relevant affiliation/disclosures, and ambiguous content. Every retained source chunk still goes to Pi. Fully omitted chunks do not save planned calls. If all output is omitted, publication fails; use standard or raw. Source chapter metadata remains complete even when focused editing omits a body section. Fake-process tests do not establish actual model fidelity.
+
+SponsorBlock is opt-in on CLI and attempted by default for MCP filtered mode. The fixed official HTTPS lookup sends only a four-character SHA-256 prefix of the video ID, then matches the actual ID locally. Prefix lookup is not an anonymity guarantee. No cookies, credentials, redirects, full-ID fallback, submissions, votes, view reports, or persistent cache are used. One lookup attempt is made; socket timeout is not a total deadline.
+
+Filtering happens after global rolling cleanup. Remove only complete nonzero cues contained in the selected interval union. Keep crossing/zero-duration cues; do not guess word timing or rerun cleanup. Duration must be verified within one second. If removal would empty the transcript, keep it and warn. Community labels cannot guarantee correct promotion detection.
+
+Lookup/data failure keeps captions and emits `warning[SPONSORBLOCK_UNAVAILABLE]`. MCP puts the warning in metadata; CLI also uses stderr. Intentional disablement and no returned segments need no failure warning. Focused editing can independently remove non-substantive text after deterministic fallback.
+
+`--raw --sponsorblock` can query metadata but never removes words. Its receipt says `not_applied`. Raw VTT always skips lookup and rejects explicit `--sponsorblock`.
+
+Metadata records lookup status separately from actual removal. Segment receipts use `removed`, `partial`, `kept`, `no_matching_captions`, or `not_applied`, with removed/retained-overlap cue counts. Aggregate counts use unique fragments rather than sums across overlapping segments. `removed` refers to matching caption fragments, not every spoken promotional word. Pi receipts describe source filtering before the model, not later model deletions. Raw and filtered headers can differ in receipt fields; equality requires identical source snapshots and receipts.
+
+**API/data license:** SponsorBlock community records are [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) unless separate permission is granted. Published records include source attribution, license URL, and a notice of selection/time normalization. Attribution, noncommercial, and share-alike terms are separate from the MIT code license. Review [upstream terms](https://github.com/ajayyy/SponsorBlock/wiki/Database-and-API-License) before deployment, especially commercial use.
 
 ## Metadata files
 
@@ -171,12 +210,28 @@ upload_date: "2008-05-29"
 duration_seconds: 597
 caption_language: "en-orig"
 caption_source: "automatic"
+chapter_status: "unavailable"
+chapters: []
+sponsorblock:
+  enabled: false
+  status: "disabled"
+  categories: ["sponsor", "selfpromo", "interaction"]
+  segments: []
+  warning: null
+  reason_code: null
+  source: null
+  license_url: null
+  changes: null
+  removal_applied: false
+  removal_stage: "none"
+  removed_cue_count: 0
+  retained_overlap_cue_count: 0
 ---
 
 The transcript starts here.
 ```
 
-Python serializes every string safely with double quotes. The serializer can also quote mapping keys. All ten fields are always present.
+Python serializes every string safely with double quotes. The serializer can also quote mapping keys. All thirteen top-level fields are always present; the original ten remain the prefix.
 
 The canonical URL excludes playlist and tracking parameters. The video ID must match the single extracted video.
 
@@ -188,9 +243,11 @@ Duration preserves zero and fractional seconds. Missing or invalid optional valu
 
 Caption source is `manual` or `automatic`. These fields do not prove that the text is untranslated original English.
 
+`chapter_status` is `available`, `unavailable`, or `invalid`. Each chapter has `title`, `start_seconds`, and nullable `end_seconds`. Chapters come from the supplied extractor list captured before yt-dlp processing. No second extraction, generated topics, or synthetic untitled chapters are used. Origin is not labelled creator-authored or automatic. Malformed optional chapters preserve captions without chapter labels.
+
 Metadata comes from the same processed extraction as the captions. Python adds the header exactly once, after all formatting succeeds. Pi cannot replace it.
 
-Descriptions, signed subtitle URLs, cookies, tokens, counts, and extraction timestamps are excluded. Raw VTT receives no header or byte changes.
+Descriptions, signed subtitle URLs, cookies, tokens, view/like counts, and extraction timestamps are excluded. Only caption-removal counts are added. Raw VTT receives no header or byte changes.
 
 ## Caption selection and cleanup
 
@@ -271,21 +328,23 @@ Example client configuration:
 
 Client-specific configuration keys can differ. Use the absolute project directory for local startup.
 
-The server exposes exactly three tools:
+The server exposes exactly one tool:
 
-| Tool | Input | Structured output |
-|---|---|---|
-| `get_transcript` | `url: string` | `format`, `document`, `metadata`, `character_count` |
-| `preview_transcript` | `url: string` | `metadata`, `character_count`, `planned_invocations`, `largest_chunk_chars`, `chunk_chars`, `max_chunks`, `within_cap`, `model_selection` |
-| `doctor` | No arguments | `healthy`, `checks` with `name`, `status`, `detail` |
+```python
+get_transcript(url: str, mode: Literal["filtered", "full"] = "filtered")
+```
 
-`get_transcript` returns `format='plain_text'`. Its document contains the complete Python-generated YAML header and cleaned body. Character count excludes the header.
+URL is the only required argument. Omitted mode equals `filtered`: try SponsorBlock unless explicitly disabled, and return full captions when no usable segments exist or lookup fails. Expected failures include a safe warning in metadata. `full` skips SponsorBlock completely. Neither mode calls Pi.
+
+**Breaking change:** MCP `preview_transcript` and `doctor` are removed. Use CLI `--preview` and `--doctor` instead.
+
+`get_transcript` returns `format='plain_text'`. Its document contains the complete Python-generated YAML header and deterministic body. Supplied chapters produce title/time headings. Missing or invalid chapters produce inline time ranges in short blocks, targeting 15 seconds. Unassigned runs also use timed blocks. Original cue times remain unchanged after removal, and blocks break across removed gaps. These are cue ranges, not exact word times. Character count includes labels but excludes YAML. No second transcript array is returned.
 
 Clients that save files must save `structuredContent.document` verbatim. Do not add a second header. The SDK also returns serialized JSON text for compatibility.
 
-Transcript and preview tools access YouTube. Doctor checks local dependencies and Deno without any Pi invocation. Missing Pi does not affect MCP readiness.
+`get_transcript` accesses YouTube and, by default, may contact SponsorBlock. Missing Pi does not affect MCP readiness. The four result fields remain `format`, `document`, `metadata`, and `character_count`.
 
-All tools have typed output schemas. Expected failures are execution errors with `isError=true`, not successful documents or protocol-level `MCPError` values.
+The tool has a typed output schema. Caption/runtime failures are execution errors with `isError=true`, not successful documents or protocol-level `MCPError` values.
 
 Initialization and tool listing do not check runtimes or access the network. A tool failure does not stop the server.
 
@@ -293,11 +352,11 @@ The server never calls Pi, writes final documents, opens a port, or exposes mode
 
 Startup accepts only configuration selection and verbosity beside `--mcp`. TOML mode and Pi timeout do not affect MCP behavior.
 
-Preview uses the configured chunk size and cap. Its model description is hypothetical and never authorizes formatting.
+All saved Pi settings are ignored. SponsorBlock categories and timeout remain server-controlled; tool arguments cannot replace them.
 
 Stdout contains only SDK protocol traffic. Diagnostics use stderr. Returned captions and metadata are untrusted source data, never instructions to an agent.
 
-Read-only annotations do not create a sandbox. Temporary intermediate files are permitted. Cancellation cannot undo YouTube requests already sent.
+Read-only annotations do not create a sandbox. Temporary intermediate files are permitted. Cancellation cannot undo YouTube or SponsorBlock requests already sent.
 
 The server permits one active worker. A second request receives `MCP_BUSY`. The event loop remains responsive during downloads.
 
@@ -365,7 +424,9 @@ Live checks require an operator-supplied public URL:
 YT_TRANSCRIPT_TEST_URL='https://youtu.be/VIDEO_ID' uv run pytest -m integration tests/test_integration.py
 ```
 
-A live Pi check additionally requires explicit spend approval and `YT_TRANSCRIPT_TEST_PI=1`. A URL alone never enables a model call.
+A live Pi check requires fresh spend approval, `YT_TRANSCRIPT_TEST_PI=1`, `YT_TRANSCRIPT_TEST_EDITORIAL_MODE=standard` or `focused`, and a preview-approved `YT_TRANSCRIPT_TEST_MAX_CHUNKS` from 1 through 1000. It runs only the chosen mode. A URL alone never enables a model call.
+
+Chapter checks also require `YT_TRANSCRIPT_TEST_CHAPTERS=1` and a confirmed chapter-bearing URL. SponsorBlock checks require a segment-bearing URL, `YT_TRANSCRIPT_TEST_SPONSORBLOCK=1`, and `YT_TRANSCRIPT_TEST_SPONSORBLOCK_LICENSE_OK=1` after operator license confirmation. Offline tests enable none of these gates.
 
 The Git source is the private repository [NMDRA/yt-transcript](https://github.com/NMDRA/yt-transcript). Your Git client needs authenticated access.
 

@@ -33,7 +33,18 @@ def test_exited_worker_with_pipe_holding_descendant_is_cleaned(tmp_path, monkeyp
     async def check():
         try:
             with pytest.raises(AppError) as exc:
-                await WorkerRunner(timeout_seconds=0.5).run({"operation": "doctor"})
+                await WorkerRunner(timeout_seconds=0.5).run(
+                    {
+                        "operation": "get_transcript",
+                        "url": "https://youtu.be/abcdefghijk",
+                        "mode": "full",
+                        "sponsorblock": {
+                            "enabled": False,
+                            "categories": ["sponsor"],
+                            "timeout_seconds": 10,
+                        },
+                    }
+                )
             assert exc.value.info.code == "MCP_TIMEOUT"
             pid = int(marker.read_text())
             # Orphans can briefly remain zombies until the OS reaps them.

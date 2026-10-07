@@ -89,8 +89,8 @@ def parse_vtt(vtt: str) -> list[Cue]:
     return cues
 
 
-def clean_vtt(vtt: str, *, automatic: bool) -> str:
-    result: list[str] = []
+def clean_vtt_timed(vtt: str, *, automatic: bool) -> tuple[Cue, ...]:
+    result: list[Cue] = []
     previous: Cue | None = None
     previous_tokens: list[str] = []
     for cue in parse_vtt(vtt):
@@ -113,7 +113,8 @@ def clean_vtt(vtt: str, *, automatic: bool) -> str:
                 ):
                     overlap = size
                     break
-        result.extend(tokens[overlap:])
+        if tokens[overlap:]:
+            result.append(Cue(cue.start_ms, cue.end_ms, " ".join(tokens[overlap:])))
         previous, previous_tokens = cue, tokens
     if not result:
         raise TranscriptError(
@@ -124,4 +125,8 @@ def clean_vtt(vtt: str, *, automatic: bool) -> str:
                 "vtt_parse",
             )
         )
-    return " ".join(result)
+    return tuple(result)
+
+
+def clean_vtt(vtt: str, *, automatic: bool) -> str:
+    return " ".join(cue.text for cue in clean_vtt_timed(vtt, automatic=automatic))

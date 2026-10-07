@@ -33,6 +33,10 @@ def _parser() -> argparse.ArgumentParser:
     modes.add_argument("--raw-vtt", dest="mode", action="store_const", const="raw-vtt")
     parser.add_argument("--model")
     parser.add_argument("--max-chunks", type=int)
+    parser.add_argument("--editorial-mode", choices=("standard", "focused"))
+    sponsor = parser.add_mutually_exclusive_group()
+    sponsor.add_argument("--sponsorblock", action="store_true", default=None)
+    sponsor.add_argument("--no-sponsorblock", dest="sponsorblock", action="store_false")
     configs = parser.add_mutually_exclusive_group()
     configs.add_argument("--config", type=Path)
     configs.add_argument("--no-config", action="store_true")
@@ -92,6 +96,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             or args.mode is not None
             or args.model is not None
             or args.max_chunks is not None
+            or args.sponsorblock is not None
+            or args.editorial_mode is not None
         )
         if args.doctor:
             if restricted or args.mcp or args.config is not None or args.no_config:
@@ -118,6 +124,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 verbose=args.verbose,
                 model=args.model,
                 max_chunks=args.max_chunks,
+                sponsorblock=args.sponsorblock,
+                editorial_mode=args.editorial_mode,
             )
         )
         verbose = config.verbose
@@ -141,8 +149,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.url:
             raise _invalid("A YouTube video URL is required.")
         from .downloader import download_english_vtt, validate_youtube_url
-        from .formatter import ensure_pi, format_with_pi, plan_formatting
-        from .metadata import format_transcript_file
+        from .formatter import ensure_pi, format_with_pi, plan_transcript_formatting
         from .output import validate_output, write_output
         from .service import fetch_clean_transcript
 
@@ -150,9 +157,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.no_clobber and args.output is None:
             raise _invalid("--no-clobber requires --output.")
         if config.mode != "markdown" and (
-            args.model is not None or args.max_chunks is not None
+            args.model is not None
+            or args.max_chunks is not None
+            or args.editorial_mode is not None
         ):
-            raise _invalid("Explicit model and chunk-cap flags require Markdown mode.")
+            raise _invalid("Explicit formatter flags require Markdown mode.")
         if args.preview and (
             config.mode != "markdown" or args.output is not None or args.no_clobber
         ):
@@ -162,6 +171,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if config.mode == "markdown" and not args.preview:
             ensure_pi()
         if config.mode == "raw-vtt":
+            if args.sponsorblock:
+                raise _invalid("--sponsorblock cannot be used with --raw-vtt.")
             raw_download = download_english_vtt(canonical, verbose=verbose)
             data = raw_download.vtt
             if verbose:
@@ -171,8 +182,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                     + "\n"
                 )
         else:
-            downloaded = fetch_clean_transcript(canonical)
-            body = downloaded.body
+            downloaded = fetch_clean_transcript(
+                canonical, sponsorblock=config.sponsorblock.resolved()
+            )
+            effective = config.mode == "markdown"
+            body = downloaded.effective_body if effective else downloaded.body
+            lookup = (
+                downloaded.projection.lookup
+                if effective and downloaded.projection
+                else downloaded.metadata.sponsorblock
+            )
+            if lookup.warning:
+                sys.stderr.write(lookup.warning + "\n")
             if verbose:
                 sys.stderr.write(
                     "caption: selected English VTT; source="
@@ -180,18 +201,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                     + "\n"
                 )
             if args.preview:
-                plan = plan_formatting(
-                    body, chunk_chars=config.chunk_chars, max_chunks=config.max_chunks
+                plan = plan_transcript_formatting(
+                    body,
+                    sections=downloaded.effective_sections,
+                    chunk_chars=config.chunk_chars,
+                    max_chunks=config.max_chunks,
                 )
                 lines = [
                     f"canonical URL: {canonical}",
-                    f"cleaned characters: {len(body)}",
+                    f"cleaned characters: {len(downloaded.body)}",
+                    f"retained input characters: {len(body)}",
+                    f"SponsorBlock status: {lookup.status}",
+                    f"removed cues: {downloaded.projection.receipt.removed_cue_count if downloaded.projection else 0}",
                     f"planned formatter invocations: {len(plan.chunks)}",
                     f"largest chunk characters: {max(plan.character_counts, default=0)}",
                     f"configured chunk limit: {config.chunk_chars}",
                     f"maximum chunks: {config.max_chunks if config.max_chunks is not None else 'unlimited'}",
                     f"cap result: {'within limit' if plan.within_cap else 'exceeds limit'}",
                     f"model selection: {config.model or 'Pi configured default'}",
+                    f"editorial mode: {config.editorial_mode}",
                 ]
                 _emit(("\n".join(lines) + "\n").encode("utf-8"))
                 return 0
@@ -202,14 +230,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     chunk_chars=config.chunk_chars,
                     timeout_seconds=config.timeout_seconds,
                     max_chunks=config.max_chunks,
+                    sections=downloaded.effective_sections,
+                    editorial_mode=config.editorial_mode,
                 )
             document = (
-                format_transcript_file(
-                    downloaded.metadata,
-                    body,
-                    language=downloaded.language,
-                    automatic=downloaded.automatic,
-                )
+                downloaded.document(body, effective=effective)
                 if args.output
                 else body.rstrip() + "\n"
             )

@@ -90,6 +90,8 @@ def test_download_orchestration(monkeypatch):
             calls.append(("extract", kwargs))
             return {
                 "id": ID,
+                "duration": 10,
+                "chapters": [{"title": "Original", "start_time": 0}],
                 "automatic_captions": {
                     "en-orig": [{"ext": "vtt", "url": "synthetic"}, {"ext": "srt"}]
                 },
@@ -98,6 +100,8 @@ def test_download_orchestration(monkeypatch):
 
         def process_ie_result(self, info, **kwargs):
             calls.append(("process", kwargs))
+            assert "chapters" not in info
+            info["chapters"] = [{"title": "<Untitled Chapter 1>", "start_time": 0}]
             assert not info["subtitles"]
             assert list(info["automatic_captions"]) == ["en-orig"]
             assert len(info["automatic_captions"]["en-orig"]) == 1
@@ -117,6 +121,7 @@ def test_download_orchestration(monkeypatch):
     monkeypatch.setattr(module, "YoutubeDL", FakeDL)
     result = module.download_english_vtt(f"https://youtu.be/{ID}")
     assert result.vtt.endswith(b"hello\r\n")
+    assert result.metadata.chapters[0].title == "Original"
     assert calls == [
         ("extract", {"download": False, "process": False}),
         ("process", {"download": True}),
@@ -164,6 +169,7 @@ def fake_download(monkeypatch, tmp_path):
 
         def process_ie_result(self, info, **kwargs):
             state.processed += 1
+            assert "chapters" not in info
             if state.failure:
                 raise state.failure
             language = next(iter(info["subtitles"] or info["automatic_captions"]))
@@ -246,6 +252,18 @@ def test_warning_missing_captions(fake_download, warning, code):
         download_english_vtt(f"https://youtu.be/{ID}")
     assert exc.value.info.code == code
     assert fake_download.processed == 0
+
+
+@pytest.mark.parametrize(
+    "chapters", ["bad", [None], [{"title": "x", "start_time": True}]]
+)
+def test_optional_malformed_chapters_do_not_reach_processor(fake_download, chapters):
+    from yt_transcript.downloader import download_english_vtt
+
+    fake_download.info["chapters"] = chapters
+    result = download_english_vtt(f"https://youtu.be/{ID}")
+    assert result.metadata.chapter_status == "invalid"
+    assert not result.metadata.chapters and fake_download.processed == 1
 
 
 def test_manual_options_and_valid_warning(fake_download):

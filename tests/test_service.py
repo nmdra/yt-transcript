@@ -18,15 +18,7 @@ def test_shared_document_and_plan(monkeypatch):
     monkeypatch.setattr(service, "download_english_vtt", download)
     result = service.fetch_transcript_document(metadata.url)
     assert len(calls) == 1
-    assert result["character_count"] == 11
-    assert result["document"].endswith("\n\nhello world\n")
+    assert result["character_count"] == 27
+    assert result["document"].endswith("\n\n[00:00 - 00:01] hello world\n")
     assert result["metadata"]["caption_source"] == "manual"
-    assert len(result["metadata"]) == 10
-    preview = service.preview_transcript_data(
-        metadata.url,
-        chunk_chars=1000,
-        max_chunks=1,
-        model_description="Pi configured default",
-    )
-    assert preview["within_cap"] and preview["planned_invocations"] == 1
-    assert "document" not in preview
+    assert len(result["metadata"]) == 13

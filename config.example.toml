@@ -1,10 +1,75 @@
+# All supported yt-transcript TOML settings are shown below.
+# Active values match the built-in defaults. Optional overrides stay commented.
+#
+# Default location: ~/.config/yt-transcript/config.toml
+# An absolute XDG_CONFIG_HOME replaces ~/.config in that location.
+# Use --config PATH to select a different file, or --no-config to skip loading.
+# Explicit CLI flags override TOML values. Project files are not auto-loaded.
+# Unknown tables/keys, invalid types, and files larger than 64 KiB are rejected.
+# Keep credentials out of this file; configure provider credentials in Pi.
+
 [output]
+# Default: "markdown". Allowed: "markdown", "raw", "raw-vtt".
+# markdown: Pi-edited Markdown; sends caption text to the configured provider.
+# raw: deterministic plain text, with no model calls.
+# raw-vtt: downloaded VTT bytes unchanged, with no model calls.
+# CLI --raw and --raw-vtt override this setting.
 mode = "markdown"
+
+# Default: false. Allowed: true or false.
+# Add caption-source and safe diagnostics to stderr, never transcript stdout.
+# CLI --verbose overrides this setting to true.
 verbose = false
 
 [pi]
+# Default: "standard". Allowed: "standard", "focused".
+# Focused removes clearly separable non-substantive material, not a summary.
+# CLI --editorial-mode overrides this. Raw and MCP ignore saved Pi settings.
+editorial_mode = "standard"
+
+# Default: 12000. Allowed: integers from 1000 through 50000.
+# Maximum stdin payload characters, including chapter/segment JSON framing.
+# This is not a token/context-window limit.
+# Smaller values usually increase invocation count, latency, and possible cost.
 chunk_chars = 12000
+
+# Default: 600. Allowed: integers from 1 through 3600.
+# Deadline in seconds for each Pi invocation, not for the complete transcript.
+# A timeout cannot undo provider work or charges already incurred.
 timeout_seconds = 600
+
+# Optional. Default: omitted, meaning no wrapper invocation cap.
+# Allowed: integers from 1 through 1000; zero is not an unlimited value.
+# Reject formatting before the first Pi call if planning exceeds this cap.
+# Preview reports exceedance without calling Pi. CLI --max-chunks overrides it.
+# Pi/provider retries can add requests, so this is not a hard billing cap.
 # max_chunks = 20
-# Omit model to preserve Pi's configured default.
+
+# Optional. Default: omitted, preserving Pi's configured default model.
+# Allowed: a nonempty model selector; a provider/model-id is recommended.
+# Replace the placeholder with a real selector before uncommenting.
+# Empty strings are invalid. CLI --model overrides this setting.
 # model = "provider/model-id"
+
+# Raw modes ignore Pi settings after validating the complete TOML file.
+# MCP never calls Pi and ignores all settings in this table.
+# Help, version, and CLI doctor bypass TOML loading.
+# URL, output path, preview, doctor, no-clobber, and MCP startup are CLI-only.
+
+[sponsorblock]
+# Optional strict boolean. Unset: CLI off; MCP filtered mode on.
+# Explicit false disables lookup in both interfaces. MCP full always skips it.
+# CLI --sponsorblock / --no-sponsorblock override this setting.
+# enabled = false
+
+# Nonempty unique list. Also allowed: intro, outro, preview.
+# Categories such as filler, music_offtopic, and full labels are not supported.
+categories = ["sponsor", "selfpromo", "interaction"]
+
+# Default: 10. Allowed: integers from 1 through 30.
+# Socket-operation timeout, not the complete workflow deadline.
+timeout_seconds = 10
+
+# Lookup sends a four-character video-ID hash prefix to the official service.
+# Expected lookup failures keep captions and report a safe warning.
+# API/data license: CC BY-NC-SA 4.0 unless separate permission is granted.
