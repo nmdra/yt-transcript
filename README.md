@@ -51,32 +51,7 @@ SponsorBlock; `full` skips it. Default plain text calls no model; explicitly set
 Copy this prompt into an agent with local shell and file access:
 
 ```text
-Install nmdra/yt-transcript v0.2.0-dev.3 for my user account with the MCP extra
-and Python 3.14.7. Use the GitHub release wheel, verify SHA256SUMS,
-and constrain dependencies to its source archive's uv.lock. Use an isolated
-uv tool installation, not the unrelated PyPI package named yt-transcript.
-Ask before replacing an existing installation or installing missing runtimes.
-Keep other tools and model credentials unchanged.
-
-Ask which MCP client(s) I want configured. Use user-level configuration unless
-I approve project scope. Read each selected client's official MCP documentation;
-use its native setup command or configuration format, not another client's schema.
-Back up affected files and preserve existing servers and unrelated settings.
-Register a local stdio server named yt-transcript with the installed executable's
-absolute path and args ["--mcp", "--no-config"]. Where supported, allow a 330-second
-tool-call timeout. Apply client-specific fields only when documented for that client.
-Pi is the optional Markdown formatter, not a required MCP client.
-Verify version, doctor, and only this server's startup/tool listing without
-live YouTube, SponsorBlock, or model calls. Confirm it exposes only get_transcript.
-Report installation/configuration paths, backups, checks, and any missing runtimes.
-Give each selected client's reload/restart instructions.
-Ask me to authenticate if access is missing. Never print credentials or add them
-to URLs or project files.
-
-Read these guides before installation or configuration:
-Installation: https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md
-MCP setup and client documentation: https://github.com/nmdra/yt-transcript/blob/main/docs/mcp.md
-Release assets: https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.3
+Install `nmdra/yt-transcript` `v0.2.0-dev.3` for my user account with the MCP extra using Python `3.14.7`; first read the official installation guide, MCP guide, and release page at https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md, https://github.com/nmdra/yt-transcript/blob/main/docs/mcp.md, and https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.3. Use the GitHub release wheel, not the unrelated PyPI package `yt-transcript`; verify it against the release `SHA256SUMS` and stop if verification fails; constrain dependencies to the same release source archive’s `uv.lock`; install it as an isolated user-level `uv tool` with the MCP extra and exactly Python `3.14.7`; ask before replacing or modifying any existing installation or installing missing runtimes/tools such as Python or `uv`; keep unrelated tools, configs, environment variables, API keys, model credentials, and existing MCP servers unchanged; configure MCP only for the client(s) I select, after reading each client’s official MCP documentation, using that client’s native setup command or config format rather than another client’s schema; if any required asset, checksum, lockfile, compatibility detail, or configuration is ambiguous, stop and explain instead of guessing; afterward, verify and report the installed version, Python version, checksum result, lockfile-constrained dependency setup, install location, MCP config changes, and a non-secret startup/connectivity check if supported.
 ```
 
 ## Documentation
