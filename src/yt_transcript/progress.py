@@ -40,7 +40,12 @@ class TerminalProgress:
             if self._thread is None and not self._stop.is_set():
                 self._started = time.monotonic()
                 self._thread = threading.Thread(target=self._animate, daemon=True)
-                self._thread.start()
+                try:
+                    self._thread.start()
+                except RuntimeError, OSError:
+                    self._thread = None
+                    self.enabled = False
+                    return
             self._draw()
 
     def chunks(self, completed: int, total: int) -> None:
@@ -73,6 +78,13 @@ class TerminalProgress:
                 if self.enabled:
                     self._draw()
 
+    def _line_width(self) -> int:
+        try:
+            columns = os.get_terminal_size(self.stream.fileno()).columns
+        except AttributeError, OSError, ValueError:
+            columns = 80
+        return max(0, columns - 1)
+
     def _draw(self) -> None:
         try:
             elapsed = max(0, int(time.monotonic() - self._started))
@@ -90,12 +102,9 @@ class TerminalProgress:
             label = f"{spinner} {LABELS[self._stage]}"
         text = f"{label} | {minutes:02}:{seconds:02} elapsed"
         try:
-            try:
-                columns = os.get_terminal_size(self.stream.fileno()).columns
-            except AttributeError, OSError, ValueError:
-                columns = 80
-            text = text[: max(0, columns - 1)]
-            width = max(self._width, len(text))
+            available = self._line_width()
+            text = text[:available]
+            width = min(available, max(self._width, len(text)))
             self.stream.write("\r" + text.ljust(width))
             self.stream.flush()
             self._width = len(text)
@@ -105,7 +114,8 @@ class TerminalProgress:
     def _clear(self) -> None:
         if self._width:
             try:
-                self.stream.write("\r" + " " * self._width + "\r")
+                width = min(self._width, self._line_width())
+                self.stream.write("\r" + " " * width + "\r")
                 self.stream.flush()
             except OSError, ValueError:
                 self.enabled = False

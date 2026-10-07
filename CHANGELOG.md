@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep CLI transcription working when the optional progress thread cannot start
+- Preserve safe MCP Markdown error explanations, hints, and validated chunk-limit counts
+- Clip terminal progress padding and cleanup after a window resize
+
 ## [0.2.0-dev.2] - 2026-10-07
 
 ### Added

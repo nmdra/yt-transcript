@@ -136,6 +136,48 @@ except KeyboardInterrupt: pass
     asyncio.run(check())
 
 
+def test_markdown_cap_error_survives_worker_transport(tmp_path, monkeypatch):
+    from dataclasses import asdict
+
+    from yt_transcript.mcp_policy import MCPFormattingPolicy
+
+    install_child(
+        tmp_path,
+        monkeypatch,
+        "import json,sys\nfrom dataclasses import asdict\n"
+        "from yt_transcript.errors import AppError\n"
+        "from yt_transcript.formatter import format_with_pi\n"
+        "sys.stdin.buffer.read()\n"
+        "try: format_with_pi('word '*1000,chunk_chars=1000,max_chunks=3)\n"
+        "except AppError as exc: print(json.dumps({'error':asdict(exc.info)}))\n",
+    )
+
+    async def check():
+        with pytest.raises(AppError) as exc:
+            await WorkerRunner().run(
+                {
+                    "operation": "get_transcript",
+                    "url": "https://youtu.be/abcdefghijk",
+                    "mode": "full",
+                    "sponsorblock": {
+                        "enabled": False,
+                        "categories": ["sponsor"],
+                        "timeout_seconds": 10,
+                    },
+                    "output_format": "markdown",
+                    "formatting": asdict(MCPFormattingPolicy(chunk_chars=1000)),
+                }
+            )
+        assert exc.value.info.code == "CHUNK_LIMIT_EXCEEDED"
+        assert "requires 5 chunks, exceeding max-chunks 3" in exc.value.info.message
+        assert (
+            exc.value.info.hint
+            == "Raise the chunk cap explicitly, or use raw/plain-text output."
+        )
+
+    asyncio.run(check())
+
+
 def test_response_limit_reaps(tmp_path, monkeypatch):
     processes = install_child(
         tmp_path,

@@ -77,6 +77,28 @@ def test_narrow_terminal(monkeypatch):
     assert all(len(frame) <= 19 for frame in stream.getvalue().split("\r"))
 
 
+@pytest.mark.parametrize("redraw", [False, True])
+def test_terminal_shrink_clips_padding_and_cleanup(monkeypatch, redraw):
+    import os
+
+    columns = 80
+    stream = io.StringIO()
+    monkeypatch.setattr(stream, "fileno", lambda: 2)
+    monkeypatch.setattr(
+        os, "get_terminal_size", lambda fd: os.terminal_size((columns, 24))
+    )
+    progress = TerminalProgress(stream, enabled=True)
+    progress._draw()
+    stream.seek(0)
+    stream.truncate()
+    columns = 20
+    if redraw:
+        progress._draw()
+    progress.close()
+    assert all(len(frame) <= 19 for frame in stream.getvalue().split("\r"))
+    assert progress._width == 0
+
+
 def test_spinner_updates_while_operation_waits():
     changed = threading.Event()
 

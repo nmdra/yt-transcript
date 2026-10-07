@@ -206,6 +206,7 @@ def classify_pi_failure(
         "PI_PROTOCOL_INVALID": "Pi did not return a valid settled JSON completion.",
         "PI_OUTPUT_INVALID": "Pi returned an invalid Markdown body.",
         "PI_OUTPUT_LIMIT": "Pi output exceeded the configured safety bound.",
+        "CHUNK_LIMIT_EXCEEDED": "Transcript exceeds the configured chunk cap.",
     }
     hints = {
         "PI_NOT_FOUND": "Install Pi or use --raw.",
@@ -217,6 +218,7 @@ def classify_pi_failure(
         "PI_QUOTA_EXCEEDED": "Check provider billing and quota or use --raw.",
         "PI_CONTEXT_LIMIT": "Reduce pi.chunk_chars in TOML, review the model choice, or use --raw.",
         "PI_OUTPUT_INCOMPLETE": "Reduce pi.chunk_chars in TOML, review the model choice, or use --raw.",
+        "CHUNK_LIMIT_EXCEEDED": "Raise the chunk cap explicitly, or use raw/plain-text output.",
     }
     return FormattingError(
         ErrorInfo(
@@ -304,6 +306,7 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         "Captions are not valid UTF-8.",
         "Deno is required for YouTube extraction.",
         "Deno or EJS setup is not compatible.",
+        "MCP Markdown output requires POSIX process supervision.",
         "Document exceeds the MCP size limit.",
         "Result exceeds the MCP size limit.",
         "Invalid private worker request.",
@@ -326,14 +329,33 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         "Install Deno >=2.3.0 and run --doctor.",
         "Install compatible Deno/EJS components and run --doctor.",
         "Use the deterministic CLI for larger transcripts.",
+        "Use plain_text output on this platform.",
     }
     hint = (
         payload["hint"]
         if isinstance(payload["hint"], str) and payload["hint"] in hints
         else None
     )
+    code = payload["code"]
+    if code.startswith("PI_") or code == "CHUNK_LIMIT_EXCEEDED":
+        safe = classify_pi_failure(code=code).info
+        message, hint = safe.message, safe.hint
+        if code == "CHUNK_LIMIT_EXCEEDED" and isinstance(payload["message"], str):
+            counts = re.fullmatch(
+                r"formatting requires ([1-9][0-9]{0,5}) chunks, exceeding max-chunks "
+                r"([1-9][0-9]{0,3}); use --preview, --raw, or explicitly raise the cap",
+                payload["message"],
+            )
+            if counts:
+                try:
+                    required, cap = int(counts[1]), int(counts[2])
+                except ValueError:
+                    pass
+                else:
+                    if cap <= 1000 and cap < required <= 100000:
+                        message = payload["message"]
     return ErrorInfo(
-        payload["code"],
+        code,
         message,
         hint,
         payload["phase"],

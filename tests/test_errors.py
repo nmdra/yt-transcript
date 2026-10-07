@@ -168,6 +168,47 @@ def test_worker_error_allowlist():
     assert safe.code == "NETWORK_FAILED"
 
 
+@pytest.mark.parametrize("code", ["PI_NOT_FOUND", "PI_AUTH_FAILED", "PI_TIMEOUT"])
+def test_worker_pi_errors_rebuild_trusted_messages(code):
+    from dataclasses import asdict, replace
+
+    from yt_transcript.errors import decode_worker_error
+
+    expected = classify_pi_failure(code=code, chunk_index=1, chunk_total=2).info
+    payload = asdict(
+        replace(expected, message="Bearer private caption text", hint="/private/path")
+    )
+    assert decode_worker_error(payload) == expected
+
+
+@pytest.mark.parametrize(
+    "required,cap,accepted",
+    [
+        ("5", "3", True),
+        ("100001", "3", False),
+        ("5", "1001", False),
+        ("3", "5", False),
+        ("5", "0", False),
+        ("private", "3", False),
+    ],
+)
+def test_worker_chunk_limit_details_are_bounded(required, cap, accepted):
+    from dataclasses import asdict, replace
+
+    from yt_transcript.errors import decode_worker_error
+
+    expected = classify_pi_failure(code="CHUNK_LIMIT_EXCEEDED").info
+    message = (
+        f"formatting requires {required} chunks, exceeding max-chunks {cap}; "
+        "use --preview, --raw, or explicitly raise the cap"
+    )
+    decoded = decode_worker_error(
+        asdict(replace(expected, message=message, hint="Bearer private"))
+    )
+    assert decoded.message == (message if accepted else expected.message)
+    assert decoded.hint == expected.hint
+
+
 def test_safe_rendering():
     secret = "Bearer key cookie Authorization signed?token=value /home/private transcript \x1b[31m"
     exc = AppError(

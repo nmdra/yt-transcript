@@ -179,8 +179,6 @@ def _transcribe(
     else:
         progress.close()
         _emit(data)
-    progress.close()
-    return
 
 
 def main(argv: Sequence[str] | None = None) -> int:

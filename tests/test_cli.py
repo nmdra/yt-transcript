@@ -191,3 +191,27 @@ def test_terminal_progress_stays_off_stdout(pipeline, monkeypatch, capsys):
     assert "Pi chunks 1/2" in stream.getvalue()
     assert "Pi chunks 2/2" in stream.getvalue()
     assert "hello world" not in stream.getvalue()
+
+
+@pytest.mark.parametrize("failure", [RuntimeError, OSError])
+def test_progress_thread_failure_keeps_transcription_working(
+    pipeline, monkeypatch, capsys, failure
+):
+    import io
+    import threading
+
+    from yt_transcript import cli
+
+    stream = io.StringIO()
+    monkeypatch.setattr(stream, "isatty", lambda: True)
+    monkeypatch.setenv("TERM", "xterm")
+    monkeypatch.setattr(cli.sys, "stderr", stream)
+
+    def fail(self):
+        raise failure("cannot start progress thread")
+
+    monkeypatch.setattr(threading.Thread, "start", fail)
+    assert main([URL, "--no-config", "--raw"]) == 0
+    assert capsys.readouterr().out == "hello world\n"
+    assert not stream.getvalue()
+    assert pipeline == ["download"]
