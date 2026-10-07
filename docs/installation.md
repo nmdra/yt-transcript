@@ -2,8 +2,9 @@
 
 [README](../README.md) · [MCP setup](mcp.md) · [Troubleshooting](troubleshooting.md)
 
-These instructions use an isolated, user-level uv tool environment. They do not
-require sudo or change the project's development environment.
+These instructions use an isolated uv tool environment for your user account.
+The instructions do not require sudo.
+The installation does not change the project's development environment.
 
 ## Prerequisites
 
@@ -13,14 +14,16 @@ require sudo or change the project's development environment.
 - Access to the `nmdra/yt-transcript` repository and release assets
 - [Pi](https://pi.dev) 1.0.4 or a newer compatible release for Markdown editing or Pi MCP integration
 
-Raw captions and MCP plain-text extraction do not need Pi to process captions.
-Explicit MCP Markdown output requires Pi and POSIX worker supervision. A Pi client
-is required when you want to connect the server to Pi. Install missing
-runtimes from their official sources after checking existing versions.
+Raw captions and MCP plain-text extraction do not require Pi for caption processing.
+Explicit MCP Markdown output requires Pi and POSIX worker supervision.
+You need a Pi client to connect the server to Pi.
+Check the installed runtime versions first.
+Then install missing runtimes from their official sources.
 
-Use `uv python find --system 3.14.7` to check the interpreter. Older uv releases,
-including 0.8.13, cannot download Python 3.14.7 from their bundled registry.
-Install that runtime separately rather than silently choosing another version.
+Use `uv python find --system 3.14.7` to check the interpreter.
+Older uv releases, including 0.8.13, cannot download Python 3.14.7 from their bundled registry.
+Install that runtime separately.
+Do not silently select another version.
 
 Pi's npm installer requires Node.js 22.19 or newer:
 
@@ -28,9 +31,10 @@ Pi's npm installer requires Node.js 22.19 or newer:
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 ```
 
-Set up provider authentication and the default model directly in Pi through
-`/login` and `/model`. Installation, doctor, and MCP tool listing need no model
-call. Keep credentials out of URLs, shell arguments, and project files.
+Set up provider authentication directly in Pi through `/login`.
+Set the default model through `/model`.
+Installation, doctor, and MCP tool listing do not require a model call.
+Keep credentials out of URLs, shell arguments, and project files.
 
 ## Quick Git-source install
 
@@ -44,25 +48,26 @@ yt-transcript --help
 yt-transcript --doctor
 ```
 
-This installs `0.2.0.dev5` with the MCP extra and pins the application source to
-the development release tag. uv resolves compatible dependencies from package
-metadata; it does not use the repository lockfile for this installation.
-Use the wheel method below when you need release-matched dependency versions.
+This command installs `0.2.0.dev5` with the MCP extra.
+The command pins the application source to the development release tag.
+uv selects compatible dependencies from package metadata.
+uv does not use the repository lockfile for this installation.
+Use the wheel method below if you need dependency versions that match the release.
 
-Bare `uvx yt-transcript` and `uv tool install yt-transcript` select an unrelated
-PyPI project. Always supply this repository or its verified release wheel.
+Bare `uvx yt-transcript` and `uv tool install yt-transcript` select an unrelated PyPI project.
+Always specify this repository or its verified release wheel.
 
 ## Verified wheel with release-matched dependencies
 
-Use this method for the copy-paste agent prompt in the README. It needs the
-[GitHub CLI](https://cli.github.com/). This repository and the approved
-`v0.2.0-dev.5` release are public. Authenticate if the CLI requests it or access
-is unavailable. Do not place tokens in
-commands or download URLs.
+Use this method for the agent installation prompt in the README.
+The method requires the [GitHub CLI](https://cli.github.com/).
+This repository and the approved `v0.2.0-dev.5` release are public.
+Authenticate if the CLI requests authentication or access is unavailable.
+Do not put tokens in commands or download URLs.
 
-The following POSIX-shell example stores assets under your user data directory.
-If that release directory already contains files, verify and reuse them or choose
-a fresh directory. `gh release download` refuses to overwrite existing files.
+The following POSIX-shell example stores assets in your user data directory.
+If the release directory already contains files, verify and reuse those files or select a new directory.
+`gh release download` does not overwrite existing files.
 
 ```sh
 release_dir="$HOME/.local/share/yt-transcript/releases/v0.2.0-dev.5"
@@ -71,9 +76,10 @@ gh release download v0.2.0-dev.5 --repo nmdra/yt-transcript --dir "$release_dir"
 (cd "$release_dir" && sha256sum --check SHA256SUMS)
 ```
 
-On macOS, use `shasum -a 256 --check SHA256SUMS` instead of `sha256sum`. Continue
-only when both wheel and source archive checksums pass. Checksums detect changed
-bytes; trust in the release still depends on your authenticated GitHub source.
+On macOS, use `shasum -a 256 --check SHA256SUMS` instead of `sha256sum`.
+Continue only when the wheel and source archive checksums both pass.
+Checksums detect changed bytes.
+Trust in the release still depends on your authenticated GitHub source.
 
 Extract constraints without unpacking or executing the source archive:
 
@@ -99,7 +105,7 @@ assert packages.pop("yt-transcript") == "0.2.0.dev5"
 PY
 ```
 
-Install the verified wheel, including the MCP extra:
+Install the verified wheel with the MCP extra:
 
 ```sh
 wheel_url=$("$python_path" -c \
@@ -112,28 +118,31 @@ yt-transcript --version
 yt-transcript --doctor
 ```
 
-These constraints select exact versions for required dependencies; they do not
-install every package listed in the development lockfile. `--offline` is optional
-when all required packages are already cached. Retain the assets and constraints
-while the uv tool receipt refers to them.
+These constraints select exact versions for required dependencies.
+The constraints do not install every package in the development lockfile.
+`--offline` is optional when all required packages are already cached.
+Keep the assets and constraints while the uv tool receipt refers to those files.
 
 ## PATH and MCP setup
 
-uv normally exposes the executable in `~/.local/bin`. Check your configured
-location with `uv tool dir --bin`, and make sure it is on `PATH`. Resolve the
-installed command with `command -v yt-transcript` before using an absolute path
-in [Pi's MCP configuration](mcp.md).
+uv normally makes the executable available in `~/.local/bin`.
+Check your configured location with `uv tool dir --bin`.
+Make sure that location is on `PATH`.
+Use `command -v yt-transcript` to find the installed command.
+Then use the absolute path in [Pi's MCP configuration](mcp.md).
 
-Doctor checks Python, yt-dlp, PyYAML, EJS compatibility, Deno, and Pi. A healthy
-report proves local readiness, not video access or model authentication.
+Doctor checks Python, yt-dlp, PyYAML, EJS compatibility, Deno, and Pi.
+A healthy report shows local readiness only.
+The report does not verify video access or model authentication.
 Do not run a live video or paid Markdown job as an installation check.
 
 ## Updates and uninstall
 
-Updates are explicit. Review the target release and changelog before replacing
-an existing installation. Repeat the chosen method with that version's tag,
-asset names, and lockfile. Ask before using `--force` to replace executables.
-Avoid an unqualified upgrade command that could select the unrelated PyPI project.
+Updates are explicit.
+Review the target release and changelog before you replace an existing installation.
+Repeat the selected installation method with that version's tag, asset names, and lockfile.
+Ask before you use `--force` to replace executables.
+Do not use an unqualified upgrade command that could select the unrelated PyPI project.
 
 To remove this tool and its Pi MCP entry:
 
@@ -142,5 +151,5 @@ pi mcp remove yt-transcript
 uv tool uninstall yt-transcript
 ```
 
-Run `/reload` in an active Pi session after changing MCP configuration. Removing
-the tool does not remove saved transcripts, release assets, or configuration backups.
+After you change MCP configuration, run `/reload` in an active Pi session.
+Removal of the tool does not remove saved transcripts, release assets, or configuration backups.

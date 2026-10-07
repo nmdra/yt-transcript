@@ -2,8 +2,8 @@
 
 [README](../README.md) · [Installation](installation.md) · [Troubleshooting](troubleshooting.md)
 
-These commands use the installed executable. In a development checkout, use
-`uv run yt-transcript` instead.
+These commands use the installed executable.
+In a development checkout, use `uv run yt-transcript` instead.
 
 ## Output modes
 
@@ -20,14 +20,18 @@ yt-transcript 'https://youtu.be/YE7VzlLtp-4' --no-config --model provider/model-
 | `--raw` | One normalized paragraph | No | YAML with `-o` |
 | `--raw-vtt` | Unchanged VTT bytes | No | None |
 
-Stdout contains only the body. File output leaves stdout empty. All non-VTT bodies end with one newline.
+Stdout contains only the transcript body.
+File output leaves stdout empty.
+All non-VTT bodies end with one newline.
 
-Terminal stderr shows a spinner during caption retrieval/filtering, then a bar
-with completed Pi chunks and elapsed time. It does not estimate download bytes,
-tokens, cost, or completion time. Progress is disabled for redirected stderr,
-`TERM=dumb`, help/version, doctor, and MCP. It never enters transcripts or files.
+Terminal stderr shows a spinner during caption retrieval/filtering.
+Then stderr shows a bar with completed Pi chunks and elapsed time.
+Progress does not estimate download bytes, tokens, cost, or completion time.
+Progress is disabled for redirected stderr, `TERM=dumb`, help/version, doctor, and MCP.
+Progress never appears in transcripts or files.
 
-Use `-o` for Python-generated YAML metadata. Shell redirection receives the body only:
+Use `-o` for Python-generated YAML metadata.
+Shell redirection receives only the transcript body:
 
 ```sh
 yt-transcript URL --no-config --raw > body.txt
@@ -35,20 +39,26 @@ yt-transcript URL --no-config --raw -o transcript.txt
 yt-transcript URL --no-config --raw | wc -w
 ```
 
-The URL must contain an 11-character video ID. Supported hosts are `youtube.com`, `www.youtube.com`, `m.youtube.com`, and `youtu.be`.
+The URL must contain an 11-character video ID.
+Supported hosts are `youtube.com`, `www.youtube.com`, `m.youtube.com`, and `youtu.be`.
 
-Watch, shorts, and embed URLs are supported. A playlist parameter on a video URL does not enable playlist downloads.
-
+Watch, shorts, and embed URLs are supported.
+A playlist parameter on a video URL does not enable playlist downloads.
 
 ## Configuration
 
-The wrapper reads `$XDG_CONFIG_HOME/yt-transcript/config.toml` when `XDG_CONFIG_HOME` is an absolute, nonempty path. Otherwise, it reads `~/.config/yt-transcript/config.toml`.
+The wrapper reads `$XDG_CONFIG_HOME/yt-transcript/config.toml` when `XDG_CONFIG_HOME` is an absolute, nonempty path.
+Otherwise, the wrapper reads `~/.config/yt-transcript/config.toml`.
 
-Relative XDG paths are ignored. Project files and parent directories are never searched. A missing default file uses built-in defaults.
+The wrapper ignores relative XDG paths.
+The wrapper never searches project files or parent directories.
+If the default file is missing, the wrapper uses built-in defaults.
 
-`--config PATH` selects one file instead of discovery. `--no-config` disables wrapper configuration. These flags do not change Pi configuration or credentials.
+`--config PATH` selects one file instead of configuration discovery.
+`--no-config` disables wrapper configuration.
+These flags do not change Pi configuration or credentials.
 
-The precedence is explicit CLI flags, then the selected TOML file, then built-in defaults:
+The wrapper applies settings in this order of priority: explicit CLI flags, the selected TOML file, then built-in defaults.
 
 ```toml
 [output]
@@ -70,7 +80,8 @@ categories = ["sponsor", "selfpromo", "interaction"]
 timeout_seconds = 10
 ```
 
-Unknown keys, invalid types, malformed TOML, and files larger than 64 KiB are errors. The wrapper does not create configuration files.
+Unknown keys, invalid types, malformed TOML, and files larger than 64 KiB cause errors.
+The wrapper does not create configuration files.
 
 | Key | Valid values |
 |---|---|
@@ -86,14 +97,21 @@ Unknown keys, invalid types, malformed TOML, and files larger than 64 KiB are er
 | `sponsorblock.categories` | Nonempty unique list: `sponsor`, `selfpromo`, `interaction`, `intro`, `outro`, `preview` |
 | `sponsorblock.timeout_seconds` | Integer 1 through 30, per socket operation |
 
-`--raw`, `--raw-vtt`, `--model`, `--max-chunks`, and `-v` override their corresponding defaults. There is no `--markdown` or `--quiet` flag.
+`--raw`, `--raw-vtt`, `--model`, `--max-chunks`, and `-v` override their corresponding defaults.
+There is no `--markdown` or `--quiet` flag.
 
-Raw modes ignore saved Pi preferences after schema checks. An explicit model, chunk cap, or editorial-mode flag conflicts with raw output. `--editorial-mode` and the mutually exclusive `--sponsorblock` / `--no-sponsorblock` flags override TOML. The existing CLI shape and defaults remain unchanged.
+Raw modes ignore saved Pi preferences after schema checks.
+An explicit model, chunk cap, or editorial-mode flag conflicts with raw output.
+`--editorial-mode` overrides TOML.
+The mutually exclusive `--sponsorblock` / `--no-sponsorblock` flags also override TOML.
+The existing CLI structure and defaults remain unchanged.
 
-Without an explicit model in TOML or CLI, every Pi call omits `--model`. Pi chooses its configured default. The wrapper never selects a fallback model.
+Without an explicit model in TOML or CLI, every Pi call omits `--model`.
+Pi selects its configured default.
+The wrapper never selects a fallback model.
 
-Help, version, and doctor ignore wrapper TOML. A malformed configuration still blocks raw mode unless `--no-config` is supplied.
-
+Help, version, and doctor ignore wrapper TOML.
+A malformed configuration still blocks raw mode unless you supply `--no-config`.
 
 ## Preview and cost controls
 
@@ -102,7 +120,9 @@ yt-transcript URL --no-config --preview
 yt-transcript URL --no-config --max-chunks 10 -o transcript.md
 ```
 
-Preview downloads and cleans captions, but never calls Pi. It shows these fields in a fixed order:
+Preview downloads and cleans captions.
+Preview never calls Pi.
+Preview shows these fields in a fixed order:
 
 1. Canonical URL
 2. Full cleaned character count
@@ -117,27 +137,41 @@ Preview downloads and cleans captions, but never calls Pi. It shows these fields
 11. Model selection
 12. Editorial mode
 
-Preview requires Markdown mode and no output path. A cap exceedance is a successful preview report. Actual formatting rejects the cap before any Pi call.
+Preview requires Markdown mode and no output path.
+If the plan exceeds the cap, preview still returns a successful report.
+Actual formatting rejects a plan that exceeds the cap before any Pi call.
 
-Preview is not a cache or a reservation. A later run downloads again. Invocation counts are not token counts, dollar estimates, or exact provider-request counts.
+Preview is not a cache or a reservation.
+A later run downloads captions again.
+Invocation counts are not token counts, dollar estimates, or exact provider-request counts.
 
-The formatter splits on sentence boundaries or whitespace without token splits or overlap. It sends chunks sequentially through independent in-memory Pi sessions.
+The formatter splits text on sentence boundaries or whitespace.
+The formatter does not split tokens or overlap chunks.
+The formatter sends chunks sequentially through independent in-memory Pi sessions.
 
-The formatter joins completed bodies without a final synthesis call. It does not summarize, globally deduplicate Markdown, or pass earlier generated chunks to Pi.
+The formatter joins completed bodies without a final synthesis call.
+The formatter does not summarize or remove duplicates across the complete Markdown document.
+The formatter does not send earlier generated chunks to Pi.
 
-A single token larger than the chunk limit fails rather than truncates. Character limits do not guarantee a compatible context window or output limit.
+If a single token is larger than the chunk limit, formatting fails.
+The formatter does not truncate the token.
+Character limits do not guarantee a compatible context window or output limit.
 
-**Default Markdown sends caption text to the configured model/provider.** It can incur one paid call per chunk, plus Pi/provider-internal retries.
+**Default Markdown sends caption text to the configured model/provider.**
+This can incur one paid call per chunk, plus Pi/provider-internal retries.
 
-A repeated run can incur new charges. A timeout or cancellation cannot undo provider work or billing. No wrapper-level model retries occur.
+A repeated run can incur new charges.
+A timeout or cancellation cannot undo provider work or billing.
+The wrapper does not retry model calls.
 
-Pi-processing failures print a warning on stderr suggesting `--raw` for plain
-text without Pi. No partial processed document or automatic fallback is written.
-MCP uses `output_format="plain_text"` for the same explicit recovery. Its total
-Markdown deadline is separate from CLI per-chunk timeouts.
+Pi-processing failures print a warning on stderr.
+The warning suggests `--raw` for plain text without Pi.
+The wrapper does not write a partial processed document or automatic fallback.
+MCP uses `output_format="plain_text"` for the same explicit recovery.
+The total MCP Markdown deadline is separate from CLI per-chunk timeouts.
 
-`--no-session` prevents local Pi session persistence. It does not prevent provider-side logging or retention.
-
+`--no-session` prevents local Pi session persistence.
+This flag does not prevent provider-side logging or retention.
 
 ## Doctor and file safety
 
@@ -146,16 +180,28 @@ yt-transcript --doctor
 yt-transcript URL --no-config --raw -o transcript.txt --no-clobber
 ```
 
-Doctor is local and ignores wrapper TOML. It reports Python, package versions, EJS compatibility, Deno, and Pi readiness.
+Doctor is local and ignores wrapper TOML.
+Doctor reports Python, package versions, EJS compatibility, Deno, and Pi readiness.
 
-Version commands use isolated directories and five-second deadlines. Doctor does not run a model or access YouTube, credentials, or authentication commands.
+Version commands use isolated directories and five-second deadlines.
+Doctor does not run a model or access YouTube, credentials, or authentication commands.
 
-A healthy report establishes local readiness only. It does not establish video access, provider authentication, caption completeness, or model accuracy.
+A healthy report shows local readiness only.
+The report does not verify video access, provider authentication, caption completeness, or model accuracy.
 
-File output uses a completed sibling temporary file. Default publication atomically replaces the destination after success. Pre-output failures leave existing files unchanged.
+File output uses a completed sibling temporary file.
+By default, publication atomically replaces the destination after success.
+Failures before output leave existing files unchanged.
 
-`--no-clobber` requires `-o`. It rejects existing entries, including broken symlinks, before extraction. Atomic hard-link publication also rejects a destination created during processing.
+`--no-clobber` requires `-o`.
+Before extraction, this flag rejects existing entries, including broken symlinks.
+Atomic hard-link publication also rejects a destination created during processing.
 
-Filesystems without usable hard links fail closed. There is no replacement fallback. A cleanup failure after publication produces a warning, not a false publication failure.
+Filesystems without usable hard links fail closed.
+There is no replacement fallback.
+A cleanup failure after publication produces a warning.
+The cleanup failure is not reported as a publication failure.
 
-The output parent directory must exist. Stdout is not transactional. A failed stdout write can leave partial bytes in a pipe.
+The output parent directory must exist.
+Stdout is not transactional.
+A failed stdout write can leave partial bytes in a pipe.

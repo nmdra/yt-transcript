@@ -3,26 +3,30 @@
 <img width="2172" height="724" alt="yt-transcript Workflow Overview" src="https://github.com/user-attachments/assets/c556b444-b47f-4afa-88c4-0aca64639cae" />
 
 Get English YouTube transcripts with chapter and timestamp context.
-Use the CLI for raw captions or Pi-edited Markdown, or connect the MCP server to an AI agent. No audio/video downloads or FFmpeg required.
+Use the CLI for raw captions or Pi-edited Markdown.
+You can also connect the MCP server to an AI agent.
+The tool does not download audio or video and does not require FFmpeg.
 
 - **CLI:** raw captions, previews, or Pi-edited Markdown
 - **MCP:** `get_transcript` with `filtered` and `full` modes
-- **Context:** preserves supplied chapters or adds original-video timestamp blocks
-- **SponsorBlock:** enabled by default for MCP, opt-in for CLI, with full-caption fallback
+- **Context:** keeps supplied chapters or adds timestamp blocks with original video times
+- **SponsorBlock:** enabled by default for MCP; opt-in for CLI; includes full-caption fallback
 - **No model required:** raw CLI output and MCP plain text make no model calls
-- **Optional Pi editing:** Markdown output uses Pi and may incur model charges
+- **Optional Pi editing:** Markdown output uses Pi and can incur model charges
 
 ## Install
 
-Requires:
+Requirements:
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - Python **3.14.7**
 - [Deno](https://docs.deno.com/runtime/getting_started/installation/) **2.3.0+**
-- [Pi](https://pi.dev) separately, only for Markdown editing
+- [Pi](https://pi.dev), installed separately, only for Markdown editing
 
 > [!NOTE]
-> `yt-transcript` uses the Pi agent for transcript post-processing features such as Markdown editing and focused cleanup. To use these features, Pi must be installed and configured separately. Raw transcript output and plain-text MCP usage do not require Pi.
+> `yt-transcript` uses Pi for Markdown editing and focused cleanup after caption extraction.
+> You must install and configure Pi separately to use these features.
+> Raw transcript output and plain-text MCP output do not require Pi.
 
 Install the pinned release:
 
@@ -34,11 +38,11 @@ yt-transcript --version
 yt-transcript --doctor
 ```
 
-This pins the application to **0.2.0.dev5**.
+This command pins the application to **0.2.0.dev5**.
 
 For verified release assets, checksum verification, and exact dependency versions, see the [installation guide](docs/installation.md).
 
-> **Important:** `uvx yt-transcript` resolves to an unrelated PyPI project. Install this project from the pinned GitHub release instead.
+> **Important:** `uvx yt-transcript` selects an unrelated PyPI project. Install this project from the pinned GitHub release instead.
 
 ## Use
 
@@ -58,20 +62,24 @@ yt-transcript URL --no-config --max-chunks 3 -o transcript.md
 yt-transcript URL --no-config --editorial-mode focused --max-chunks 3 -o focused.md
 ```
 
-Raw output requires no model. `--preview` fetches captions without calling Pi and shows the planned call count before Markdown editing. When using `-o`, output includes YAML metadata; stdout is body-only.
+Raw output does not require a model.
+`--preview` fetches captions without calling Pi.
+The preview shows the planned call count before Markdown editing.
+With `-o`, the output file includes YAML metadata.
+Stdout contains only the transcript body.
 
 ## MCP
 
-For any compatible MCP client, follow the [MCP setup guide](docs/mcp.md).
+For a compatible MCP client, follow the [MCP setup guide](docs/mcp.md).
 
-The MCP server exposes `get_transcript`:
+The MCP server provides `get_transcript`:
 
 - `filtered` is the default and attempts SponsorBlock filtering
 - `full` skips SponsorBlock filtering
-- plain-text output makes no model call
+- Plain-text output makes no model call
 - `output_format="markdown"` explicitly enables Pi editing
-- supplied chapters are preserved; otherwise timestamp context is added
-- CLI progress is written to terminal stderr
+- The tool keeps supplied chapters; otherwise, it adds timestamp context
+- The CLI writes progress to terminal stderr
 
 ## Install with an AI agent
 
@@ -83,18 +91,19 @@ Install `nmdra/yt-transcript` `v0.2.0-dev.5` for my user account with the MCP ex
 
 ## Documentation
 
-- [Installation](docs/installation.md) — prerequisites, pinned releases, updates, and uninstall
-- [CLI reference](docs/cli.md) — modes, configuration, preview, and file safety
-- [MCP setup](docs/mcp.md) — client configuration, tool results, and limits
-- [Transcript behavior](docs/behavior.md) — chapters, cleanup, focused editing, metadata, and filtering
-- [Troubleshooting](docs/troubleshooting.md) — error codes and recovery
-- [Development and releases](docs/development.md) — tests, live-check gates, and release workflow
+- [Installation](docs/installation.md): prerequisites, pinned releases, updates, and uninstall
+- [CLI reference](docs/cli.md): modes, configuration, preview, and file safety
+- [MCP setup](docs/mcp.md): client configuration, tool results, and limits
+- [Transcript behavior](docs/behavior.md): chapters, cleanup, focused editing, metadata, and filtering
+- [Troubleshooting](docs/troubleshooting.md): error codes and recovery
+- [Development and releases](docs/development.md): tests, conditions for live checks, and release workflow
 - [Changelog](CHANGELOG.md)
 
 ## License
 
-Code is licensed under [MIT](LICENSE).
+The code has an [MIT](LICENSE) license.
 
-SponsorBlock data is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) unless separate permission is granted.
+SponsorBlock data has a [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) license unless separate permission is granted.
 
-GitHub releases use the tag-triggered public release workflow. PyPI publication requires separate approval.
+GitHub releases use the tag-triggered public release workflow.
+PyPI publication requires separate approval.
