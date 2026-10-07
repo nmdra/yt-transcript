@@ -18,12 +18,12 @@ Install the pinned release from this repository:
 
 ```sh
 uv tool install --python 3.14.7 \
-  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.2'
+  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.3'
 yt-transcript --version
 yt-transcript --doctor
 ```
 
-This pins the application to **0.2.0.dev2**. For verified release assets and exact
+This pins the application to **0.2.0.dev3**. For verified release assets and exact
 dependency versions, see [installation details](docs/installation.md).
 **Bare `uvx yt-transcript` runs an unrelated PyPI project.**
 
@@ -51,7 +51,7 @@ SponsorBlock; `full` skips it. Default plain text calls no model; explicitly set
 Copy this prompt into an agent with local shell and file access:
 
 ```text
-Install nmdra/yt-transcript v0.2.0-dev.2 for my user account with the MCP extra
+Install nmdra/yt-transcript v0.2.0-dev.3 for my user account with the MCP extra
 and Python 3.14.7. Use the GitHub release wheel, verify SHA256SUMS,
 and constrain dependencies to its source archive's uv.lock. Use an isolated
 uv tool installation, not the unrelated PyPI package named yt-transcript.
@@ -76,7 +76,7 @@ to URLs or project files.
 Read these guides before installation or configuration:
 Installation: https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md
 MCP setup and client documentation: https://github.com/nmdra/yt-transcript/blob/main/docs/mcp.md
-Release assets: https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.2
+Release assets: https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.3
 ```
 
 ## Documentation

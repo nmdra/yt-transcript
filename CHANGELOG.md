@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.2.0-dev.3] - 2026-10-07
+
+### Changed
+
+- Make the installation prompt client-neutral with links to official MCP client setup guides
+
 ### Fixed
 
 - Keep CLI transcription working when the optional progress thread cannot start
@@ -43,6 +49,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.2...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.3...HEAD
+[0.2.0-dev.3]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.2...v0.2.0-dev.3
 [0.2.0-dev.2]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.1...v0.2.0-dev.2
 [0.2.0-dev.1]: https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.1
