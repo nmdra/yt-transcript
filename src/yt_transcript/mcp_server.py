@@ -262,13 +262,10 @@ def create_server(config: AppConfig, *, runner: Runner | None = None):
             return tools
 
         async def call_tool(self, name, arguments, context=None):
-            fields = {
-                "get_transcript": {"url", "mode", "output_format"},
-            }
             if (
-                name in fields
+                name == "get_transcript"
                 and isinstance(arguments, dict)
-                and set(arguments) - fields[name]
+                and set(arguments) - {"url", "mode", "output_format"}
             ):
                 raise ToolError(
                     "[CONFIG_INVALID] Unknown tool argument fields."
@@ -283,9 +280,9 @@ def create_server(config: AppConfig, *, runner: Runner | None = None):
                 )
                 if safe is not None:
                     raise ToolError(render_mcp_error(safe.info)) from None
-                if name not in {
-                    "get_transcript",
-                } or any(isinstance(cause, ValidationError) for cause in causes):
+                if name != "get_transcript" or any(
+                    isinstance(cause, ValidationError) for cause in causes
+                ):
                     info = ErrorInfo(
                         "CONFIG_INVALID",
                         "Invalid tool arguments or tool name.",

@@ -104,6 +104,10 @@ def test_schema_errors_never_echo_arguments(caplog):
             for name, arguments in [
                 ("get_transcript", {"url": {"Authorization": secret}}),
                 ("get_transcript", {"url": [secret]}),
+                (
+                    "get_transcript",
+                    {"url": "https://youtu.be/abcdefghijk", "extra": secret},
+                ),
                 ("doctor", {"private": secret}),
                 ("preview_transcript", {"url": secret}),
                 ("private-token-name", {}),

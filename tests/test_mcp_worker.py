@@ -31,6 +31,53 @@ def test_requests(payload):
         validate_request(payload)
 
 
+@pytest.mark.parametrize("markdown", [False, True])
+def test_dispatch_uses_explicit_formatting_options(monkeypatch, markdown):
+    from dataclasses import asdict
+
+    from yt_transcript import service
+    from yt_transcript.mcp_policy import MCPFormattingPolicy
+    from yt_transcript.mcp_worker import dispatch
+    from yt_transcript.sponsorblock import SponsorBlockConfig
+
+    request = {
+        "operation": "get_transcript",
+        "url": "https://youtu.be/abcdefghijk",
+        "mode": "full",
+        "sponsorblock": {
+            "enabled": False,
+            "categories": ["sponsor"],
+            "timeout_seconds": 10,
+        },
+    }
+    policy = MCPFormattingPolicy()
+    if markdown:
+        request.update(output_format="markdown", formatting=asdict(policy))
+    captured = []
+    expected = {"document": "body"}
+
+    def fetch(url, mode, **kwargs):
+        captured.append((url, mode, kwargs))
+        return expected
+
+    monkeypatch.setattr(service, "fetch_transcript_document", fetch)
+    assert dispatch(validate_request(request)) is expected
+    assert captured == [
+        (
+            request["url"],
+            "full",
+            {
+                "sponsorblock": SponsorBlockConfig(
+                    enabled=False, categories=("sponsor",), timeout_seconds=10
+                ),
+                "output_format": "markdown" if markdown else "plain_text",
+                "formatting": policy if markdown else None,
+                "supervised": markdown,
+            },
+        )
+    ]
+
+
 def test_real_worker_invalid_request():
     result = subprocess.run(
         [sys.executable, "-m", "yt_transcript.mcp_worker"],

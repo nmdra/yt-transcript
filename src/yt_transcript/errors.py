@@ -261,6 +261,10 @@ class WarningCollector:
         )
 
 
+def _is_formatting_failure(code: str) -> bool:
+    return code.startswith("PI_") or code == "CHUNK_LIMIT_EXCEEDED"
+
+
 def render_cli_error(exc: AppError) -> str:
     info = exc.info
     position = (
@@ -269,7 +273,7 @@ def render_cli_error(exc: AppError) -> str:
     result = f"error[{info.code}]: {info.message}{position}\n"
     if info.hint:
         result += f"hint: {info.hint}\n"
-    if info.code.startswith("PI_") or info.code == "CHUNK_LIMIT_EXCEEDED":
+    if _is_formatting_failure(info.code):
         result += "warning: No Pi-processed transcript was returned. Retry with --raw for plain text without Pi.\n"
     return result
 
@@ -283,9 +287,7 @@ def render_mcp_error(info: ErrorInfo) -> str:
     ):
         position = f" (chunk {info.chunk_index}/{info.chunk_total})"
     # Adapt only trusted Pi recovery text, not unrelated hints such as --raw-vtt.
-    formatting_failure = (
-        info.code.startswith("PI_") or info.code == "CHUNK_LIMIT_EXCEEDED"
-    )
+    formatting_failure = _is_formatting_failure(info.code)
     hint, message = info.hint, info.message
     if formatting_failure:
         hint = hint.replace("--raw", 'output_format="plain_text"') if hint else None
@@ -365,7 +367,7 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         else None
     )
     code = payload["code"]
-    if code.startswith("PI_") or code == "CHUNK_LIMIT_EXCEEDED":
+    if _is_formatting_failure(code):
         safe = classify_pi_failure(code=code).info
         message, hint = safe.message, safe.hint
         if code == "CHUNK_LIMIT_EXCEEDED" and isinstance(payload["message"], str):

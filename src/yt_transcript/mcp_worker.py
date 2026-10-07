@@ -18,16 +18,14 @@ def validate_request(request: object) -> dict:
     if not isinstance(request, dict):
         raise ValueError
     operation = request.get("operation")
-    allowed = {
-        "get_transcript": {"operation", "url", "mode", "sponsorblock"},
-    }
+    required_fields = {"operation", "url", "mode", "sponsorblock"}
     if (
         not isinstance(operation, str)
-        or operation not in allowed
+        or operation != "get_transcript"
         or set(request)
         not in (
-            allowed[operation],
-            allowed[operation] | {"output_format", "formatting"},
+            required_fields,
+            required_fields | {"output_format", "formatting"},
         )
     ):
         raise ValueError
@@ -58,19 +56,16 @@ def dispatch(request: dict) -> Mapping[str, Any]:
     from .service import fetch_transcript_document
     from .sponsorblock import validate_policy
 
+    sponsorblock = validate_policy(request["sponsorblock"])
+    markdown = request.get("output_format") == "markdown"
+    formatting = validate_formatting_policy(request["formatting"]) if markdown else None
     return fetch_transcript_document(
         request["url"],
         request["mode"],
-        sponsorblock=validate_policy(request["sponsorblock"]),
-        **(
-            {
-                "output_format": "markdown",
-                "formatting": validate_formatting_policy(request["formatting"]),
-                "supervised": True,
-            }
-            if request.get("output_format") == "markdown"
-            else {}
-        ),
+        sponsorblock=sponsorblock,
+        output_format="markdown" if markdown else "plain_text",
+        formatting=formatting,
+        supervised=markdown,
     )
 
 
