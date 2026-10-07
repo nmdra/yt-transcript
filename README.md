@@ -28,13 +28,13 @@ Install the pinned release:
 
 ```sh
 uv tool install --python 3.14.7 \
-  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.4'
+  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.5'
 
 yt-transcript --version
 yt-transcript --doctor
 ```
 
-This pins the application to **0.2.0.dev4**.
+This pins the application to **0.2.0.dev5**.
 
 For verified release assets, checksum verification, and exact dependency versions, see the [installation guide](docs/installation.md).
 
@@ -78,7 +78,7 @@ The MCP server exposes `get_transcript`:
 Copy the following prompt into an agent with local shell and file access:
 
 ```text
-Install `nmdra/yt-transcript` `v0.2.0-dev.4` for my user account with the MCP extra using Python `3.14.7`; first read the official installation guide, MCP guide, and release page at https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md, https://github.com/nmdra/yt-transcript/blob/main/docs/mcp.md, and https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.4. Use the GitHub release wheel, not the unrelated PyPI package `yt-transcript`; verify it against the release `SHA256SUMS` and stop if verification fails; constrain dependencies to the same release source archive's `uv.lock`; install it as an isolated user-level `uv tool` with the MCP extra and exactly Python `3.14.7`; ask before replacing or modifying any existing installation or installing missing runtimes/tools such as Python, Deno, or `uv`; keep unrelated tools, configs, environment variables, API keys, model credentials, and existing MCP servers unchanged; configure MCP only for the client(s) I select, after reading each client's official MCP documentation, using that client's native setup command or config format rather than another client's schema; if any required asset, checksum, lockfile, compatibility detail, or configuration is ambiguous, stop and explain instead of guessing; afterward, verify and report the installed version, Python version, checksum result, lockfile-constrained dependency setup, install location, MCP config changes, and a non-secret startup/connectivity check if supported.
+Install `nmdra/yt-transcript` `v0.2.0-dev.5` for my user account with the MCP extra using Python `3.14.7`; first read the official installation guide, MCP guide, and release page at https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md, https://github.com/nmdra/yt-transcript/blob/main/docs/mcp.md, and https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.5. Use the GitHub release wheel, not the unrelated PyPI package `yt-transcript`; verify it against the release `SHA256SUMS` and stop if verification fails; constrain dependencies to the same release source archive's `uv.lock`; install it as an isolated user-level `uv tool` with the MCP extra and exactly Python `3.14.7`; ask before replacing or modifying any existing installation or installing missing runtimes/tools such as Python, Deno, or `uv`; keep unrelated tools, configs, environment variables, API keys, model credentials, and existing MCP servers unchanged; configure MCP only for the client(s) I select, after reading each client's official MCP documentation, using that client's native setup command or config format rather than another client's schema; if any required asset, checksum, lockfile, compatibility detail, or configuration is ambiguous, stop and explain instead of guessing; afterward, verify and report the installed version, Python version, checksum result, lockfile-constrained dependency setup, install location, MCP config changes, and a non-secret startup/connectivity check if supported.
 ```
 
 ## Documentation
