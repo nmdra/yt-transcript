@@ -370,8 +370,10 @@ A live Pi check additionally requires explicit spend approval and `YT_TRANSCRIPT
 The Git source is the private repository [NMDRA/yt-transcript](https://github.com/NMDRA/yt-transcript). Your Git client needs authenticated access.
 
 ```sh
-uvx --from 'git+https://github.com/NMDRA/yt-transcript.git' yt-transcript --help
-uvx --from 'yt-transcript[mcp] @ git+https://github.com/NMDRA/yt-transcript.git' yt-transcript --mcp --no-config
+uvx --python 3.14.7 --from 'git+https://github.com/nmdra/yt-transcript.git' yt-transcript --help
+uvx --python 3.14.7 --from 'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git' yt-transcript --mcp --no-config
 ```
+
+The explicit Python selector also works with older uv releases that select an incompatible interpreter for the MCP extra.
 
 Keep credentials out of URLs and command arguments. PyPI publication and live model checks still require separate approval.
