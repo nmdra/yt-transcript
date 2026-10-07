@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.32.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yt-transcript"
+version = "0.1.0"
+description = "English YouTube captions with deterministic cleanup and isolated Pi editing"
+readme = "README.md"
+requires-python = ">=3.14.7"
+license = "MIT"
+dependencies = ["yt-dlp[default]>=2026.8.19", "PyYAML>=6.0.3"]
+
+[project.optional-dependencies]
+mcp = ["mcp>=2.3.0"]
+
+[dependency-groups]
+dev = ["pytest>=9.1.1", "ruff>=0.16.10"]
+
+[project.scripts]
+yt-transcript = "yt_transcript.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: explicitly enabled live checks"]
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yt_transcript"]

@@ -1,0 +1,15 @@
+WEBVTT
+
+REGION
+id:main
+
+NOTE ignored
+not a caption
+
+STYLE
+::cue {color:white}
+
+cue-id
+01:02:03.004 --> 01:02:04.500 align:start
+<v Person><c.color>Hello</c></v> &amp; &lt;literal&gt;
+42 NOTE 😀

@@ -1,0 +1,10 @@
+[output]
+mode = "markdown"
+verbose = false
+
+[pi]
+chunk_chars = 12000
+timeout_seconds = 600
+# max_chunks = 20
+# Omit model to preserve Pi's configured default.
+# model = "provider/model-id"

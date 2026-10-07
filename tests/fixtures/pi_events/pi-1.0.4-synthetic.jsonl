@@ -1,0 +1,10 @@
+{"type":"session","version":3,"id":"synthetic","timestamp":"2026-01-01T00:00:00.000Z","cwd":"/synthetic"}
+{"type":"agent_start"}
+{"type":"turn_start"}
+{"type":"message_end","message":{"role":"user","content":"Source only","timestamp":0}}
+{"type":"message_start","message":{"role":"assistant","content":[],"stopReason":"pending"}}
+{"type":"message_update","assistantMessageEvent":{"type":"thinking_delta","delta":"ignored private thinking","contentIndex":0}}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"thinking","thinking":"ignored"},{"type":"text","text":"## Edited transcript\n\nCafé 😀."}],"stopReason":"stop","provider":"synthetic","model":"synthetic","timestamp":0}}
+{"type":"turn_end","message":{"role":"assistant","content":[{"type":"text","text":"## Edited transcript\n\nCafé 😀."}],"stopReason":"stop"},"toolResults":[]}
+{"type":"agent_end","messages":[],"willRetry":false}
+{"type":"agent_settled"}

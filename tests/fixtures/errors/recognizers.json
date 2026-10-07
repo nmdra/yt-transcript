@@ -1,0 +1,22 @@
+{
+  "yt_dlp_version": "2026.8.19",
+  "pi_cli_version": "1.0.4",
+  "source": "Synthetic fixtures for narrow recognizable upstream error fields; not captured live runs.",
+  "youtube": [
+    ["Sign in to confirm your age", "AGE_RESTRICTED"],
+    ["Sign in to confirm you're not a bot", "YOUTUBE_ACCESS_LIMITED"],
+    ["This video is private", "AUTH_REQUIRED"],
+    ["Video unavailable", "VIDEO_UNAVAILABLE"],
+    ["PO Token required", "YOUTUBE_ACCESS_LIMITED"],
+    ["Ambiguous HTTP 403 auth quota unavailable", "YOUTUBE_EXTRACT_FAILED"]
+  ],
+  "pi": [
+    ["No API key found for provider", "PI_AUTH_FAILED"],
+    ["Model not found: synthetic", "PI_MODEL_UNAVAILABLE"],
+    ["insufficient_quota", "PI_QUOTA_EXCEEDED"],
+    ["rate_limit_exceeded", "PI_RATE_LIMITED"],
+    ["context_length_exceeded", "PI_CONTEXT_LIMIT"],
+    ["Unknown option: --no-context-files", "PI_INCOMPATIBLE"],
+    ["Provider credentials billing rejected in unknown words", "PI_FAILED"]
+  ]
+}
