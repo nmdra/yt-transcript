@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.2.0-dev.7] - 2026-10-08
+
 ### Added
 
 - Nullable video `description` in CLI YAML headers and MCP metadata, including compatibility JSON; keep extractor text unchanged and separate from transcript bodies and Pi input
@@ -83,7 +85,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.6...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.7...HEAD
+[0.2.0-dev.7]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.6...v0.2.0-dev.7
 [0.2.0-dev.6]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.5...v0.2.0-dev.6
 [0.2.0-dev.5]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.4...v0.2.0-dev.5
 [0.2.0-dev.4]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.3...v0.2.0-dev.4
