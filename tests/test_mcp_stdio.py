@@ -207,7 +207,7 @@ from yt_transcript.service import CleanedTranscript
 class Runner:
     async def close(self): pass
     async def run(self, payload):
-        cleaned=CleanedTranscript("hello world",VideoMetadata("https://www.youtube.com/watch?v=abcdefghijk","abcdefghijk"),"en",False)
+        cleaned=CleanedTranscript("hello world",VideoMetadata("https://www.youtube.com/watch?v=abcdefghijk","abcdefghijk",description='STDIO_DESCRIPTION_SENTINEL\\nquote" 😀\\n'),"en",False)
         return {"format":"plain_text","document":cleaned.body,"metadata":cleaned.mapping(),"character_count":11}
 create_server(AppConfig(),runner=Runner()).run(transport="stdio")
 """)
@@ -221,6 +221,10 @@ create_server(AppConfig(),runner=Runner()).run(transport="stdio")
                 "get_transcript", {"url": "https://youtu.be/abcdefghijk"}
             )
             assert result.structured_content["document"] == "hello world"
+            assert (
+                result.structured_content["metadata"]["description"]
+                == 'STDIO_DESCRIPTION_SENTINEL\nquote" 😀\n'
+            )
             assert json.loads(text_content(result)) == result.structured_content
 
     asyncio.run(check())

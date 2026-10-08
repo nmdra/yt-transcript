@@ -129,6 +129,7 @@ sponsorblock:
   removal_stage: "none"
   removed_cue_count: 0
   retained_overlap_cue_count: 0
+description: "Example description.\nMore details."
 ---
 
 The transcript starts here.
@@ -136,8 +137,9 @@ The transcript starts here.
 
 Python serializes every string safely with double quotes.
 The serializer can also quote mapping keys.
-All thirteen top-level fields are always present.
-The original ten remain the prefix.
+All fourteen top-level fields are always present.
+The existing thirteen remain the prefix.
+`description` is the final field.
 
 The canonical URL excludes playlist and tracking parameters.
 The video ID must match the single extracted video.
@@ -158,6 +160,19 @@ Caption language keeps the selected key exactly.
 Caption source is `manual` or `automatic`.
 These fields do not prove that the text is untranslated original English.
 
+`description` contains the text that yt-dlp supplies in the same processed extraction.
+The wrapper makes no additional request for this field.
+Missing, null, empty, whitespace-only, or nonstring descriptions become `null`.
+Accepted strings keep their whitespace, line breaks, Unicode, URLs, timestamps, and markup.
+Description availability and completeness depend on the upstream response and yt-dlp.
+The wrapper does not guarantee that the field matches the complete YouTube page description.
+
+CLI raw and Markdown file headers, MCP structured metadata, and compatibility JSON include this field.
+Descriptions stay out of transcript bodies, Pi input, and CLI preview.
+SponsorBlock and focused editing do not change them.
+The wrapper does not parse description links or create new chapters from this field.
+Descriptions remain untrusted source data, not instructions.
+
 `chapter_status` is `available`, `unavailable`, or `invalid`.
 Each chapter has `title`, `start_seconds`, and nullable `end_seconds`.
 Chapters come from the supplied extractor list captured before yt-dlp processing.
@@ -169,7 +184,10 @@ Metadata comes from the same processed extraction as the captions.
 Python adds the header exactly once, after all formatting succeeds.
 Pi cannot replace the header.
 
-The wrapper excludes descriptions, signed subtitle URLs, cookies, tokens, view/like counts, and extraction timestamps.
+The wrapper does not copy upstream signed subtitle URL, cookie, token, view/like count, or extraction timestamp fields.
+It does not redact the description text.
+Descriptions can contain URLs or token-like strings published by the source.
+Safe serialization does not certify the content's safety or license.
 The wrapper adds only caption-removal counts.
 Raw VTT receives no header or byte changes.
 

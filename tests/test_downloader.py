@@ -125,6 +125,7 @@ def test_download_orchestration(monkeypatch):
                 "id": ID,
                 "duration": 10,
                 "chapters": [{"title": "Original", "start_time": 0}],
+                "description": "Extracted description",
                 "automatic_captions": {
                     "en-orig": [{"ext": "vtt", "url": "synthetic"}, {"ext": "srt"}]
                 },
@@ -133,6 +134,7 @@ def test_download_orchestration(monkeypatch):
 
         def process_ie_result(self, info, **kwargs):
             calls.append(("process", kwargs))
+            assert info["description"] == "Extracted description"
             assert "chapters" not in info
             info["chapters"] = [{"title": "<Untitled Chapter 1>", "start_time": 0}]
             assert not info["subtitles"]
@@ -148,6 +150,7 @@ def test_download_orchestration(monkeypatch):
                 "requested_subtitles": {
                     "en-orig": {"ext": "vtt", "filepath": str(path)}
                 },
+                "description": "Processed description\nhttps://example.test/\n",
             }
 
     monkeypatch.setattr(module, "ensure_deno", lambda: None)
@@ -155,6 +158,9 @@ def test_download_orchestration(monkeypatch):
     result = module.download_english_vtt(f"https://youtu.be/{ID}")
     assert result.vtt.endswith(b"hello\r\n")
     assert result.metadata.chapters[0].title == "Original"
+    assert (
+        result.metadata.description == "Processed description\nhttps://example.test/\n"
+    )
     assert calls == [
         ("extract", {"download": False, "process": False}),
         ("process", {"download": True}),

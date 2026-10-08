@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Nullable video `description` in CLI YAML headers and MCP metadata, including compatibility JSON; keep extractor text unchanged and separate from transcript bodies and Pi input
+
 ## [0.2.0-dev.6] - 2026-10-07
 
 ### Changed

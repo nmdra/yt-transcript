@@ -36,6 +36,7 @@ def source(monkeypatch):
         "https://www.youtube.com/watch?v=abcdefghijk",
         "abcdefghijk",
         duration_seconds=10,
+        description="MCP_DESCRIPTION_SENTINEL\nhttps://example.test/\n",
     )
     monkeypatch.setattr(
         service,
@@ -71,6 +72,8 @@ def test_markdown_returns_body_and_structured_metadata(source, monkeypatch):
     assert result["document"] == "## Edited\n\nHello world."
     assert result["metadata"]["video_id"] == "abcdefghijk"
     assert result["metadata"]["caption_source"] == "manual"
+    assert result["metadata"]["description"] == source.description
+    assert "MCP_DESCRIPTION_SENTINEL" not in repr(calls)
     assert result["character_count"] == len("## Edited\n\nHello world.")
     assert calls[0][0] == "hello world"
     assert calls[0][1]["max_chunks"] == 20

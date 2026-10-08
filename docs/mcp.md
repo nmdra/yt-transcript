@@ -173,6 +173,13 @@ Use CLI `--preview` and `--doctor` instead.
 The result returns metadata only in `metadata`, not as YAML frontmatter in `document`.
 CLI file output still includes YAML frontmatter.
 
+Metadata includes an always-present `description` field: extractor text or `null`.
+Both modes and output formats include the same description for the same source snapshot.
+The SDK compatibility JSON includes it too.
+Descriptions stay out of `document`, `character_count`, and Pi input.
+Clients that reject unknown metadata keys must update for this additional field.
+See [Metadata files](behavior.md#metadata-files) for normalization and source-data limits.
+
 Plain-text requests return `format='plain_text'`.
 The document contains the deterministic body.
 Supplied chapters produce title/time headings.
@@ -233,7 +240,10 @@ The event loop remains responsive during downloads.
 | Serialized tool result, including compatibility text | 1 MiB |
 | Retained private stderr | 64 KiB |
 
+Descriptions count toward the serialized result limit, including their compatibility JSON copy.
+A long description can exceed this limit even when the document fits its own limit.
 Oversized results fail without truncation.
+For Markdown, a result-size error can occur after Pi calls.
 The deterministic CLI supports larger transcripts.
 
 Timeout, cancellation, disconnect, and shutdown stop workers.

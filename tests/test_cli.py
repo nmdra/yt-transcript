@@ -1,6 +1,7 @@
 from importlib.metadata import version
 
 import pytest
+import yaml
 
 from yt_transcript import downloader, formatter, service
 from yt_transcript.cli import main
@@ -8,6 +9,7 @@ from yt_transcript.downloader import DownloadedCaptions
 from yt_transcript.metadata import VideoMetadata
 
 URL = "https://youtu.be/abcdefghijk"
+DESCRIPTION = '  CLI_DESCRIPTION_SENTINEL\nquote" \\ path\nhttps://example.test/\n'
 VTT = b"WEBVTT\r\n\r\n00:00.000 --> 00:01.000\r\nhello world\r\n"
 
 
@@ -15,7 +17,10 @@ VTT = b"WEBVTT\r\n\r\n00:00.000 --> 00:01.000\r\nhello world\r\n"
 def pipeline(monkeypatch):
     calls = []
     metadata = VideoMetadata(
-        "https://www.youtube.com/watch?v=abcdefghijk", "abcdefghijk", title="Title"
+        "https://www.youtube.com/watch?v=abcdefghijk",
+        "abcdefghijk",
+        title="Title",
+        description=DESCRIPTION,
     )
 
     def download(url, **kwargs):
@@ -27,6 +32,8 @@ def pipeline(monkeypatch):
     monkeypatch.setattr(formatter, "ensure_pi", lambda: calls.append("ensure") or "pi")
 
     def format(body, **kwargs):
+        assert body == "hello world"
+        assert "CLI_DESCRIPTION_SENTINEL" not in body + repr(kwargs)
         calls.append(("format", kwargs))
         return "## Edited\n\nhello world"
 
@@ -72,6 +79,9 @@ def test_files(pipeline, capsys, tmp_path, mode):
     else:
         assert path.read_text().startswith("---\n")
         assert "caption_language" in path.read_text()
+        _, header, body = path.read_text().split("---\n", 2)
+        assert yaml.safe_load(header)["description"] == DESCRIPTION
+        assert "CLI_DESCRIPTION_SENTINEL" not in body
 
 
 @pytest.mark.parametrize(
@@ -94,7 +104,9 @@ def test_conflicts(pipeline, capsys, flags):
 def test_preview(pipeline, capsys):
     assert main([URL, "--no-config", "--preview"]) == 0
     assert pipeline == ["download"]
-    assert "planned formatter invocations: 1" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "planned formatter invocations: 1" in output
+    assert "CLI_DESCRIPTION_SENTINEL" not in output
 
 
 def test_no_clobber_early(pipeline, tmp_path):

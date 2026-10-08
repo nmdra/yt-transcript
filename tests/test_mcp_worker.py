@@ -8,7 +8,9 @@ import pytest
 
 from yt_transcript.errors import AppError
 from yt_transcript.mcp_server import WorkerRunner
-from yt_transcript.mcp_worker import validate_request
+from yt_transcript.mcp_worker import RESULT_LIMIT, validate_request
+from yt_transcript.metadata import VideoMetadata
+from yt_transcript.service import CleanedTranscript
 
 
 @pytest.mark.parametrize(
@@ -271,6 +273,104 @@ def test_format_specific_deadline(tmp_path, monkeypatch, markdown, limit, fails)
         assert await runner.run(request) == {"document": "body"}
 
     asyncio.run(check())
+
+
+@pytest.mark.parametrize(
+    "unit,repeats,limit_stage",
+    [
+        ('😀\n\\"', 1000, None),
+        ("x", RESULT_LIMIT, "private"),
+        ("😀", 60000, "public"),
+        ('\n\\"', 90000, "public"),
+    ],
+    ids=["fits", "private-envelope", "public-unicode", "public-escaping"],
+)
+def test_description_result_limits_and_reuse(
+    tmp_path, monkeypatch, caplog, unit, repeats, limit_stage
+):
+    description = "MCP_SIZE_DESCRIPTION_SENTINEL" + unit * repeats
+    cleaned = CleanedTranscript(
+        "body",
+        VideoMetadata(
+            "https://www.youtube.com/watch?v=abcdefghijk",
+            "abcdefghijk",
+            description=description,
+        ),
+        "en",
+        False,
+    )
+    result = {
+        "format": "plain_text",
+        "document": "body",
+        "metadata": cleaned.mapping(),
+        "character_count": 4,
+    }
+    envelope_size = len(
+        json.dumps({"result": result}, ensure_ascii=False).encode("utf-8")
+    )
+    compatibility = json.dumps(result, ensure_ascii=False)
+    public_size = len(
+        json.dumps(
+            {
+                "structuredContent": result,
+                "content": [{"type": "text", "text": compatibility}],
+            }
+        ).encode("utf-8")
+    )
+    if limit_stage == "private":
+        assert envelope_size > RESULT_LIMIT
+    else:
+        assert envelope_size < RESULT_LIMIT
+        assert (public_size > RESULT_LIMIT) == (limit_stage == "public")
+    processes = install_child(
+        tmp_path,
+        monkeypatch,
+        "import json\nfrom yt_transcript import mcp_worker as worker\n"
+        f"result = json.loads({json.dumps(result, ensure_ascii=False)!r})\n"
+        "def dispatch(request):\n"
+        "    if request['mode'] == 'filtered':\n"
+        "        result['metadata']['description'] = 'Recovered description'\n"
+        "    return result\n"
+        "worker.dispatch = dispatch\nraise SystemExit(worker.main())\n",
+    )
+    request = {
+        "operation": "get_transcript",
+        "url": "https://youtu.be/abcdefghijk",
+        "mode": "full",
+        "sponsorblock": {
+            "enabled": False,
+            "categories": ["sponsor"],
+            "timeout_seconds": 10,
+        },
+    }
+
+    async def check():
+        runner = WorkerRunner(timeout_seconds=5)
+        if limit_stage:
+            with pytest.raises(AppError) as exc:
+                await runner.run(request)
+            assert exc.value.info.code == "MCP_RESPONSE_LIMIT"
+            assert "MCP_SIZE_DESCRIPTION_SENTINEL" not in str(exc.value)
+            expected_message = (
+                "Result exceeds the MCP size limit."
+                if limit_stage == "private"
+                else "Tool result exceeds the MCP size limit."
+            )
+            assert exc.value.info.message == expected_message
+        else:
+            returned = await runner.run(request)
+            assert returned == result
+            assert returned["metadata"]["description"] == description
+        assert len(processes) == 1 and processes[0].returncode == 0
+        assert not runner._busy and runner._process is None
+        recovered = await runner.run({**request, "mode": "filtered"})
+        assert recovered["document"] == "body"
+        assert recovered["metadata"]["description"] == "Recovered description"
+        assert len(processes) == 2 and processes[1].returncode == 0
+        assert not runner._busy and runner._process is None
+
+    asyncio.run(check())
+    assert "MCP_SIZE_DESCRIPTION_SENTINEL" not in caplog.text
 
 
 def test_response_limit_reaps(tmp_path, monkeypatch):

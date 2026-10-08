@@ -84,3 +84,128 @@ def test_yaml_roundtrip(title):
 def test_mismatch():
     with pytest.raises(TranscriptError):
         extract_video_metadata({"id": "different"}, canonical_url=URL)
+
+
+@pytest.mark.parametrize("value", [None, "", " \t\r\n", True, 7, [], {}])
+def test_invalid_description_becomes_null(value):
+    from yt_transcript.metadata import metadata_mapping
+
+    metadata = extract_video_metadata(
+        {"id": "abcdefghijk", "description": value}, canonical_url=URL
+    )
+    assert metadata.description is None
+    assert (
+        metadata_mapping(metadata, language="en", automatic=False)["description"]
+        is None
+    )
+
+
+def test_missing_description_becomes_null():
+    from yt_transcript.metadata import metadata_mapping
+
+    metadata = extract_video_metadata({"id": "abcdefghijk"}, canonical_url=URL)
+    assert metadata.description is None
+    assert (
+        metadata_mapping(metadata, language="en", automatic=False)["description"]
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        '  colon: quote" back\\slash\r\nline  \n',
+        "emoji 😀 café\n\n",
+        "\x01control",
+        "---\nurl: https://invalid.example/\n---\n",
+        "00:00 Intro\nhttps://example.test/?token=published\n<b>markup</b>",
+        "null",
+    ],
+)
+def test_description_roundtrip(description):
+    import json
+
+    import yaml
+
+    from yt_transcript.metadata import format_transcript_file, metadata_mapping
+
+    metadata = extract_video_metadata(
+        {"id": "abcdefghijk", "description": description}, canonical_url=URL
+    )
+    assert metadata.description == description
+    mapping = metadata_mapping(metadata, language="en", automatic=False)
+    assert json.loads(json.dumps(mapping)) == mapping
+    body = "## Heading\n\nCaption text."
+    document = format_transcript_file(metadata, body, language="en", automatic=False)
+    _, header, rendered_body = document.split("---\n", 2)
+    assert yaml.safe_load(header) == mapping
+    assert yaml.safe_load(header)["description"] == description
+    assert rendered_body == "\n" + body + "\n"
+    assert document == format_transcript_file(
+        metadata, body, language="en", automatic=False
+    )
+
+
+def test_description_preserves_positional_fields_and_mapping_prefix():
+    from yt_transcript.chapters import Chapter
+    from yt_transcript.metadata import VideoMetadata, metadata_mapping
+    from yt_transcript.sponsorblock import SponsorBlockLookup
+
+    chapters = (Chapter("Intro", 0, 1000),)
+    lookup = SponsorBlockLookup()
+    metadata = VideoMetadata(
+        URL,
+        "abcdefghijk",
+        "Title",
+        "Channel",
+        "UCid",
+        "https://example.test/channel",
+        "2008-05-29",
+        1.5,
+        chapters,
+        "available",
+        lookup,
+    )
+    assert (
+        metadata.url,
+        metadata.video_id,
+        metadata.title,
+        metadata.channel,
+        metadata.channel_id,
+        metadata.channel_url,
+        metadata.upload_date,
+        metadata.duration_seconds,
+        metadata.chapters,
+        metadata.chapter_status,
+        metadata.sponsorblock,
+    ) == (
+        URL,
+        "abcdefghijk",
+        "Title",
+        "Channel",
+        "UCid",
+        "https://example.test/channel",
+        "2008-05-29",
+        1.5,
+        chapters,
+        "available",
+        lookup,
+    )
+    assert metadata.description is None
+    mapping = metadata_mapping(metadata, language="en", automatic=False)
+    assert list(mapping) == [
+        "url",
+        "video_id",
+        "title",
+        "channel",
+        "channel_id",
+        "channel_url",
+        "upload_date",
+        "duration_seconds",
+        "caption_language",
+        "caption_source",
+        "chapter_status",
+        "chapters",
+        "sponsorblock",
+        "description",
+    ]

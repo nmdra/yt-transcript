@@ -60,6 +60,7 @@ class MetadataResult(TypedDict):
     chapter_status: Literal["available", "unavailable", "invalid"]
     chapters: list[ChapterResult]
     sponsorblock: SponsorBlockResult
+    description: str | None
 
 
 class TranscriptResult(TypedDict):

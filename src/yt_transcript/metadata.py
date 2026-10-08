@@ -28,6 +28,7 @@ class VideoMetadata:
     chapters: tuple[Chapter, ...] = ()
     chapter_status: ChapterStatus = "unavailable"
     sponsorblock: SponsorBlockLookup = SponsorBlockLookup()
+    description: str | None = None
 
 
 def _string(value: Any) -> str | None:
@@ -85,6 +86,7 @@ def extract_video_metadata(
         duration,
         extracted.chapters,
         extracted.status,
+        description=_string(info.get("description")),
     )
 
 
@@ -124,6 +126,7 @@ def metadata_mapping(
         "sponsorblock": sponsorblock_mapping(
             sponsorblock_result or metadata.sponsorblock, removal_receipt
         ),
+        "description": metadata.description,
     }
 
 

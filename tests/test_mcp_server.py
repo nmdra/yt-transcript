@@ -1,6 +1,7 @@
 import asyncio
 import json
 
+import pytest
 from mcp import Client
 from mcp.types import TextContent
 
@@ -18,8 +19,9 @@ def text_content(result):
 
 
 class Runner:
-    def __init__(self):
+    def __init__(self, description=None):
         self.calls = []
+        self.description = description
 
     async def close(self):
         pass
@@ -34,7 +36,11 @@ class Runner:
             )
         cleaned = CleanedTranscript(
             "hello world",
-            VideoMetadata("https://www.youtube.com/watch?v=abcdefghijk", "abcdefghijk"),
+            VideoMetadata(
+                "https://www.youtube.com/watch?v=abcdefghijk",
+                "abcdefghijk",
+                description=self.description,
+            ),
             "en",
             False,
         )
@@ -46,9 +52,12 @@ class Runner:
         }
 
 
-def test_tools_schemas_and_success():
+@pytest.mark.parametrize(
+    "description", [None, '  SDK_DESCRIPTION_SENTINEL\nquote" 😀\n']
+)
+def test_tools_schemas_and_success(description):
     async def check():
-        runner = Runner()
+        runner = Runner(description)
         async with Client(
             create_server(AppConfig(mode="raw", model="saved"), runner=runner),
             raise_exceptions=True,
@@ -66,10 +75,22 @@ def test_tools_schemas_and_success():
             )
             assert result.structured_content["character_count"] == 11
             assert result.structured_content["document"] == "hello world"
+            assert result.structured_content["metadata"]["description"] == description
             assert json.loads(text_content(result)) == result.structured_content
             import jsonschema
 
             jsonschema.validate(result.structured_content, tool.output_schema)
+            missing = dict(result.structured_content["metadata"])
+            del missing["description"]
+            for invalid in (
+                missing,
+                {**result.structured_content["metadata"], "description": 7},
+            ):
+                with pytest.raises(jsonschema.ValidationError):
+                    jsonschema.validate(
+                        {**result.structured_content, "metadata": invalid},
+                        tool.output_schema,
+                    )
             assert not (await client.list_resources()).resources
             assert not (await client.list_prompts()).prompts
 
@@ -123,6 +144,35 @@ def test_schema_errors_never_echo_arguments(caplog):
     assert "/home/private" not in caplog.text
 
 
+def test_invalid_description_does_not_reach_sdk(caplog):
+    class InvalidRunner(Runner):
+        async def run(self, payload):
+            result = await super().run(payload)
+            if len(self.calls) == 1:
+                result["metadata"]["description"] = {
+                    "PRIVATE_DESCRIPTION_SENTINEL": "data"
+                }
+            return result
+
+    async def check():
+        runner = InvalidRunner()
+        async with Client(create_server(AppConfig(), runner=runner)) as client:
+            result = await client.call_tool(
+                "get_transcript", {"url": "https://youtu.be/abcdefghijk"}
+            )
+            assert result.is_error and result.structured_content is None
+            assert "INTERNAL_ERROR" in text_content(result)
+            assert "PRIVATE_DESCRIPTION_SENTINEL" not in text_content(result)
+            success = await client.call_tool(
+                "get_transcript", {"url": "https://youtu.be/abcdefghijk"}
+            )
+            assert not success.is_error
+            assert len(runner.calls) == 2
+
+    asyncio.run(check())
+    assert "PRIVATE_DESCRIPTION_SENTINEL" not in caplog.text
+
+
 def test_unexpected_worker_error_is_safe(caplog):
     class BrokenRunner(Runner):
         async def run(self, payload):
@@ -137,6 +187,45 @@ def test_unexpected_worker_error_is_safe(caplog):
 
     asyncio.run(check())
     assert "private-key" not in caplog.text
+
+
+def test_response_limit_has_no_partial_result_or_source_leak(caplog):
+    class LimitedRunner(Runner):
+        async def run(self, payload):
+            result = await super().run(payload)
+            if len(self.calls) == 1:
+                raise AppError(
+                    ErrorInfo(
+                        "MCP_RESPONSE_LIMIT",
+                        "Tool result exceeds the MCP size limit.",
+                        "Use the deterministic CLI for larger transcripts.",
+                        "mcp_worker",
+                    )
+                ) from ValueError(self.description)
+            return result
+
+    async def check():
+        runner = LimitedRunner("PRIVATE_DESCRIPTION_SENTINEL")
+        async with Client(create_server(AppConfig(), runner=runner)) as client:
+            result = await client.call_tool(
+                "get_transcript", {"url": "https://youtu.be/abcdefghijk"}
+            )
+            assert result.is_error and result.structured_content is None
+            assert "MCP_RESPONSE_LIMIT" in text_content(result)
+            assert "PRIVATE_DESCRIPTION_SENTINEL" not in text_content(result)
+            assert len(result.content) == 1
+            success = await client.call_tool(
+                "get_transcript", {"url": "https://youtu.be/abcdefghijk"}
+            )
+            assert not success.is_error
+            assert (
+                success.structured_content["metadata"]["description"]
+                == runner.description
+            )
+            assert len(runner.calls) == 2
+
+    asyncio.run(check())
+    assert "PRIVATE_DESCRIPTION_SENTINEL" not in caplog.text
 
 
 def test_expected_failure_and_server_reuse():

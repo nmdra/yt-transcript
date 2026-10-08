@@ -31,6 +31,9 @@ Progress is disabled for redirected stderr, `TERM=dumb`, help/version, doctor, a
 Progress never appears in transcripts or files.
 
 Use `-o` for Python-generated YAML metadata.
+Raw and Markdown file headers include the nullable video `description`.
+See [Metadata files](behavior.md#metadata-files) for the field contract.
+Descriptions stay out of stdout bodies, Pi input, preview, and raw VTT.
 Shell redirection receives only the transcript body:
 
 ```sh
