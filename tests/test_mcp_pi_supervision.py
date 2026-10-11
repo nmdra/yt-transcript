@@ -27,6 +27,8 @@ def payload():
             "timeout_seconds": 120,
             "max_chunks": 3,
             "editorial_mode": "standard",
+            "provider": "pi",
+            "openrouter_max_output_tokens": 8192,
         },
     }
 

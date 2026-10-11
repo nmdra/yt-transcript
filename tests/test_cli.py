@@ -37,7 +37,7 @@ def pipeline(monkeypatch):
         calls.append(("format", kwargs))
         return "## Edited\n\nhello world"
 
-    monkeypatch.setattr(formatter, "format_with_pi", format)
+    monkeypatch.setattr(formatter, "format_transcript", format)
     return calls
 
 
@@ -183,7 +183,7 @@ def test_failed_format_preserves_file(pipeline, monkeypatch, tmp_path, capsys, c
     def fail(*args, **kwargs):
         raise classify_pi_failure(code=code, chunk_index=2, chunk_total=3)
 
-    monkeypatch.setattr(formatter, "format_with_pi", fail)
+    monkeypatch.setattr(formatter, "format_transcript", fail)
     path = tmp_path / "existing"
     path.write_text("old")
     assert main([URL, "--no-config", "-o", str(path)]) == 1
@@ -217,7 +217,7 @@ def test_terminal_progress_stays_off_stdout(pipeline, monkeypatch, capsys):
         callback(2, 2)
         return "## Edited\n\nhello world"
 
-    monkeypatch.setattr(formatter, "format_with_pi", edit)
+    monkeypatch.setattr(formatter, "format_transcript", edit)
     assert main([URL, "--no-config"]) == 0
     assert capsys.readouterr().out == "## Edited\n\nhello world\n"
     assert "Pi chunks 1/2" in stream.getvalue()

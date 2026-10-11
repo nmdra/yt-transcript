@@ -32,6 +32,7 @@ def _parser() -> argparse.ArgumentParser:
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--raw", dest="mode", action="store_const", const="raw")
     modes.add_argument("--raw-vtt", dest="mode", action="store_const", const="raw-vtt")
+    parser.add_argument("--provider", choices=("pi", "openrouter"))
     parser.add_argument("--model")
     parser.add_argument("--max-chunks", type=int)
     parser.add_argument(
@@ -83,7 +84,11 @@ def _transcribe(
     if not args.url:
         raise _invalid("A YouTube video URL is required.")
     from .downloader import download_english_vtt, validate_youtube_url
-    from .formatter import ensure_pi, format_with_pi, plan_transcript_formatting
+    from .formatter import (
+        ensure_formatter,
+        format_transcript,
+        plan_transcript_formatting,
+    )
     from .output import validate_output, write_output
     from .service import fetch_clean_transcript
 
@@ -91,7 +96,8 @@ def _transcribe(
     if args.no_clobber and args.output is None:
         raise _invalid("--no-clobber requires --output.")
     if config.mode != "markdown" and (
-        args.model is not None
+        args.provider is not None
+        or args.model is not None
         or args.max_chunks is not None
         or args.editorial_mode is not None
     ):
@@ -103,7 +109,13 @@ def _transcribe(
     if args.output:
         validate_output(args.output, no_clobber=args.no_clobber)
     if config.mode == "markdown" and not args.preview:
-        ensure_pi()
+        ensure_formatter(config.provider, config.model)
+    if args.preview and config.provider == "openrouter" and not config.model:
+        from .errors import classify_openrouter_failure
+
+        raise classify_openrouter_failure(
+            "OPENROUTER_NOT_CONFIGURED", phase="runtime_check"
+        )
     if config.mode == "raw-vtt" and args.sponsorblock:
         raise _invalid("--sponsorblock cannot be used with --raw-vtt.")
     progress.stage("fetch")
@@ -140,6 +152,7 @@ def _transcribe(
                 chunk_chars=config.chunk_chars,
                 max_chunks=config.max_chunks,
                 editorial_mode=config.editorial_mode,
+                provider=config.provider,
             )
             lines = [
                 f"canonical URL: {canonical}",
@@ -152,6 +165,7 @@ def _transcribe(
                 f"configured chunk limit: {config.chunk_chars}",
                 f"maximum chunks: {config.max_chunks if config.max_chunks is not None else 'unlimited'}",
                 f"cap result: {'within limit' if plan.within_cap else 'exceeds limit'}",
+                f"provider: {config.provider}",
                 f"model selection: {config.model or 'Pi configured default'}",
                 f"editorial mode: {config.editorial_mode}",
             ]
@@ -160,9 +174,11 @@ def _transcribe(
             return
         if config.mode == "markdown":
             progress.stage("format")
-            body = format_with_pi(
+            body = format_transcript(
                 body,
                 model=config.model,
+                provider=config.provider,
+                openrouter=config.openrouter,
                 chunk_chars=config.chunk_chars,
                 timeout_seconds=config.timeout_seconds,
                 max_chunks=config.max_chunks,
@@ -208,17 +224,39 @@ def main(argv: Sequence[str] | None = None) -> int:
             or args.output is not None
             or args.no_clobber
             or args.mode is not None
+            or args.provider is not None
             or args.model is not None
             or args.max_chunks is not None
             or args.sponsorblock is not None
             or args.editorial_mode is not None
         )
         if args.doctor:
-            if restricted or args.mcp or args.config is not None or args.no_config:
-                raise _invalid("--doctor permits only --verbose.")
+            if (
+                args.url is not None
+                or args.preview
+                or args.output is not None
+                or args.no_clobber
+                or args.mode is not None
+                or args.max_chunks is not None
+                or args.sponsorblock is not None
+                or args.editorial_mode is not None
+                or args.mcp
+            ):
+                raise _invalid(
+                    "--doctor permits provider, model, config selection, and --verbose."
+                )
             from .doctor import render_doctor, run_doctor
 
-            report = run_doctor()
+            doctor_config = resolve_config(
+                load_config(args.config, disabled=args.no_config),
+                provider=args.provider,
+                model=args.model,
+            )
+            report = run_doctor(
+                include_pi=doctor_config.provider == "pi",
+                provider=doctor_config.provider,
+                model=doctor_config.model,
+            )
             _emit(render_doctor(report).encode("utf-8"))
             return 0 if report.healthy else 1
         if args.mcp and restricted:
@@ -236,6 +274,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file_config,
                 mode=args.mode,
                 verbose=args.verbose,
+                provider=args.provider,
                 model=args.model,
                 max_chunks=args.max_chunks,
                 sponsorblock=args.sponsorblock,

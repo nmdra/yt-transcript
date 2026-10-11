@@ -1,4 +1,4 @@
-"""Server-controlled, bounded policy for explicitly requested MCP Pi editing."""
+"""Server-controlled, bounded policy for explicitly requested model editing."""
 
 from dataclasses import dataclass
 
@@ -10,6 +10,8 @@ class MCPFormattingPolicy:
     timeout_seconds: int = 120
     max_chunks: int = 20
     editorial_mode: str = "standard"
+    provider: str = "pi"
+    openrouter_max_output_tokens: int = 8192
 
 
 def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
@@ -19,19 +21,29 @@ def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
         "timeout_seconds",
         "max_chunks",
         "editorial_mode",
+        "provider",
+        "openrouter_max_output_tokens",
     }:
         raise ValueError("Invalid MCP formatting policy.")
     for key, lower, upper in (
         ("chunk_chars", 1000, 50000),
         ("timeout_seconds", 1, 120),
         ("max_chunks", 1, 1000),
+        ("openrouter_max_output_tokens", 1, 131072),
     ):
         if type(value[key]) is not int or not lower <= value[key] <= upper:
             raise ValueError("Invalid MCP formatting policy.")
+    if not isinstance(value["provider"], str) or value["provider"] not in (
+        "pi",
+        "openrouter",
+    ):
+        raise ValueError("Invalid MCP formatting policy.")
     model = value["model"]
     if model is not None and (
         not isinstance(model, str) or not model.strip() or len(model) > 4096
     ):
+        raise ValueError("Invalid MCP formatting policy.")
+    if value["provider"] == "openrouter" and model is None:
         raise ValueError("Invalid MCP formatting policy.")
     if not isinstance(value["editorial_mode"], str) or value["editorial_mode"] not in (
         "standard",

@@ -52,7 +52,7 @@ def source(monkeypatch):
 def test_plain_text_never_calls_pi(source, monkeypatch):
     monkeypatch.setattr(formatter, "ensure_pi", lambda: pytest.fail("no Pi check"))
     monkeypatch.setattr(
-        formatter, "format_with_pi", lambda *a, **k: pytest.fail("no Pi")
+        formatter, "format_transcript", lambda *a, **k: pytest.fail("no Pi")
     )
     result = service.fetch_transcript_document(URL, "full")
     assert result["format"] == "plain_text"
@@ -66,7 +66,7 @@ def test_markdown_returns_body_and_structured_metadata(source, monkeypatch):
         calls.append((body, kwargs))
         return "## Edited\n\nHello world."
 
-    monkeypatch.setattr(formatter, "format_with_pi", edit)
+    monkeypatch.setattr(formatter, "format_transcript", edit)
     result = dispatch(validate_request(request()))
     assert result["format"] == "markdown"
     assert result["document"] == "## Edited\n\nHello world."
@@ -86,7 +86,7 @@ def test_markdown_returns_body_and_structured_metadata(source, monkeypatch):
 def test_direct_service_owns_pi_process_group(source, monkeypatch):
     calls = []
     monkeypatch.setattr(
-        formatter, "format_with_pi", lambda body, **kw: calls.append(kw) or "Edited"
+        formatter, "format_transcript", lambda body, **kw: calls.append(kw) or "Edited"
     )
     service.fetch_transcript_document(URL, "full", output_format="markdown")
     assert calls[0]["own_process_group"] is True
@@ -153,7 +153,7 @@ def test_sdk_formatting_failure_advises_plain_text(source, monkeypatch, code):
         calls.append(1)
         raise classify_pi_failure(code=code, chunk_index=2, chunk_total=3)
 
-    monkeypatch.setattr(formatter, "format_with_pi", fail)
+    monkeypatch.setattr(formatter, "format_transcript", fail)
 
     async def check():
         async with Client(create_server(AppConfig(), runner=Runner())) as client:
@@ -183,7 +183,7 @@ def test_pi_failure_has_no_raw_fallback(source, monkeypatch):
     def fail(*args, **kwargs):
         raise classify_pi_failure(code="PI_TIMEOUT")
 
-    monkeypatch.setattr(formatter, "format_with_pi", fail)
+    monkeypatch.setattr(formatter, "format_transcript", fail)
     with pytest.raises(AppError) as exc:
         dispatch(request())
     assert exc.value.info.code == "PI_TIMEOUT"
