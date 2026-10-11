@@ -168,7 +168,7 @@ def test_sdk_formatting_failure_advises_plain_text(source, monkeypatch, code):
             text = content.text
             assert code in text and "(chunk 2/3)" in text
             assert 'output_format="plain_text"' in text
-            assert "warning: No Pi-processed transcript was returned." in text
+            assert "warning: No model-processed transcript was returned." in text
             plain = await client.call_tool(
                 "get_transcript",
                 {"url": URL, "mode": "full", "output_format": "plain_text"},

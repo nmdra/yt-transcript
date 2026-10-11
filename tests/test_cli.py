@@ -118,7 +118,7 @@ def test_no_clobber_early(pipeline, tmp_path):
 
 def test_config_raw(pipeline, tmp_path, capsys):
     path = tmp_path / "config.toml"
-    path.write_text('[output]\nmode="raw"\n[pi]\nmodel="saved"\nmax_chunks=1')
+    path.write_text('[output]\nmode="raw"\n[formatting]\nmodel="saved"\nmax_chunks=1')
     assert main([URL, "--config", str(path)]) == 0
     assert pipeline == ["download"]
     assert capsys.readouterr().out == "hello world\n"
@@ -140,7 +140,7 @@ def test_new_flag_conflicts_are_early(pipeline, capsys, flags):
 
 def test_focused_config_precedence_and_raw_ignore(pipeline, tmp_path, capsys):
     path = tmp_path / "focused.toml"
-    path.write_text('[pi]\neditorial_mode="focused"')
+    path.write_text('[formatting]\neditorial_mode="focused"')
     assert main([URL, "--config", str(path)]) == 0
     assert pipeline[-1][1]["editorial_mode"] == "focused"
     pipeline.clear()
@@ -154,7 +154,9 @@ def test_focused_config_precedence_and_raw_ignore(pipeline, tmp_path, capsys):
 
 def test_raw_vtt_ignores_saved_sponsorblock_and_focused(pipeline, tmp_path, capsys):
     path = tmp_path / "saved.toml"
-    path.write_text('[sponsorblock]\nenabled=true\n[pi]\neditorial_mode="focused"')
+    path.write_text(
+        '[sponsorblock]\nenabled=true\n[formatting]\neditorial_mode="focused"'
+    )
     assert main([URL, "--config", str(path), "--raw-vtt"]) == 0
     assert pipeline == ["download"] and capsys.readouterr().out == VTT.decode()
 
@@ -189,7 +191,7 @@ def test_failed_format_preserves_file(pipeline, monkeypatch, tmp_path, capsys, c
     captured = capsys.readouterr()
     assert not captured.out and code in captured.err
     assert "(chunk 2/3)" in captured.err
-    assert "warning: No Pi-processed transcript was returned." in captured.err
+    assert "warning: No model-processed transcript was returned." in captured.err
     assert "Retry with --raw" in captured.err
     pipeline.clear()
     assert main([URL, "--no-config", "--raw"]) == 0

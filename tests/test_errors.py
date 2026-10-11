@@ -243,11 +243,11 @@ def test_formatting_recovery_is_interface_specific(code):
     cli = render_cli_error(exc)
     mcp = render_mcp_error(exc.info)
     assert "(chunk 2/3)" in cli and "(chunk 2/3)" in mcp
-    assert "warning: No Pi-processed transcript was returned." in cli
+    assert "warning: No model-processed transcript was returned." in cli
     assert "Retry with --raw" in cli
     assert 'output_format="plain_text"' in mcp
     assert "--raw" not in mcp
-    assert "warning: No Pi-processed transcript was returned." in mcp
+    assert "warning: No model-processed transcript was returned." in mcp
 
 
 def test_nonformatting_errors_have_no_pi_warning():

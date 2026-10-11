@@ -65,7 +65,7 @@ def summary_plan(source=SOURCE, **kwargs):
 
 def test_configuration_and_policy_accept_summarized(tmp_path):
     path = tmp_path / "config.toml"
-    path.write_text('[pi]\neditorial_mode="summarized"')
+    path.write_text('[formatting]\neditorial_mode="summarized"')
     config = load_config(path)
     assert config.editorial_mode == "summarized"
     assert resolve_config(AppConfig(), editorial_mode="summarized") == config
@@ -260,7 +260,7 @@ def download_fixture(monkeypatch):
 def test_cli_preview_counts_synthesis_without_pi(tmp_path, monkeypatch, capsys):
     download_fixture(monkeypatch)
     config = tmp_path / "config.toml"
-    config.write_text("[pi]\nchunk_chars=1000\n[sponsorblock]\nenabled=false")
+    config.write_text("[formatting]\nchunk_chars=1000\n[sponsorblock]\nenabled=false")
     monkeypatch.setattr(
         formatter, "ensure_pi", lambda: pytest.fail("preview must not launch Pi")
     )
@@ -286,7 +286,7 @@ def test_cli_failed_synthesis_keeps_existing_file(tmp_path, monkeypatch, capsys)
     download_fixture(monkeypatch)
     config = tmp_path / "config.toml"
     config.write_text(
-        '[pi]\nchunk_chars=1000\neditorial_mode="summarized"\n[sponsorblock]\nenabled=false'
+        '[formatting]\nchunk_chars=1000\neditorial_mode="summarized"\n[sponsorblock]\nenabled=false'
     )
     plan = summary_plan()
     calls, record = summary_pi(
@@ -311,7 +311,7 @@ def test_cli_summary_yaml_keeps_metadata_out_of_pi(tmp_path, monkeypatch, capsys
         tmp_path, monkeypatch, [*["- Factual note."] * len(plan.chunks), SUMMARY]
     )
     config = tmp_path / "config.toml"
-    config.write_text("[pi]\nchunk_chars=1000\n[sponsorblock]\nenabled=false")
+    config.write_text("[formatting]\nchunk_chars=1000\n[sponsorblock]\nenabled=false")
     output = tmp_path / "summary.md"
     assert (
         main(
@@ -341,7 +341,7 @@ def test_saved_summary_preference_does_not_change_cli_raw(
     download_fixture(monkeypatch)
     config = tmp_path / "config.toml"
     config.write_text(
-        '[pi]\neditorial_mode="summarized"\n[sponsorblock]\nenabled=false'
+        '[formatting]\neditorial_mode="summarized"\n[sponsorblock]\nenabled=false'
     )
     monkeypatch.setattr(
         formatter, "ensure_pi", lambda: pytest.fail("raw must not check Pi")

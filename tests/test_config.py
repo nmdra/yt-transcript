@@ -27,13 +27,13 @@ def test_discovery(monkeypatch, tmp_path, xdg):
 @pytest.mark.parametrize(
     "text",
     [
-        "[pi]\nchunk_chars=true",
-        "[pi]\nchunk_chars=999",
-        "[pi]\nchunk_chars=50001",
-        '[pi]\nmodel=" "',
-        "[pi]\nmax_chunks=0",
-        "[pi]\ntimeout_seconds=3601",
-        "[pi]\nother=1",
+        "[formatting]\nchunk_chars=true",
+        "[formatting]\nchunk_chars=999",
+        "[formatting]\nchunk_chars=50001",
+        '[formatting]\nmodel=" "',
+        "[formatting]\nmax_chunks=0",
+        "[formatting]\ntimeout_seconds=3601",
+        "[formatting]\nother=1",
         "[other]",
         "mcp = 2",
         "[mcp]\nunknown=300",
@@ -46,7 +46,7 @@ def test_discovery(monkeypatch, tmp_path, xdg):
         '[output]\nmode="other"',
         "invalid = [",
         "output = 2",
-        '[pi]\neditorial_mode="unknown"',
+        '[formatting]\neditorial_mode="unknown"',
         '[sponsorblock]\nenabled="yes"',
         "[sponsorblock]\ncategories=[]",
         '[sponsorblock]\ncategories=["sponsor", "sponsor"]',
@@ -66,7 +66,9 @@ def test_invalid(tmp_path, text):
 
 def test_partial_and_precedence(tmp_path):
     path = tmp_path / "config.toml"
-    path.write_text('[pi]\nmodel=" provider/model "\nmax_chunks=2\nchunk_chars=1000')
+    path.write_text(
+        '[formatting]\nmodel=" provider/model "\nmax_chunks=2\nchunk_chars=1000'
+    )
     config = load_config(path)
     assert config.model == "provider/model"
     assert config.chunk_chars == 1000
@@ -82,10 +84,10 @@ def test_example_documents_all_supported_settings(tmp_path):
     text = example.read_text(encoding="utf-8")
     complete = re.sub(r"^# (?=(?:max_chunks|model|enabled) =)", "", text, flags=re.M)
     tables = tomllib.loads(complete)
-    assert set(tables) == {"output", "pi", "sponsorblock", "mcp"}
-    assert set(tables["output"]) | set(tables["pi"]) == set(
+    assert set(tables) == {"output", "formatting", "openrouter", "sponsorblock", "mcp"}
+    assert set(tables["output"]) | set(tables["formatting"]) == set(
         AppConfig.__dataclass_fields__
-    ) - {"sponsorblock", "mcp"}
+    ) - {"sponsorblock", "mcp", "openrouter"}
     assert set(tables["sponsorblock"]) == set(SponsorBlockConfig.__dataclass_fields__)
     assert set(tables["mcp"]) == set(MCPConfig.__dataclass_fields__)
     selected = tmp_path / "complete.toml"

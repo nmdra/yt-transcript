@@ -21,7 +21,8 @@ mode = "markdown"
 # CLI --verbose overrides this setting to true.
 verbose = false
 
-[pi]
+[formatting]
+provider = "pi"
 # Default: "standard". Allowed: "standard", "focused", "summarized".
 # Focused removes clearly separable non-substantive material, not a summary.
 # Summarized targets one 400–700-word overview, shorter for short videos.
@@ -61,6 +62,10 @@ timeout_seconds = 600
 # The total MCP deadline is separate; see [mcp] below.
 # Help, version, and CLI doctor bypass TOML loading.
 # URL, output path, preview, doctor, no-clobber, and MCP startup are CLI-only.
+
+[openrouter]
+# OpenRouter completion allowance; model-specific limits still apply.
+max_output_tokens = 8192
 
 [mcp]
 # Default: 300. Allowed: integers from 300 through 3600.

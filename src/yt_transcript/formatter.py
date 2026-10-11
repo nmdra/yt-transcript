@@ -105,6 +105,30 @@ ISOLATION_FLAGS = [
 
 
 @dataclass(frozen=True)
+class ChunkRequest:
+    system_prompt: str
+    append_system_prompt: str
+    instruction: str
+    source: str
+    model: str | None
+    timeout_seconds: int
+    own_process_group: bool = True
+
+
+def validate_chunk_body(result: str) -> str:
+    if not result.strip():
+        raise classify_pi_failure(code="PI_OUTPUT_INVALID")
+    if len(result.encode("utf-8")) > 1024 * 1024:
+        raise classify_pi_failure(code="PI_OUTPUT_LIMIT")
+    lines = result.splitlines()
+    yaml_header = re.match(r"^---[ \t]*\n[\s\S]*?\n---(?:[ \t]*\n|$)", result)
+    outer_fence = len(lines) >= 2 and re.fullmatch(r"(`{3,}|~{3,})[^\n]*", lines[0])
+    if yaml_header or (outer_fence and lines[-1].strip() == outer_fence[1]):
+        raise classify_pi_failure(code="PI_OUTPUT_INVALID")
+    return result
+
+
+@dataclass(frozen=True)
 class FormattingPlan:
     chunks: tuple[str, ...]
     character_counts: tuple[int, ...]
@@ -416,8 +440,7 @@ def terminate_child(
             process.wait()
 
 
-def _run_chunk(
-    executable: str,
+def _build_chunk_request(
     chunk: str,
     *,
     index: int,
@@ -430,7 +453,7 @@ def _run_chunk(
     own_process_group: bool = True,
     summary_stage: str | None = None,
     summary_note_chars: int | None = None,
-) -> str:
+) -> ChunkRequest:
     prompt = get_editorial_prompt(editorial_mode, chapter_mode=chapter_mode)
     instruction = f"Edit transcript chunk {index} of {total}. Preserve incomplete transitions and all substantive content. Return only the Markdown body."
     context_instructions = CONTEXT_INSTRUCTIONS if contextual else ""
@@ -452,6 +475,59 @@ def _run_chunk(
             instruction = "Produce one whole-video summary from the supplied factual notes. Return only the Markdown body."
         else:
             instruction = "Summarize the supplied video captions as one whole-video summary. Return only the Markdown body."
+    return ChunkRequest(
+        prompt,
+        EDITORIAL_APPEND_PROMPT
+        + context_instructions
+        + (
+            FOCUSED_CHAPTER_INSTRUCTIONS
+            if chapter_mode and editorial_mode == "focused"
+            else ""
+        ),
+        instruction,
+        chunk,
+        model,
+        timeout_seconds,
+        own_process_group,
+    )
+
+
+def _run_chunk(
+    executable: str,
+    chunk: str,
+    *,
+    index: int,
+    total: int,
+    model: str | None,
+    timeout_seconds: int,
+    editorial_mode: str = "standard",
+    chapter_mode: bool = False,
+    contextual: bool = False,
+    own_process_group: bool = True,
+    summary_stage: str | None = None,
+    summary_note_chars: int | None = None,
+) -> str:
+    request = _build_chunk_request(
+        chunk,
+        index=index,
+        total=total,
+        model=model,
+        timeout_seconds=timeout_seconds,
+        editorial_mode=editorial_mode,
+        chapter_mode=chapter_mode,
+        contextual=contextual,
+        own_process_group=own_process_group,
+        summary_stage=summary_stage,
+        summary_note_chars=summary_note_chars,
+    )
+    return validate_chunk_body(_run_pi_chunk(executable, request))
+
+
+def _run_pi_chunk(executable: str, request: ChunkRequest) -> str:
+    chunk = request.source
+    model = request.model
+    timeout_seconds = request.timeout_seconds
+    own_process_group = request.own_process_group
     parser = PiEventParser()
     failures: queue.SimpleQueue[BaseException] = queue.SimpleQueue()
     stderr = bytearray()
@@ -462,22 +538,16 @@ def _run_chunk(
         "json",
         *ISOLATION_FLAGS,
         "--system-prompt",
-        prompt,
+        request.system_prompt,
         "--append-system-prompt",
-        EDITORIAL_APPEND_PROMPT
-        + context_instructions
-        + (
-            FOCUSED_CHAPTER_INSTRUCTIONS
-            if chapter_mode and editorial_mode == "focused"
-            else ""
-        ),
+        request.append_system_prompt,
     ]
     if model is not None:
         argv.extend(["--model", model])
     argv.extend(
         [
             "--",
-            instruction,
+            request.instruction,
         ]
     )
     with TemporaryDirectory(prefix="yt-transcript-pi-") as cwd:
@@ -552,13 +622,6 @@ def _run_chunk(
             if process.returncode != 0:
                 raise classify_pi_failure(stderr.decode("utf-8", errors="replace"))
             result = parser.finish().text
-            lines = result.splitlines()
-            yaml_header = re.match(r"^---[ \t]*\n[\s\S]*?\n---(?:[ \t]*\n|$)", result)
-            outer_fence = len(lines) >= 2 and re.fullmatch(
-                r"(`{3,}|~{3,})[^\n]*", lines[0]
-            )
-            if yaml_header or (outer_fence and lines[-1].strip() == outer_fence[1]):
-                raise classify_pi_failure(code="PI_OUTPUT_INVALID")
             return result
         finally:
             terminate_child(process, own_process_group=own_process_group)
@@ -600,7 +663,7 @@ def _validate_summary_output(result: str, *, final: bool) -> None:
     raise classify_pi_failure(code="PI_OUTPUT_INVALID")
 
 
-def _summarize_with_pi(
+def _summarize_transcript(
     executable: str,
     plan: FormattingPlan | ContextFormattingPlan,
     *,
@@ -663,7 +726,7 @@ def _summarize_with_pi(
     return result
 
 
-def format_with_pi(
+def format_transcript(
     transcript: str,
     model: str | None = None,
     *,
@@ -685,7 +748,7 @@ def format_with_pi(
     )
     if not plan.within_cap:
         exc = classify_pi_failure(code="CHUNK_LIMIT_EXCEEDED")
-        unit = "Pi calls" if editorial_mode == "summarized" else "chunks"
+        unit = "model calls" if editorial_mode == "summarized" else "chunks"
         exc.info = replace(
             exc.info,
             message=f"formatting requires {plan.call_count} {unit}, exceeding max-chunks {max_chunks}; use --preview, --raw, or explicitly raise the cap",
@@ -693,7 +756,7 @@ def format_with_pi(
         raise exc
     executable = ensure_pi()
     if editorial_mode == "summarized":
-        return _summarize_with_pi(
+        return _summarize_transcript(
             executable,
             plan,
             chunk_chars=chunk_chars,
@@ -760,3 +823,29 @@ def format_with_pi(
     if retained_runs:
         _chapter_parts(result, tuple(retained_runs))
     return result
+
+
+def format_with_pi(
+    transcript: str,
+    model: str | None = None,
+    *,
+    chunk_chars: int = 12000,
+    timeout_seconds: int = 600,
+    max_chunks: int | None = None,
+    sections: tuple[ChapterSection, ...] | None = None,
+    editorial_mode: str = "standard",
+    on_progress: Callable[[int, int], None] | None = None,
+    own_process_group: bool = True,
+) -> str:
+    """Compatibility entry point for explicitly Pi-based formatting."""
+    return format_transcript(
+        transcript,
+        model,
+        chunk_chars=chunk_chars,
+        timeout_seconds=timeout_seconds,
+        max_chunks=max_chunks,
+        sections=sections,
+        editorial_mode=editorial_mode,
+        on_progress=on_progress,
+        own_process_group=own_process_group,
+    )
