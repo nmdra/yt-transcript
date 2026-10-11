@@ -8,7 +8,7 @@ from typing import Literal, TextIO
 Stage = Literal["fetch", "format", "output"]
 LABELS: dict[Stage, str] = {
     "fetch": "Fetching captions / filtering",
-    "format": "Pi chunks",
+    "format": "Model calls",
     "output": "Writing output",
 }
 
@@ -97,7 +97,7 @@ class TerminalProgress:
         if self._stage == "format" and self._total:
             filled = 16 * self._completed // self._total
             bar = "#" * filled + "-" * (16 - filled)
-            label = f"[{bar}] Pi chunks {self._completed}/{self._total}"
+            label = f"[{bar}] Model calls {self._completed}/{self._total}"
         else:
             label = f"{spinner} {LABELS[self._stage]}"
         text = f"{label} | {minutes:02}:{seconds:02} elapsed"

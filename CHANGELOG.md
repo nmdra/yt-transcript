@@ -9,7 +9,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- Opt-in `summarized` editorial mode for whole-video Markdown summaries, with bounded factual notes, a final synthesis call for multi-chunk input, and preview/cap/progress accounting for all Pi calls
+- Direct OpenRouter formatting for CLI and MCP Markdown without Pi, with an explicit model, environment-only API key, bounded responses, and supervised deadlines
+- Provider-aware offline doctor checks and preview output
+- Opt-in `summarized` editorial mode for whole-video Markdown summaries, with bounded factual notes, a final synthesis call for multi-chunk input, and preview/cap/progress accounting for all model calls
+
+### Changed
+
+- **Breaking:** Replace the `[pi]` TOML table with `[formatting]`; add provider selection and a separate `[openrouter]` output-token setting
 
 ## [0.2.0-dev.7] - 2026-10-08
 

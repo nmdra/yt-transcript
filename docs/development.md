@@ -36,6 +36,15 @@ Authenticate directly in Pi through `/login`.
 Select or save a default model through `/model`.
 This wrapper never installs runtimes or changes credentials.
 
+## Offline OpenRouter acceptance
+
+OpenRouter tests mock HTTP and use local helper processes.
+No real API key, model, YouTube request, or SponsorBlock lookup is needed.
+The checkout's CLI doctor can read config and accepts `--provider`, `--model`, and config selection.
+For OpenRouter it reports key/model presence only, never authentication validity.
+Pi is checked only for the Pi backend; an OpenRouter-only CLI does not require the MCP extra.
+Real model evaluation still needs fresh explicit call/spend approval.
+
 ## Public GitHub releases
 
 The first development release is `v0.2.0-dev.1`.

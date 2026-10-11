@@ -3,16 +3,16 @@
 <img width="2172" height="724" alt="yt-transcript Workflow Overview" src="https://github.com/user-attachments/assets/c556b444-b47f-4afa-88c4-0aca64639cae" />
 
 Get English YouTube transcripts with chapter and timestamp context.
-Use the CLI for raw captions or Pi-edited Markdown.
+Use the CLI for raw captions or model-edited Markdown.
 You can also connect the MCP server to an AI agent.
 The tool does not download audio or video and does not require FFmpeg.
 
-- **CLI:** raw captions, previews, or Pi-edited Markdown
+- **CLI:** raw captions, previews, or model-edited Markdown
 - **MCP:** `get_transcript` with `filtered` and `full` modes
 - **Context:** keeps supplied chapters or adds timestamp blocks with original video times
 - **SponsorBlock:** enabled by default for MCP; opt-in for CLI; includes full-caption fallback
 - **No model required:** raw CLI output and MCP plain text make no model calls
-- **Optional Pi editing:** Markdown output uses Pi and can incur model charges
+- **Optional model editing:** Pi is the default; unreleased OpenRouter support provides a direct API backend
 
 ## Install
 
@@ -24,7 +24,7 @@ Requirements:
 - [Pi](https://pi.dev), installed separately, only for Markdown editing
 
 > [!NOTE]
-> `yt-transcript` uses Pi for Markdown editing and focused cleanup after caption extraction.
+> The pinned dev7 release uses Pi for Markdown editing and focused cleanup after caption extraction.
 > You must install and configure Pi separately to use these features.
 > Raw transcript output and plain-text MCP output do not require Pi.
 
@@ -71,6 +71,23 @@ The preview shows the planned call count before Markdown editing.
 With `-o`, the output file includes YAML metadata.
 Stdout contains only the transcript body.
 
+## OpenRouter (unreleased checkout)
+
+Direct OpenRouter formatting does not require Pi:
+
+```sh
+# Set OPENROUTER_API_KEY in the environment first; do not store it in TOML.
+uv run yt-transcript URL --no-config --provider openrouter --model openai/gpt-4o -o transcript.md
+uv run yt-transcript URL --no-config --provider openrouter --model openai/gpt-4o --editorial-mode summarized --max-chunks 20 -o summary.md
+```
+
+Pi remains the default backend. Raw output and MCP plain text remain model-free.
+The checkout uses `[formatting]` instead of `[pi]`, with a separate `[openrouter]` token limit.
+No automatic retry, provider fallback, or partial output is returned.
+Transcript text is sent to OpenRouter and its upstream provider and can incur charges.
+See the [CLI provider guide](docs/cli.md#providers-unreleased-checkout).
+The pinned dev7 release above does not include OpenRouter support.
+
 ## MCP
 
 For a compatible MCP client, follow the [MCP setup guide](docs/mcp.md).
@@ -80,7 +97,7 @@ The MCP server provides `get_transcript`:
 - `filtered` is the default and attempts SponsorBlock filtering
 - `full` skips SponsorBlock filtering
 - Plain-text output makes no model call
-- `output_format="markdown"` explicitly enables Pi editing
+- `output_format="markdown"` explicitly enables the server-selected model backend
 - Plain text keeps supplied chapters; otherwise, it adds timestamp context
 - Server-configured `summarized` mode produces a whole-video summary for explicit Markdown requests
 - The CLI writes progress to terminal stderr

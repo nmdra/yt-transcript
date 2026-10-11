@@ -155,3 +155,20 @@ def test_workflow_release_boundaries():
     assert checksum_step["working-directory"] == "dist"
     assert "--clobber" not in release["run"]
     assert "pypi" not in release["run"].lower()
+
+
+def test_backend_helpers_are_in_source_archive():
+    import io
+    import tarfile
+
+    raw = subprocess.run(
+        ["git", "archive", "HEAD"], cwd=ROOT, capture_output=True, check=True
+    ).stdout
+    with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
+        paths = set(archive.getnames())
+    assert {
+        "src/yt_transcript/openrouter_backend.py",
+        "src/yt_transcript/openrouter_worker.py",
+        "src/yt_transcript/json_tools.py",
+    } <= paths
+    assert not any(path.startswith(".agents/plans/") for path in paths)

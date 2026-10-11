@@ -6,6 +6,15 @@ These instructions use an isolated uv tool environment for your user account.
 The instructions do not require sudo.
 The installation does not change the project's development environment.
 
+## OpenRouter checkout requirements
+
+The pinned dev7 release documented here requires Pi for Markdown.
+The unreleased checkout can instead use OpenRouter with an explicit model and `OPENROUTER_API_KEY` in the environment.
+That backend requires no Pi installation or additional HTTP dependency.
+Python, Deno, and caption-extraction dependencies remain unchanged.
+Read the [provider guide](cli.md#providers-unreleased-checkout) before running billable requests.
+Do not change an installed tool or credentials merely to test this checkout.
+
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)

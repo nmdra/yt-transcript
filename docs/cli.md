@@ -14,7 +14,7 @@ yt-transcript 'https://youtu.be/YE7VzlLtp-4' --no-config --raw-vtt -o captions.v
 yt-transcript 'https://youtu.be/YE7VzlLtp-4' --no-config --model provider/model-id -o transcript.md
 ```
 
-| Mode | Body | Pi | File metadata |
+| Mode | Body | AI model | File metadata |
 |---|---|---|---|
 | Default | Edited Markdown | Yes | YAML with `-o` |
 | `--raw` | One normalized paragraph | No | YAML with `-o` |
@@ -25,7 +25,7 @@ File output leaves stdout empty.
 All non-VTT bodies end with one newline.
 
 Terminal stderr shows a spinner during caption retrieval/filtering.
-Then stderr shows a bar with completed Pi calls and elapsed time.
+Then stderr shows a bar with completed model calls and elapsed time.
 Summarized mode includes the final synthesis call in this count.
 Progress does not estimate download bytes, tokens, cost, or completion time.
 Progress is disabled for redirected stderr, `TERM=dumb`, help/version, doctor, and MCP.
@@ -34,7 +34,7 @@ Progress never appears in transcripts or files.
 Use `-o` for Python-generated YAML metadata.
 Raw and Markdown file headers include the nullable video `description`.
 See [Metadata files](behavior.md#metadata-files) for the field contract.
-Descriptions stay out of stdout bodies, Pi input, preview, and raw VTT.
+Descriptions stay out of stdout bodies, model input, preview, and raw VTT.
 Shell redirection receives only the transcript body:
 
 ```sh
@@ -69,7 +69,7 @@ The wrapper applies settings in this order of priority: explicit CLI flags, the 
 mode = "markdown"       # "markdown", "raw", or "raw-vtt"
 verbose = false
 
-[pi]
+[formatting]
 chunk_chars = 12000
 timeout_seconds = 600
 editorial_mode = "standard"  # "standard", "focused", or "summarized"
@@ -91,11 +91,13 @@ The wrapper does not create configuration files.
 |---|---|
 | `output.mode` | `markdown`, `raw`, `raw-vtt` |
 | `output.verbose` | Boolean |
-| `pi.model` | Nonempty selector string, or omit the key |
-| `pi.chunk_chars` | Integer 1,000 through 50,000 |
-| `pi.timeout_seconds` | Integer 1 through 3,600, per Pi call |
-| `pi.max_chunks` | Integer 1 through 1,000, or omit for unlimited; includes summary synthesis |
-| `pi.editorial_mode` | `standard` (default), `focused`, or `summarized` |
+| `formatting.provider` | `pi` (default) or `openrouter` |
+| `openrouter.max_output_tokens` | Integer 1 through 131072; default 8192 |
+| `formatting.model` | Nonempty selector string, or omit the key |
+| `formatting.chunk_chars` | Integer 1,000 through 50,000 |
+| `formatting.timeout_seconds` | Integer 1 through 3,600, per model call |
+| `formatting.max_chunks` | Integer 1 through 1,000, or omit for unlimited; includes summary synthesis |
+| `formatting.editorial_mode` | `standard` (default), `focused`, or `summarized` |
 | `mcp.markdown_timeout_seconds` | Integer 300 through 3,600; total MCP Markdown deadline, default 300; ignored by CLI |
 | `sponsorblock.enabled` | Optional boolean; unset means CLI off, MCP filtered on |
 | `sponsorblock.categories` | Nonempty unique list: `sponsor`, `selfpromo`, `interaction`, `intro`, `outro`, `preview` |
@@ -104,7 +106,7 @@ The wrapper does not create configuration files.
 `--raw`, `--raw-vtt`, `--model`, `--max-chunks`, and `-v` override their corresponding defaults.
 There is no `--markdown` or `--quiet` flag.
 
-Raw modes ignore saved Pi preferences after schema checks.
+Raw modes ignore saved formatting preferences after schema checks.
 An explicit model, chunk cap, or editorial-mode flag conflicts with raw output.
 `--editorial-mode` overrides TOML.
 The mutually exclusive `--sponsorblock` / `--no-sponsorblock` flags also override TOML.
@@ -114,8 +116,39 @@ Without an explicit model in TOML or CLI, every Pi call omits `--model`.
 Pi selects its configured default.
 The wrapper never selects a fallback model.
 
-Help, version, and doctor ignore wrapper TOML.
+Help and version ignore wrapper TOML. Doctor loads the selected TOML without network requests.
 A malformed configuration still blocks raw mode unless you supply `--no-config`.
+
+## Providers (unreleased checkout)
+
+Pi remains the default. Select OpenRouter explicitly:
+
+```sh
+uv run yt-transcript URL --no-config --provider openrouter --model openai/gpt-4o -o transcript.md
+```
+
+Set `OPENROUTER_API_KEY` in the process environment, never TOML or command arguments.
+OpenRouter requires an explicit model and no Pi installation.
+Raw modes require neither a model nor credentials.
+Preview needs a selected OpenRouter model but no key and makes no model request.
+
+**TOML migration:** rename `[pi]` to `[formatting]`.
+The old table is rejected rather than merged.
+Add `provider = "openrouter"` or keep the default `"pi"`.
+The `[openrouter]` table accepts only `max_output_tokens`, default 8192, range 1–131072.
+This is sent as `max_tokens`; supported limits depend on the model.
+Reasoning tokens can consume the allowance. Truncated or empty output fails without repair.
+
+The wrapper sends one nonstreaming HTTPS request per completion through a supervised Python helper.
+It rejects redirects, HTTP error bodies, tool calls, and incomplete output.
+A monotonic deadline covers the helper and HTTP work; socket timeouts alone are not the deadline.
+The wrapper does not retry or change providers automatically.
+Requests disable OpenRouter upstream fallback, require parameter support, and request providers with `data_collection="deny"`.
+This can leave no available route. It does not guarantee zero retention, accuracy, or a fixed upstream identity.
+Transcript text reaches OpenRouter and its selected upstream provider.
+Calls can incur charges, including work completed after a local timeout.
+
+These features are not in the pinned dev7 release. Existing dev7 installations still use `[pi]`.
 
 ## Editorial modes
 
@@ -143,8 +176,8 @@ Only the final summary is published; intermediate notes are not returned.
 `--max-chunks` counts all these calls.
 For example, three input chunks require a cap of at least four.
 Notes have per-chunk budgets that include JSON escaping.
-The final synthesis input must fit `pi.chunk_chars`.
-An infeasible note budget fails with `PI_CONTEXT_LIMIT` before model calls.
+The final synthesis input must fit `formatting.chunk_chars`.
+An infeasible note budget fails with `PI_CONTEXT_LIMIT` or `OPENROUTER_CONTEXT_LIMIT` before model calls.
 Oversized or invalid notes fail without truncation, a repair call, or a partial summary.
 Small chunks can create too many notes for one bounded synthesis input.
 Use preview to check the plan; a larger cap alone does not solve this input limit.
@@ -160,7 +193,7 @@ yt-transcript URL --no-config --max-chunks 10 -o transcript.md
 ```
 
 Preview downloads and cleans captions.
-Preview never calls Pi.
+Preview never calls a model.
 Preview shows these fields in a fixed order:
 
 1. Canonical URL
@@ -173,12 +206,13 @@ Preview shows these fields in a fixed order:
 8. Configured chunk limit
 9. Maximum chunks
 10. Cap result
-11. Model selection
-12. Editorial mode
+11. Provider
+12. Model selection
+13. Editorial mode
 
 Preview requires Markdown mode and no output path.
 If the plan exceeds the cap, preview still returns a successful report.
-Actual formatting rejects a plan that exceeds the cap before any Pi call.
+Actual formatting rejects a plan that exceeds the cap before any model call.
 
 Preview is not a cache or a reservation.
 A later run downloads captions again.
@@ -186,7 +220,7 @@ Invocation counts are not token counts, dollar estimates, or exact provider-requ
 
 The formatter splits text on sentence boundaries or whitespace.
 The formatter does not split tokens or overlap chunks.
-The formatter sends chunks sequentially through independent in-memory Pi sessions.
+Pi sends chunks sequentially through independent in-memory sessions; OpenRouter uses independent HTTP completions.
 
 Standard and focused modes join completed bodies without a final synthesis call.
 They do not summarize or remove duplicates across the complete Markdown document.
@@ -206,8 +240,8 @@ A repeated run can incur new charges.
 A timeout or cancellation cannot undo provider work or billing.
 The wrapper does not retry model calls.
 
-Pi-processing failures print a warning on stderr.
-The warning suggests `--raw` for plain text without Pi.
+Model-processing failures print a warning on stderr.
+The warning suggests `--raw` for plain text without an AI model.
 The wrapper does not write a partial processed document or automatic fallback.
 MCP uses `output_format="plain_text"` for the same explicit recovery.
 The total MCP Markdown deadline is separate from CLI per-chunk timeouts.
@@ -222,11 +256,11 @@ yt-transcript --doctor
 yt-transcript URL --no-config --raw -o transcript.txt --no-clobber
 ```
 
-Doctor is local and ignores wrapper TOML.
-Doctor reports Python, package versions, EJS compatibility, Deno, and Pi readiness.
+Doctor is local and loads the selected wrapper TOML; use --no-config to skip it.
+Doctor reports Python, package versions, EJS compatibility, Deno, and selected-backend readiness without network requests. It accepts --provider, --model, --config, and --no-config. OpenRouter checks key/model presence, not authentication.
 
 Version commands use isolated directories and five-second deadlines.
-Doctor does not run a model or access YouTube, credentials, or authentication commands.
+Doctor does not run a model, access YouTube, or run authentication commands. It checks OpenRouter key presence without displaying the key.
 
 A healthy report shows local readiness only.
 The report does not verify video access, provider authentication, caption completeness, or model accuracy.

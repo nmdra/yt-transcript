@@ -50,7 +50,7 @@ Focused editing is selective editing, not summarization.
 Focused editing removes separable greetings, ads, interaction requests, housekeeping, and unrelated tangents.
 Focused editing keeps substantive examples, technical product explanations, code, URLs, numbers, qualifications, relevant affiliation/disclosures, and ambiguous content.
 
-Every retained source chunk still goes to Pi.
+Every retained source chunk still goes to the selected model backend.
 Fully omitted chunks do not reduce planned calls.
 If all output is omitted, publication fails.
 Use standard or raw in this case.
@@ -99,7 +99,7 @@ Review [upstream terms](https://github.com/ajayyy/SponsorBlock/wiki/Database-and
 
 ## Summarized editing
 
-`--editorial-mode summarized` or `pi.editorial_mode = "summarized"` selects a whole-video summary for Markdown output.
+`--editorial-mode summarized` or `formatting.editorial_mode = "summarized"` selects a whole-video summary for Markdown output.
 Standard remains the default; raw and MCP plain-text output stay deterministic.
 The prompt targets 400–700 words, with shorter output for short sources.
 It requests an overview, key points, and supported conclusions or caveats.
@@ -113,7 +113,7 @@ The existing invocation cap includes synthesis; the existing per-call and MCP to
 Each note has a bounded serialized character budget.
 Python rejects impossible budgets before model calls and rejects oversized notes without truncation.
 The final synthesis input fits the configured stdin character limit.
-Notes use independent isolated Pi sessions and are passed only to the final synthesis call.
+Notes use independent backend calls and are passed only to the final synthesis call.
 They are never published as transcript output.
 
 Python validates final headings and nonempty bodies, but does not prove summary accuracy or enforce the target word count.
@@ -121,6 +121,17 @@ Failures publish no partial notes, summary, or automatic fallback.
 The final summary uses its own headings rather than canonical chapter headings.
 Source chapter metadata, descriptions, and SponsorBlock receipts remain unchanged.
 Removal receipts still describe source filtering, not what the summary includes or omits.
+
+## Backend-independent formatting (unreleased checkout)
+
+Both backends use the same source prompts, chapter validation, omission rules, and summary assembly.
+Descriptions are never model input.
+Pi keeps the isolated subprocess contract above.
+OpenRouter uses one bounded nonstreaming HTTPS completion through a supervised Python helper.
+It rejects tool calls, redirects, invalid/oversize responses, and non-stop completions.
+The wrapper makes no automatic retry or provider switch and publishes no partial result.
+HTTP response and completion text bounds are 2 MiB and 1 MiB respectively.
+A local deadline cannot cancel provider billing or establish factual accuracy.
 
 ## Metadata files
 
@@ -193,7 +204,7 @@ Description availability and completeness depend on the upstream response and yt
 The wrapper does not guarantee that the field matches the complete YouTube page description.
 
 CLI raw and Markdown file headers, MCP structured metadata, and compatibility JSON include this field.
-Descriptions stay out of transcript bodies, Pi input, and CLI preview.
+Descriptions stay out of transcript bodies, model input, and CLI preview.
 SponsorBlock and focused editing do not change them.
 The wrapper does not parse description links or create new chapters from this field.
 Descriptions remain untrusted source data, not instructions.
