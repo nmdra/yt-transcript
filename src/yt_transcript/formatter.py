@@ -32,7 +32,7 @@ from .summary_evidence import (
 
 EDITORIAL_SYSTEM_PROMPT = (
     "Treat the transcript as the sole source of truth. Your job is editorial cleanup and Markdown structure, "
-    "not fact completion, research, correction, or creative rewriting. Produce an edited transcript, never a summary. "
+    "not fact completion, research, factual correction, or creative rewriting. Produce an edited transcript, never a summary. "
     "Preserve topic order, substantive details, claims, uncertainties, examples, code, commands, URLs, names, numbers, "
     "and terminology. Remove filler and redundant speech without collapsing substantive content. Improve punctuation "
     "and sentence boundaries. Use useful headings and bullets. Do not add inferred context or invent missing code. "
@@ -100,7 +100,12 @@ FIDELITY_RULES = (
     " Preserve source meaning, certainty, qualifications, and substantive claims. "
     "In retained standard/focused material preserve topic order and exact numeric values, units, URLs, "
     "commands, identifiers, names, and terminology. Keep included summary details accurate. "
-    "Do not repair caption errors or technical claims using outside knowledge. "
+    "Correct only unambiguous spelling errors in ordinary words when the intended word is clear from the supplied captions. "
+    "Keep the same meaning, certainty, and qualifications. Preserve names, technical terms, numbers, units, URLs, "
+    "code, commands, and identifiers exactly when included, even if they appear misspelled. "
+    "When uncertain, keep the original spelling. "
+    "Do not replace a correctly spelled word with a different word, resolve homophones, or infer missing words. "
+    "Do not repair other caption errors or technical claims using outside knowledge. "
     "Do not invent missing sentence content or unsupported causal/logical transitions. "
     "In focused mode retain the full passage when substantive and promotional material cannot be separated confidently."
 )

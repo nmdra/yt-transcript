@@ -32,6 +32,22 @@ Events, thinking, and raw stderr never appear in documents or diagnostics.
 A normal stop does not prove factual accuracy or semantic completeness.
 Offline structural tests do not prove that actual model edits keep the source meaning.
 
+## Conservative spelling correction
+
+Pi and OpenRouter receive the same spelling rules in all Markdown editorial modes, including summary notes and synthesis.
+The model may correct an unambiguous ordinary-word spelling error when the intended word is clear from the captions.
+For example, `recieve the message` can become `receive the message`.
+The model must keep the source meaning, certainty, and qualifications.
+
+In retained text and included summary details, names, technical terms, numbers, units, URLs, code, commands, and identifiers must remain unchanged, even if they appear misspelled.
+Uncertain spellings must remain unchanged.
+The model must not replace a correctly spelled word with a different word, resolve homophones, infer missing words, or repair technical claims.
+This policy does not correct every speech-recognition error.
+
+These are prompt instructions, not a deterministic spelling checker or a guarantee of model fidelity.
+The policy adds no model calls, research, retries, or repair pass.
+Raw captions, raw VTT, MCP plain text, metadata, and canonical chapter headings remain unchanged.
+
 ## Chapters, focused editing, and SponsorBlock
 
 In standard and focused modes, valid supplied chapters become canonical `## [time] title` Markdown headings.

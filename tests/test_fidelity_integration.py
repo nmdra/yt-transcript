@@ -35,6 +35,11 @@ def test_chapter_revisits_omissions_and_ambiguous_content_match(
     )
 
     def echo(request):
+        assert (
+            "Correct only unambiguous spelling errors in ordinary words"
+            in request.system_prompt
+        )
+        assert "When uncertain, keep the original spelling" in request.system_prompt
         data = json.loads(request.source)
         calls.append(data)
         blocks = []
@@ -89,6 +94,11 @@ def test_source_driven_summary_parity(provider, repeats, monkeypatch):
         requests.append(request)
         assert "DESCRIPTION_SECRET" not in request.source
         assert "metadata descriptions" in request.system_prompt
+        assert (
+            "Correct only unambiguous spelling errors in ordinary words"
+            in request.system_prompt
+        )
+        assert "Do not repair other caption errors" in request.system_prompt
         if request.instruction.startswith("Extract"):
             payload = json.loads(request.source)
             span = payload["runs"][0]["fragments"][0]

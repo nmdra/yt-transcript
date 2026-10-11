@@ -251,10 +251,14 @@ def test_cli_context_failure_preserves_old_file(monkeypatch, capsys, tmp_path):
     assert not capsys.readouterr().out
 
 
-def test_shared_rules_reinforce_no_correction_without_losing_focused_examples():
+def test_shared_rules_allow_bounded_spelling_without_losing_focused_examples():
     for mode in ("standard", "focused", "summarized"):
         prompt = formatter.get_editorial_prompt(mode)
-        assert "Do not repair caption errors" in prompt
+        assert "Correct only unambiguous spelling errors in ordinary words" in prompt
+        assert "When uncertain, keep the original spelling" in prompt
+        assert "even if they appear misspelled" in prompt
+        assert "resolve homophones, or infer missing words" in prompt
+        assert "Do not repair other caption errors" in prompt
         assert "unsupported causal/logical transitions" in prompt
         assert "exact numeric values" in prompt
     focused = formatter.get_editorial_prompt("focused")

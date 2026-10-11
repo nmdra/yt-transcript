@@ -9,6 +9,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Allow conservative ordinary-word spelling correction in Pi and OpenRouter Markdown prompts; preserve uncertain words, names, technical terms, protected literals, and source meaning without extra calls
 - Raise the default OpenRouter output allowance from 8192 to 16384 tokens per model call; reasoning tokens can consume the allowance, and model-specific limits still apply
 
 ## [0.2.0-dev.8] - 2026-10-12
