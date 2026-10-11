@@ -14,6 +14,7 @@ from yt_transcript.errors import AppError
 from yt_transcript.fidelity import MODES, anchor_present, compare_fidelity
 from yt_transcript.json_tools import strict_json_loads
 from yt_transcript.output import write_output
+from yt_transcript.summary_evidence import parse_claims
 
 LIMIT = 8 * 1024 * 1024
 SAFE_ERROR = (
@@ -144,20 +145,10 @@ def inspect_notes(
         if len(set(supplied)) != len(supplied) or set(supplied) - source_ids:
             raise ValueError("Invalid saved ownership.")
         try:
-            note = strict_json_loads(string(chunk["response"]))
-            obj(note, {"claims"})
-            for claim in rows(note["claims"], 64):
-                obj(claim, {"statement", "source_ids", "qualifications"})
-                string(claim["statement"])
-                references = strings(claim["source_ids"], 16)
-                if not references or len(set(references)) != len(references):
-                    raise ValueError("Invalid references.")
-                for reference in references:
-                    if reference in supplied:
-                        valid += 1
-                    else:
-                        invalid += 1
-                all_qualifications.extend(strings(claim["qualifications"], 16))
+            claims = parse_claims(string(chunk["response"]), supplied)
+            for claim in claims:
+                valid += len(claim.source_ids)
+                all_qualifications.extend(claim.qualifications)
         except ValueError, TypeError:
             invalid += 1
     joined = " ".join(all_qualifications)

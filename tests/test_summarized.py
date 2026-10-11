@@ -29,6 +29,25 @@ SOURCE = "Retries can duplicate writes. Idempotency prevents duplicate effects. 
 URL = "https://www.youtube.com/watch?v=abcdefghijk"
 
 
+def evidence_notes(plan, statement="Factual note."):
+    return [
+        json.dumps(
+            {
+                "claims": [
+                    {
+                        "statement": statement,
+                        "source_ids": [spans[0].source_id],
+                        "qualifications": ["Uncertainty remains."],
+                    }
+                ]
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        for spans in plan.source_spans
+    ]
+
+
 def summary_pi(tmp_path, monkeypatch, outputs, *, sleep_at=None, reason_at=None):
     record = tmp_path / "summary-inputs.jsonl"
     script = tmp_path / "summary-pi.py"
@@ -59,7 +78,7 @@ def summary_pi(tmp_path, monkeypatch, outputs, *, sleep_at=None, reason_at=None)
 
 def summary_plan(source=SOURCE, **kwargs):
     return formatter.plan_transcript_formatting(
-        source, editorial_mode="summarized", chunk_chars=1000, **kwargs
+        source, editorial_mode="summarized", chunk_chars=2000, **kwargs
     )
 
 
@@ -99,9 +118,9 @@ def test_single_chunk_uses_one_isolated_summary_call(tmp_path, monkeypatch):
         == SUMMARY
     )
     assert progress == [(0, 1), (1, 1)]
-    assert record.read_text().splitlines() == [
-        json.dumps("Retries can duplicate writes.")
-    ]
+    source = json.loads(json.loads(record.read_text()))
+    assert source["source_spans"][0]["text"] == "Retries can duplicate writes."
+    assert source["source_spans"][0]["origin"]["start_ms"] is None
     assert len(calls) == 1
     argv, kwargs = calls[0]
     assert all(flag in argv for flag in formatter.ISOLATION_FLAGS)
@@ -115,13 +134,13 @@ def test_multiple_chunks_produce_bounded_notes_then_one_summary(tmp_path, monkey
     plan = summary_plan()
     assert len(plan.chunks) > 1
     assert plan.call_count == len(plan.chunks) + 1
-    notes = ['- Claim "quoted"; uncertainty remains. 😀' for _ in plan.chunks]
+    notes = evidence_notes(plan, 'Claim "quoted"; uncertainty remains. 😀')
     calls, record = summary_pi(tmp_path, monkeypatch, [*notes, SUMMARY])
     progress = []
     result = formatter.format_with_pi(
         SOURCE,
         editorial_mode="summarized",
-        chunk_chars=1000,
+        chunk_chars=2000,
         max_chunks=plan.call_count,
         timeout_seconds=2,
         on_progress=lambda n, total: progress.append((n, total)),
@@ -132,10 +151,11 @@ def test_multiple_chunks_produce_bounded_notes_then_one_summary(tmp_path, monkey
     synthesis = json.loads(inputs[-1])
     assert synthesis == {
         "notes": [
-            {"chunk_index": index, "text": note} for index, note in enumerate(notes, 1)
+            {"chunk_index": index, **json.loads(note)}
+            for index, note in enumerate(notes, 1)
         ]
     }
-    assert len(inputs[-1]) <= 1000
+    assert len(inputs[-1]) <= 2000
     assert len(calls) == plan.call_count
     assert progress == [(n, plan.call_count) for n in range(plan.call_count + 1)]
     assert "notes" in calls[0][0][-1]
@@ -152,7 +172,7 @@ def test_synthesis_is_reserved_by_cap_before_launch(monkeypatch):
         formatter.format_with_pi(
             SOURCE,
             editorial_mode="summarized",
-            chunk_chars=1000,
+            chunk_chars=2000,
             max_chunks=len(plan.chunks),
         )
     assert exc.value.info.code == "CHUNK_LIMIT_EXCEEDED"
@@ -172,7 +192,7 @@ def test_summary_note_budget_is_checked_before_launch(monkeypatch):
         formatter.format_with_pi(
             "word " * 10000,
             editorial_mode="summarized",
-            chunk_chars=1000,
+            chunk_chars=2000,
         )
     assert exc.value.info.code == "PI_CONTEXT_LIMIT"
 
@@ -186,7 +206,7 @@ def test_bad_notes_fail_without_synthesis_or_partial_output(tmp_path, monkeypatc
         formatter.format_with_pi(
             SOURCE,
             editorial_mode="summarized",
-            chunk_chars=1000,
+            chunk_chars=2000,
             on_progress=lambda n, total: progress.append((n, total)),
         )
     assert exc.value.info.code == "PI_OUTPUT_INVALID"
@@ -204,15 +224,13 @@ def test_invalid_final_summary_fails_and_does_not_complete_progress(
     tmp_path, monkeypatch, bad
 ):
     plan = summary_plan()
-    calls, _ = summary_pi(
-        tmp_path, monkeypatch, [*["- Factual note."] * len(plan.chunks), bad]
-    )
+    calls, _ = summary_pi(tmp_path, monkeypatch, [*evidence_notes(plan), bad])
     progress = []
     with pytest.raises(FormattingError) as exc:
         formatter.format_with_pi(
             SOURCE,
             editorial_mode="summarized",
-            chunk_chars=1000,
+            chunk_chars=2000,
             on_progress=lambda n, total: progress.append((n, total)),
         )
     assert exc.value.info.code == "PI_OUTPUT_INVALID"
@@ -260,7 +278,7 @@ def download_fixture(monkeypatch):
 def test_cli_preview_counts_synthesis_without_pi(tmp_path, monkeypatch, capsys):
     download_fixture(monkeypatch)
     config = tmp_path / "config.toml"
-    config.write_text("[formatting]\nchunk_chars=1000\n[sponsorblock]\nenabled=false")
+    config.write_text("[formatting]\nchunk_chars=2000\n[sponsorblock]\nenabled=false")
     monkeypatch.setattr(
         formatter, "ensure_pi", lambda: pytest.fail("preview must not launch Pi")
     )
@@ -286,13 +304,13 @@ def test_cli_failed_synthesis_keeps_existing_file(tmp_path, monkeypatch, capsys)
     download_fixture(monkeypatch)
     config = tmp_path / "config.toml"
     config.write_text(
-        '[formatting]\nchunk_chars=1000\neditorial_mode="summarized"\n[sponsorblock]\nenabled=false'
+        '[formatting]\nchunk_chars=2000\neditorial_mode="summarized"\n[sponsorblock]\nenabled=false'
     )
     plan = summary_plan()
     calls, record = summary_pi(
         tmp_path,
         monkeypatch,
-        [*["- Factual note."] * len(plan.chunks), "## Edited\n\nwrong"],
+        [*evidence_notes(plan), "## Edited\n\nwrong"],
     )
     output = tmp_path / "existing.md"
     output.write_text("original")
@@ -307,11 +325,9 @@ def test_cli_failed_synthesis_keeps_existing_file(tmp_path, monkeypatch, capsys)
 def test_cli_summary_yaml_keeps_metadata_out_of_pi(tmp_path, monkeypatch, capsys):
     metadata = download_fixture(monkeypatch)
     plan = summary_plan()
-    calls, record = summary_pi(
-        tmp_path, monkeypatch, [*["- Factual note."] * len(plan.chunks), SUMMARY]
-    )
+    calls, record = summary_pi(tmp_path, monkeypatch, [*evidence_notes(plan), SUMMARY])
     config = tmp_path / "config.toml"
-    config.write_text("[formatting]\nchunk_chars=1000\n[sponsorblock]\nenabled=false")
+    config.write_text("[formatting]\nchunk_chars=2000\n[sponsorblock]\nenabled=false")
     output = tmp_path / "summary.md"
     assert (
         main(
@@ -352,16 +368,22 @@ def test_saved_summary_preference_does_not_change_cli_raw(
 
 def test_summary_notes_fill_but_never_exceed_synthesis_budget(tmp_path, monkeypatch):
     plan = summary_plan()
-    limit = formatter._summary_note_limit(len(plan.chunks), 1000)
-    calls, record = summary_pi(
-        tmp_path, monkeypatch, [*["x" * limit] * len(plan.chunks), SUMMARY]
-    )
+    limit = formatter._summary_note_limit(len(plan.chunks), 2000)
+    notes = evidence_notes(plan, "")
+    for index, note in enumerate(notes):
+        value = json.loads(note)
+        empty = len(json.dumps(value, ensure_ascii=False, separators=(",", ":"))) - len(
+            '{"claims":[]} '.strip()
+        )
+        value["claims"][0]["statement"] = "x" * (limit - empty)
+        notes[index] = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    calls, record = summary_pi(tmp_path, monkeypatch, [*notes, SUMMARY])
     assert (
-        formatter.format_with_pi(SOURCE, editorial_mode="summarized", chunk_chars=1000)
+        formatter.format_with_pi(SOURCE, editorial_mode="summarized", chunk_chars=2000)
         == SUMMARY
     )
     payload = json.loads(record.read_text().splitlines()[-1])
-    assert 1000 - len(plan.chunks) < len(payload) <= 1000
+    assert 2000 - len(plan.chunks) < len(payload) <= 2000
     assert len(calls) == plan.call_count
 
 
@@ -373,7 +395,7 @@ def test_synthesis_failure_preserves_diagnostics_and_cleanup(
     calls, _ = summary_pi(
         tmp_path,
         monkeypatch,
-        [*["- Factual note."] * len(plan.chunks), SUMMARY],
+        [*evidence_notes(plan), SUMMARY],
         sleep_at=len(plan.chunks) if failure == "timeout" else None,
         reason_at=len(plan.chunks) if failure == "incomplete" else None,
     )
@@ -382,7 +404,7 @@ def test_synthesis_failure_preserves_diagnostics_and_cleanup(
         formatter.format_with_pi(
             SOURCE,
             editorial_mode="summarized",
-            chunk_chars=1000,
+            chunk_chars=2000,
             timeout_seconds=1,
             on_progress=lambda n, total: progress.append((n, total)),
         )
@@ -420,7 +442,7 @@ def test_mcp_server_summary_policy_and_compatibility_round_trip(tmp_path, monkey
     metadata = download_fixture(monkeypatch)
     plan = summary_plan()
     calls, record = summary_pi(
-        tmp_path, monkeypatch, ([*["- Factual note."] * len(plan.chunks), SUMMARY]) * 2
+        tmp_path, monkeypatch, ([*evidence_notes(plan), SUMMARY]) * 2
     )
 
     class Runner:
@@ -433,7 +455,7 @@ def test_mcp_server_summary_policy_and_compatibility_round_trip(tmp_path, monkey
     async def check():
         config = AppConfig(
             editorial_mode="summarized",
-            chunk_chars=1000,
+            chunk_chars=2000,
             sponsorblock=SponsorBlockConfig(enabled=False),
         )
         async with Client(create_server(config, runner=Runner())) as client:

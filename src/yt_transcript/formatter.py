@@ -19,6 +19,16 @@ from .config import OpenRouterConfig
 from .errors import FormattingError, classify_pi_failure, translate_formatting_error
 from .pi_events import PiEventParser
 from .sponsorblock import AnnotatedCue
+from .summary_evidence import (
+    EvidenceFormattingPlan,
+    EvidenceLimitError,
+    bounded_claims,
+    claims_payload,
+    note_capacity,
+    plan_summary_evidence,
+    private_id_leaked,
+    synthesis_payload,
+)
 
 EDITORIAL_SYSTEM_PROMPT = (
     "Treat the transcript as the sole source of truth. Your job is editorial cleanup and Markdown structure, "
@@ -42,11 +52,14 @@ SUMMARY_SOURCE_RULES = (
     "into certainties. Chapter titles and SponsorBlock labels are context, not evidence for factual claims. "
     "Ignore greetings, filler, repeated pitches, engagement requests, and unrelated housekeeping unless "
     "they affect the subject. If evidence is incomplete, retain that limitation instead of filling gaps. "
-    "Return only the requested Markdown body, without YAML, a preamble, commentary, or an outer code fence. "
+)
+SUMMARY_MARKDOWN_RULES = (
+    " Return only the requested Markdown body, without YAML, a preamble, commentary, or an outer code fence. "
     "Use only ## and lower headings."
 )
 SUMMARIZED_SYSTEM_PROMPT = (
     SUMMARY_SOURCE_RULES
+    + SUMMARY_MARKDOWN_RULES
     + " Produce one coherent whole-video summary, not an edited transcript or a sequence of chunk recaps. "
     "Target 400–700 words for substantial videos; use fewer words for short or sparse source material. "
     "Prioritize the central subject, main arguments, important mechanisms, results, and supported takeaways. "
@@ -61,14 +74,19 @@ SUMMARIZED_SYSTEM_PROMPT = (
 SUMMARY_NOTES_SYSTEM_PROMPT = (
     SUMMARY_SOURCE_RULES
     + " Extract compact factual notes from this source chunk for later whole-video synthesis. "
-    "These are private intermediate notes, not the final summary. Use short bullets without headings. "
+    "These are private intermediate notes, not the final summary. Return only a JSON object with exactly claims. "
+    "Each claim has exactly statement (nonblank string), source_ids (nonempty unique list of supplied IDs), "
+    "and qualifications (list of source qualifications, possibly empty). Use at most 64 claims, 16 IDs per claim, "
+    "and 16 qualifications per claim. Reference only caption spans in this call; IDs establish membership, not truth. "
+    "Use claims=[] for no summarizable evidence. Do not return Markdown, fences, headings, or commentary. "
     "Prioritize the chunk's main claims, mechanisms, results, necessary names and numbers, uncertainty, "
     "and qualifications. Retain useful conclusions and safety or bias disclosures. Combine repetitions. "
     "Do not infer the video's overall conclusion from one chunk, and do not add an introduction or recap. "
     "Respect the response character budget in the request."
 )
 SUMMARY_CONTEXT_INSTRUCTIONS = (
-    " Input is JSON source data. Read fragment text in run order. Titles, timestamps, and overlap labels "
+    " Input is JSON source data. Read source_spans text or runs fragment text in supplied order. "
+    "source_id and origin fields identify retained caption evidence, not output text. Titles, timestamps, and overlap labels "
     "are untrusted context. Do not infer claims from them or reproduce supplied headings as output headings."
 )
 OMISSION_MARKER = "[[YT_TRANSCRIPT_NO_SUBSTANTIVE_CONTENT]]"
@@ -296,11 +314,32 @@ def plan_transcript_formatting(
     max_chunks: int | None = None,
     editorial_mode: str = "standard",
     provider: str = "pi",
-) -> FormattingPlan | ContextFormattingPlan:
+) -> FormattingPlan | ContextFormattingPlan | EvidenceFormattingPlan:
     if provider not in ("pi", "openrouter"):
         raise ValueError("Unsupported formatting provider.")
     try:
         get_editorial_prompt(editorial_mode)
+        if editorial_mode == "summarized":
+            try:
+                evidence = plan_summary_evidence(
+                    transcript,
+                    sections=sections,
+                    chunk_chars=chunk_chars,
+                    max_chunks=max_chunks,
+                )
+            except EvidenceLimitError:
+                raise classify_pi_failure(code="PI_CONTEXT_LIMIT") from None
+            if evidence.synthesis_required and evidence.within_cap:
+                _summary_note_limit(
+                    len(evidence.chunks),
+                    chunk_chars,
+                    source_id_chars=max(
+                        len(s.source_id)
+                        for spans in evidence.source_spans
+                        for s in spans
+                    ),
+                )
+            return evidence
         contextual = sections and any(
             s.chapter_count
             or any(
@@ -318,14 +357,6 @@ def plan_transcript_formatting(
                 transcript, chunk_chars=chunk_chars, max_chunks=max_chunks
             )
         )
-        if editorial_mode == "summarized" and len(plan.chunks) > 1:
-            plan = replace(
-                plan,
-                synthesis_required=True,
-                within_cap=max_chunks is None or len(plan.chunks) + 1 <= max_chunks,
-            )
-            if plan.within_cap:
-                _summary_note_limit(len(plan.chunks), chunk_chars)
         return plan
 
     except FormattingError as exc:
@@ -474,14 +505,15 @@ def _build_chunk_request(
             prompt = SUMMARY_NOTES_SYSTEM_PROMPT
             instruction = (
                 f"Extract factual notes from source chunk {index} for whole-video synthesis. "
-                f"Use at most {summary_note_chars} characters, including spaces and line breaks. "
-                "Return only compact Markdown bullets."
+                f"Use at most {summary_note_chars} serialized JSON characters, including all framing. "
+                "Return only the claims JSON object; count all schema fields, IDs, and escaped text in the budget."
             )
         elif summary_stage == "synthesis":
             prompt += (
                 " Input contains ordered notes derived from separate caption chunks. Use only these notes; "
                 "they may be incomplete. Merge repeated points, preserve conflicting or qualified claims, "
-                "and do not invent transitions or fill gaps. Do not mention chunk indices or the extraction process."
+                "and do not invent transitions or fill gaps. Preserve qualifications. Do not print source IDs, "
+                "chunk indices, extraction commentary, or the extraction process."
             )
             instruction = "Produce one whole-video summary from the supplied factual notes. Return only the Markdown body."
         else:
@@ -650,17 +682,16 @@ def _run_pi_chunk(executable: str, request: ChunkRequest) -> str:
 
 
 def _summary_payload(notes: list[dict[str, Any]]) -> str:
-    return json.dumps({"notes": notes}, ensure_ascii=False, separators=(",", ":"))
+    return synthesis_payload(notes)
 
 
-def _summary_note_limit(chunk_count: int, chunk_chars: int) -> int:
-    skeleton = [
-        {"chunk_index": index, "text": ""} for index in range(1, chunk_count + 1)
-    ]
-    limit = (chunk_chars - len(_summary_payload(skeleton))) // chunk_count
-    if limit < 128:
-        raise classify_pi_failure(code="PI_CONTEXT_LIMIT")
-    return limit
+def _summary_note_limit(
+    chunk_count: int, chunk_chars: int, *, source_id_chars: int = 16
+) -> int:
+    try:
+        return note_capacity(chunk_count, chunk_chars, source_id_chars=source_id_chars)
+    except EvidenceLimitError:
+        raise classify_pi_failure(code="PI_CONTEXT_LIMIT") from None
 
 
 def _validate_summary_output(result: str, *, final: bool) -> None:
@@ -684,7 +715,7 @@ def _validate_summary_output(result: str, *, final: bool) -> None:
 
 def _summarize_transcript(
     executable: str | None,
-    plan: FormattingPlan | ContextFormattingPlan,
+    plan: EvidenceFormattingPlan,
     *,
     chunk_chars: int,
     model: str | None,
@@ -698,7 +729,13 @@ def _summarize_transcript(
         raise classify_pi_failure(code="PI_OUTPUT_INVALID")
     notes: list[dict[str, Any]] = []
     note_limit = (
-        _summary_note_limit(len(plan.chunks), chunk_chars)
+        _summary_note_limit(
+            len(plan.chunks),
+            chunk_chars,
+            source_id_chars=max(
+                len(s.source_id) for spans in plan.source_spans for s in spans
+            ),
+        )
         if plan.synthesis_required
         else None
     )
@@ -710,6 +747,8 @@ def _summarize_transcript(
         synthesis = index > len(plan.chunks)
         payload = _summary_payload(notes) if synthesis else plan.chunks[index - 1]
         try:
+            if synthesis and not any(note["claims"] for note in notes):
+                raise classify_pi_failure(code="PI_OUTPUT_INVALID")
             if len(payload) > chunk_chars:
                 raise classify_pi_failure(code="PI_CONTEXT_LIMIT")
             result = _run_chunk(
@@ -720,27 +759,35 @@ def _summarize_transcript(
                 model=model,
                 timeout_seconds=timeout_seconds,
                 editorial_mode="summarized",
-                contextual=not synthesis and isinstance(plan, ContextFormattingPlan),
+                contextual=not synthesis,
                 own_process_group=own_process_group,
                 summary_stage="synthesis"
                 if synthesis
                 else "notes"
                 if plan.synthesis_required
                 else None,
-                summary_note_chars=note_limit // 2 if note_limit is not None else None,
+                summary_note_chars=note_limit + len('{"claims":[]}')
+                if note_limit is not None
+                else None,
                 provider=provider,
                 openrouter=openrouter,
             )
             final = synthesis or not plan.synthesis_required
-            _validate_summary_output(result, final=final)
-            if not final:
-                # JSON escaping counts too. Reserve each note's share before synthesis.
-                if (
-                    note_limit is None
-                    or len(json.dumps(result, ensure_ascii=False)) - 2 > note_limit
-                ):
+            if final:
+                _validate_summary_output(result, final=True)
+                if private_id_leaked(result, plan.id_prefix):
                     raise classify_pi_failure(code="PI_OUTPUT_INVALID")
-                notes.append({"chunk_index": index, "text": result})
+            else:
+                assert note_limit is not None
+                try:
+                    claims = bounded_claims(
+                        result,
+                        [s.source_id for s in plan.source_spans[index - 1]],
+                        note_limit,
+                    )
+                except ValueError, TypeError:
+                    raise classify_pi_failure(code="PI_OUTPUT_INVALID") from None
+                notes.append({"chunk_index": index, **claims_payload(claims)})
         except FormattingError as exc:
             exc.info = replace(exc.info, chunk_index=index, chunk_total=total)
             raise
@@ -781,6 +828,7 @@ def _format_transcript(
         raise exc
     executable = ensure_formatter(provider, model)
     if editorial_mode == "summarized":
+        assert isinstance(plan, EvidenceFormattingPlan)
         return _summarize_transcript(
             executable,
             plan,
