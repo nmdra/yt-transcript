@@ -16,7 +16,7 @@ class MCPConfig:
 
 @dataclass(frozen=True)
 class OpenRouterConfig:
-    max_output_tokens: int = 8192
+    max_output_tokens: int = 16384
 
 
 @dataclass(frozen=True)
@@ -131,7 +131,7 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
     openrouter = data.get("openrouter", {})
     if not isinstance(openrouter, dict) or set(openrouter) - {"max_output_tokens"}:
         raise invalid("openrouter")
-    tokens = openrouter.get("max_output_tokens", 8192)
+    tokens = openrouter.get("max_output_tokens", 16384)
     if type(tokens) is not int or not 1 <= tokens <= 131072:
         raise invalid("openrouter.max_output_tokens")
     values["openrouter"] = OpenRouterConfig(tokens)

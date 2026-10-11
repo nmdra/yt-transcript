@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Raise the default OpenRouter output allowance from 8192 to 16384 tokens per model call; reasoning tokens can consume the allowance, and model-specific limits still apply
+
 ## [0.2.0-dev.8] - 2026-10-12
 
 ### Added

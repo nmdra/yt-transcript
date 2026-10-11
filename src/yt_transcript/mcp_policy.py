@@ -11,7 +11,7 @@ class MCPFormattingPolicy:
     max_chunks: int = 20
     editorial_mode: str = "standard"
     provider: str = "pi"
-    openrouter_max_output_tokens: int = 8192
+    openrouter_max_output_tokens: int = 16384
 
 
 def validate_formatting_policy(value: object) -> MCPFormattingPolicy:

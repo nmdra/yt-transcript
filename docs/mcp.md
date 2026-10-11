@@ -57,7 +57,7 @@ model = "openai/gpt-4o"
 max_chunks = 20
 
 [openrouter]
-max_output_tokens = 8192
+max_output_tokens = 16384
 ```
 
 Launch without `--no-config` and make `OPENROUTER_API_KEY` available in the server environment.

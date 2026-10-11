@@ -95,7 +95,7 @@ The wrapper does not create configuration files.
 | `output.mode` | `markdown`, `raw`, `raw-vtt` |
 | `output.verbose` | Boolean |
 | `formatting.provider` | `pi` (default) or `openrouter` |
-| `openrouter.max_output_tokens` | Integer 1 through 131072; default 8192 |
+| `openrouter.max_output_tokens` | Integer 1 through 131072; default 16384 |
 | `formatting.model` | Nonempty selector string, or omit the key |
 | `formatting.chunk_chars` | Integer 1,000 through 50,000 |
 | `formatting.timeout_seconds` | Integer 1 through 3,600, per model call |
@@ -143,7 +143,7 @@ Preview does not make a model request.
 The old table is rejected rather than merged.
 Add `provider = "openrouter"` or keep the default `"pi"`.
 The `[openrouter]` table accepts only `max_output_tokens`.
-Its default is 8192, and its range is 1–131072.
+Its default is 16384, and its range is 1–131072.
 The wrapper sends this value as `max_tokens`.
 The supported limits depend on the model.
 Reasoning tokens can use the allowance.
