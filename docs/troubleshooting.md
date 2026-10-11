@@ -15,7 +15,7 @@ Verbose mode uses only allowlisted diagnostic fields.
 |---|---|
 | `INVALID_URL`, `CONFIG_INVALID` | Correct the input or use `--no-config`. |
 | `RUNTIME_MISSING`, `RUNTIME_INCOMPATIBLE` | Install compatible Deno/EJS components. Run doctor. |
-| `NO_ENGLISH_CAPTIONS`, `NO_ENGLISH_VTT` | No matching captions were returned. This does not fully prove caption availability. |
+| `NO_ENGLISH_CAPTIONS`, `NO_ENGLISH_VTT` | The extraction returned no matching English track, or English tracks without a VTT format. This does not prove that the video has no English captions. Check permitted access and supported runtime setup. |
 | `YOUTUBE_ACCESS_LIMITED` | Check permitted browser access. Access restrictions can cause captions to be omitted. |
 | `VIDEO_UNAVAILABLE`, `AUTH_REQUIRED`, `AGE_RESTRICTED`, `GEO_RESTRICTED` | Check permitted browser/account access. The tool provides no bypass. |
 | `REMOTE_RATE_LIMITED`, `NETWORK_FAILED` | Wait or check the network/certificates. Keep TLS verification enabled. |
@@ -29,14 +29,14 @@ Verbose mode uses only allowlisted diagnostic fields.
 | `PI_CONTEXT_LIMIT`, `PI_OUTPUT_INCOMPLETE` | Smaller chunks or a suitable model can help. Smaller chunks increase calls and delay. Use CLI `--raw` or MCP `output_format="plain_text"` to avoid Pi. |
 | `PI_CONTEXT_MUTATED` | Pi attempted compaction or context changes. Complete formatting cannot be verified. Review Pi/model compatibility or request plain text. Do not accept summarized source as a complete transcript. |
 | `PI_TIMEOUT`, `PI_ABORTED`, `PI_FAILED` | Check provider/model setup or use deterministic output. |
-| `PI_PROTOCOL_INVALID`, `PI_OUTPUT_INVALID`, `PI_OUTPUT_LIMIT` | Check compatible Pi setup. Buffered output is discarded. |
+| `PI_PROTOCOL_INVALID`, `PI_OUTPUT_INVALID`, `PI_OUTPUT_LIMIT` | Check compatible Pi setup. The tool discards buffered output. |
 | `OPENROUTER_NOT_CONFIGURED` | Set an explicit model and OPENROUTER_API_KEY in the environment. No Pi is required. |
 | `OPENROUTER_AUTH_FAILED` | Review permitted authentication/access. A 403 can also be a guardrail rejection. |
 | `OPENROUTER_LIMITED` | Review rate, credit, and budget limits. No automatic retry occurs. |
-| `OPENROUTER_FAILED` | Review network/TLS access and model availability. Raw HTTP error bodies are not exposed. |
-| `OPENROUTER_OUTPUT_INVALID`, `OPENROUTER_OUTPUT_INCOMPLETE` | Output was discarded. Review model/token limits, or explicitly request raw/plain text. |
+| `OPENROUTER_FAILED` | Review network/TLS access and model availability. The tool does not expose raw HTTP error bodies. |
+| `OPENROUTER_OUTPUT_INVALID`, `OPENROUTER_OUTPUT_INCOMPLETE` | The tool discarded output. Review model/token limits, or explicitly request raw/plain text. |
 | `OPENROUTER_TIMEOUT`, `OPENROUTER_CONTEXT_LIMIT` | Review formatting.chunk_chars, per-call limits, and the model. Completion and billing cancellation are not guaranteed. |
-| `CHUNK_LIMIT_EXCEEDED` | Preview the plan or explicitly change the cap. No text is truncated. |
+| `CHUNK_LIMIT_EXCEEDED` | Preview the plan or explicitly change the cap. The tool does not truncate text. |
 | `OUTPUT_EXISTS`, `OUTPUT_FAILED` | Select a usable path. Check filesystem support. |
 | `MCP_TIMEOUT` | The total worker deadline expired, including fetching and model calls. Review `mcp.markdown_timeout_seconds` and the client timeout, or explicitly request `output_format="plain_text"`. |
 | `MCP_BUSY`, `MCP_RESPONSE_LIMIT`, `INTERNAL_ERROR` | Wait or use the deterministic CLI. |
@@ -47,9 +47,12 @@ MCP suggests `output_format="plain_text"`.
 The tool returns no partial document or automatic fallback.
 If the failing chunk is known, MCP errors show that chunk.
 
-A new plain-text request fetches captions again.
-The request does not call a model.
-The request can still fail because of network or caption errors.
+A new MCP plain-text request can reuse a valid source snapshot from the shared cache when the video and resolved mode/SponsorBlock policy match.
+It fetches captions again if the cache is disabled or unavailable, or if no valid matching snapshot remains, including after expiry or eviction.
+A failed effective SponsorBlock lookup is not cached for reuse.
+CLI `--raw` fetches captions again.
+Neither plain-text recovery path calls a model.
+A fresh fetch can still fail because of network or caption errors.
 Timeouts do not undo model charges already incurred.
 
 If upstream wording is unknown, the tool returns a generic error.

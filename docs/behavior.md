@@ -6,7 +6,8 @@
 
 Pi receives cleaned text through stdin.
 With chapter or SponsorBlock boundary context, stdin contains JSON with applicable titles, times, annotations, and retained text.
-Text occurs once in each plan.
+Each retained source word belongs to one current chunk in the plan.
+Optional read-only boundary context can repeat neighboring words as context, not as text that owns output.
 The complete serialized input counts toward the chunk limit.
 Context overhead can increase the number of calls.
 Pi receives neither YAML nor the upstream metadata dictionary.
@@ -35,11 +36,12 @@ Offline structural tests do not prove that actual model edits keep the source me
 ## Conservative spelling correction
 
 Pi and OpenRouter receive the same spelling rules in all Markdown editorial modes, including summary notes and synthesis.
-The model may correct an unambiguous ordinary-word spelling error when the intended word is clear from the captions.
+If the intended word is clear from the captions, the model may correct an unambiguous ordinary-word spelling error.
 For example, `recieve the message` can become `receive the message`.
 The model must keep the source meaning, certainty, and qualifications.
 
-In retained text and included summary details, names, technical terms, numbers, units, URLs, code, commands, and identifiers must remain unchanged, even if they appear misspelled.
+In retained text and included summary details, names, technical terms, numbers, units, URLs, code, commands, and identifiers must remain unchanged.
+This requirement applies even if they appear misspelled.
 Uncertain spellings must remain unchanged.
 The model must not replace a correctly spelled word with a different word, resolve homophones, infer missing words, or repair technical claims.
 This policy does not correct every speech-recognition error.
@@ -79,7 +81,8 @@ MCP filtered mode attempts SponsorBlock by default.
 The fixed official HTTPS lookup sends only a four-character SHA-256 prefix of the video ID.
 Then the wrapper matches the actual ID locally.
 Prefix lookup does not guarantee anonymity.
-The wrapper uses no cookies, credentials, redirects, full-ID fallback, submissions, votes, view reports, or persistent cache.
+SponsorBlock lookup uses no cookies, credentials, redirects, full-ID fallback, submissions, votes, view reports, or separate persistent cache.
+MCP can store and reuse the lookup result with captions in its shared source cache.
 The wrapper makes one lookup attempt.
 The socket timeout is not a total deadline.
 
@@ -87,7 +90,10 @@ Filtering occurs after global rolling cleanup.
 The wrapper removes only complete nonzero cues contained in the selected interval union.
 The wrapper keeps crossing cues and zero-duration cues.
 The wrapper does not guess word timing or repeat cleanup.
-Duration must be verified within one second.
+The wrapper converts both video durations to milliseconds.
+For each accepted segment, the submitted SponsorBlock duration must differ from the extracted video duration by at most 1,000 ms.
+A difference of exactly one second is accepted.
+This tolerance checks duration alignment, not the time taken by the lookup.
 If removal would empty the transcript, the wrapper keeps the transcript and gives a warning.
 Community labels cannot guarantee correct promotion detection.
 
@@ -133,7 +139,8 @@ The existing per-call and MCP total deadlines still apply.
 Each note has a bounded serialized character budget.
 Python rejects impossible budgets before model calls and rejects oversized notes without truncation.
 The final synthesis input fits the configured stdin character limit.
-Notes use independent backend calls and are passed only to the final synthesis call as validated private evidence objects.
+Notes use independent backend calls.
+Only the final synthesis call receives them as validated private evidence objects.
 They are never published as transcript output.
 
 Python validates final headings and nonempty bodies.
@@ -150,7 +157,8 @@ Timed source origins retain source indices, run order, original cue times, and s
 Untimed source origins use normalized-text offsets and null timestamps.
 The ID namespace is absent from retained caption text.
 Removed captions and descriptions are never added to the registry.
-A split cue keeps its original interval; no finer timing is inferred.
+A split cue keeps its original interval.
+The wrapper does not infer finer timing.
 
 Multi-chunk note calls return strict JSON with exactly `claims`.
 Each claim has `statement`, unique same-call `source_ids`, and a `qualifications` array.
@@ -184,7 +192,8 @@ Only current words own output.
 Only current runs determine canonical headings.
 Windows use whole tokens, never chapter titles, descriptions, removed captions, or earlier model output.
 Worst-case JSON escaping is reserved before deterministic repartitioning.
-A neighbor token larger than its window is omitted, not truncated.
+If a neighbor token is larger than its window, the wrapper omits it.
+The wrapper does not truncate it.
 Context can increase calls or leave no room for a current token.
 A model can still copy context into its output.
 Prompts and heading validation do not prove output ownership.
@@ -201,7 +210,8 @@ Pi keeps the isolated subprocess contract above.
 OpenRouter uses one bounded nonstreaming HTTPS completion through a supervised Python helper.
 It rejects tool calls, redirects, invalid or oversized responses, and non-stop completions.
 The wrapper makes no automatic retry or provider switch and publishes no partial result.
-HTTP response and completion text bounds are 2 MiB and 1 MiB respectively.
+The HTTP response bound is 2 MiB.
+The completion text bound is 1 MiB.
 A local deadline cannot cancel provider billing or establish factual accuracy.
 
 ## Metadata files
@@ -269,7 +279,7 @@ These fields do not prove that the text is untranslated original English.
 
 `description` contains the text that yt-dlp supplies in the same processed extraction.
 The wrapper makes no additional request for this field.
-If a description is missing, null, empty, whitespace-only, or not a string, it becomes `null`.
+If a description is missing, null, empty, whitespace-only, or not a string, the wrapper sets it to `null`.
 Accepted strings keep their whitespace, line breaks, Unicode, URLs, timestamps, and markup.
 Description availability and completeness depend on the upstream response and yt-dlp.
 The wrapper does not guarantee that the field matches the complete YouTube page description.
@@ -351,10 +361,11 @@ The wrapper provides no cookies, bypass flags, or token provisioning.
 
 ## MCP source retrieval and caching
 
-The unreleased development checkout adds deterministic metadata, segment, search, and page tools.
+Version 1.0.0 includes deterministic metadata, segment, search, and page tools.
 They share source-caption snapshots with MCP `get_transcript`, without calling a model.
 Cache rehydration preserves original cues, chapters, descriptions, filtering receipts, and source order.
 A failed effective SponsorBlock lookup is not persisted as a successful filtered snapshot.
-Markdown is formatted again on each explicit request; only source data is cached.
+The wrapper formats Markdown again on each explicit request.
+The cache stores only source data.
 CLI processing remains unchanged.
 See [MCP retrieval tools](mcp.md#retrieval-tools) and [cache privacy and limits](mcp.md#local-source-cache).

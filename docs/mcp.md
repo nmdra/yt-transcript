@@ -31,7 +31,7 @@ Add this entry to `mcpServers`:
 Replace the command placeholder with the installed path.
 The 330-second client timeout allows time beyond the server's 300-second operation deadline.
 `--no-config` uses server defaults instead of your saved CLI TOML settings.
-If you want to use saved SponsorBlock and Pi preferences, omit this flag.
+To use saved SponsorBlock and Pi preferences, omit this flag.
 The `codemode` exposure setting lets Pi's codemode find and call the tool.
 
 In an existing Pi session, run `/reload`.
@@ -70,7 +70,8 @@ Both backends retain the POSIX restriction for supervised MCP Markdown.
 Deadlines, one-active-worker behavior, result sizes, metadata, and safe errors remain unchanged.
 See [CLI provider limits](cli.md#providers) for routing, privacy, and output-token limits.
 
-When updating from dev7, rename `[pi]` to `[formatting]`. Pi remains the default backend.
+When you update from dev7, rename `[pi]` to `[formatting]`.
+Pi remains the default backend.
 
 ## Explicit model-processed Markdown output
 
@@ -110,10 +111,11 @@ Start the server with that configuration and without `--no-config`.
 Then reconnect the server.
 Continue to request `output_format="markdown"`.
 There is no caller-controlled `editorial_mode` tool argument.
-The shared formatter targets 400–700 words, shorter for short sources.
+The shared formatter targets 400–700 words, with shorter output for short sources.
 One source chunk uses one summary call.
 Multiple chunks use factual notes plus one final synthesis call.
-The cap includes synthesis, so the default cap allows at most 19 source chunks when synthesis is needed.
+The cap includes synthesis.
+If synthesis is needed, the default cap allows at most 19 source chunks.
 An infeasible note budget fails before model calls.
 The server returns no intermediate notes, private source IDs, partial summary, automatic retry, or fallback.
 Summary notes use strict references from the same call and qualification arrays internally.
@@ -139,7 +141,7 @@ Set:
 markdown_timeout_seconds = 1800
 ```
 
-Where supported, use a client timeout of at least 1830 seconds.
+If the client supports it, use a client timeout of at least 1830 seconds.
 In Pi, update its `timeout` field.
 Other clients use their own settings.
 Then reconnect the server.
@@ -176,7 +178,7 @@ Keep existing entries.
 
 Use that client's native configuration format or setup command.
 Do not copy Pi's `exposure`, `description`, or `timeout` fields into another client's configuration.
-Where supported, allow a 330-second tool-call timeout.
+If the client supports it, allow a 330-second tool-call timeout.
 Configuration locations, scope, field names, timeout units, and reload steps depend on the client:
 
 - [Claude Code](https://code.claude.com/docs/en/mcp)
@@ -208,7 +210,7 @@ For a development checkout, use an absolute project path:
 ## Tool contract
 
 `get_transcript` remains the primary tool and is listed first.
-The development checkout adds four [retrieval tools](#retrieval-tools); these additions are not yet in the pinned dev9 release.
+Version 1.0.0 includes four [retrieval tools](#retrieval-tools) that share source-caption snapshots with the primary tool.
 
 ```text
 get_transcript(url: str, mode: Literal["filtered", "full"] = "filtered",
@@ -218,7 +220,7 @@ get_transcript(url: str, mode: Literal["filtered", "full"] = "filtered",
 URL is the only required argument.
 If you omit the mode, the server uses `filtered`.
 This mode attempts SponsorBlock unless you explicitly disable it.
-The mode returns full captions when no usable segments exist or lookup fails.
+If no usable segments exist or lookup fails, the mode returns full captions.
 Expected failures include a safe warning in metadata.
 `full` skips SponsorBlock completely.
 If you use the default `plain_text` output, neither mode calls Pi.
@@ -233,7 +235,7 @@ CLI file output still includes YAML frontmatter.
 Metadata includes an always-present `description` field: extractor text or `null`.
 Both modes and output formats include the same description for the same source snapshot.
 The SDK compatibility JSON also includes the description.
-Descriptions stay out of `document`, `character_count`, and model input.
+Descriptions are not included in `document`, `character_count`, or model input.
 Clients that reject unknown metadata keys must update for this additional field.
 See [Metadata files](behavior.md#metadata-files) for normalization and source-data limits.
 
@@ -313,7 +315,7 @@ Cleanup is not guaranteed.
 
 ## Retrieval tools
 
-These four additions are available in the development checkout, not the pinned dev9 release.
+Version 1.0.0 provides four additional retrieval tools.
 All return structured data and compatibility JSON.
 They use the same supervised worker and source cache as `get_transcript`.
 They never call Pi or OpenRouter.
@@ -341,7 +343,8 @@ It can fail when usable English captions are unavailable.
 Its metadata includes the same description, provenance, attribution, and filtering receipts as `get_transcript`.
 
 Segments allow finite, nonnegative times with start less than end and an interval of at most 900 seconds.
-At most 200 cues are returned; larger results fail without silent truncation.
+The server returns at most 200 cues.
+Larger results fail without silent truncation.
 Each cue has `start_seconds, end_seconds, text, url`.
 Overlap includes the whole cue, with its original start/end times.
 Zero-duration cues are included when their timestamp is within the requested interval.
@@ -351,7 +354,8 @@ The returned query is whitespace-normalized and casefolded.
 Phrases can cross adjoining cues, but cannot cross removed source cues.
 Results use earliest timestamps, with source order for ties.
 Each match has `start_seconds, end_seconds, text, context, url`.
-Text preserves the complete covered cues; surrounding context is limited to 500 characters.
+Text preserves the complete covered cues.
+Surrounding context is limited to 500 characters.
 No match returns `matches: []`.
 
 For example:
@@ -362,7 +366,7 @@ For example:
 {"name":"get_transcript_page","arguments":{"url":"https://youtu.be/abcdefghijk","max_chars":12000}}
 ```
 
-Replace the example ID with a real video ID before making a request.
+Before you make a request, replace the example ID with a real video ID.
 Timestamp URLs point to original cue times, not word-level alignment.
 
 Pages allow max_chars from 1000 through 20000, default 12000.
@@ -386,7 +390,8 @@ Use the returned cursor unchanged for the next request, with the same URL, mode,
 The example cursor above is illustrative, not valid input.
 A final page has `has_more=false` and `next_cursor=null`.
 Malformed or mismatched cursors return `CACHE_CURSOR_INVALID`.
-Expired, evicted, replaced, corrupt, or unreadable snapshots return `CACHE_CURSOR_EXPIRED`; continuation never fetches new captions.
+Expired, evicted, replaced, corrupt, or unreadable snapshots return `CACHE_CURSOR_EXPIRED`.
+Continuation never fetches new captions.
 The cursor is for stable paging, not authentication.
 
 Invalid segment ranges return `SEGMENT_RANGE_INVALID`.
@@ -396,7 +401,7 @@ All helpers retain the serialized result limit, safe errors, 300-second deadline
 
 ## Local source cache
 
-The development checkout enables a shared SQLite cache for MCP only.
+Version 1.0.0 enables a shared SQLite cache for MCP only.
 It stores source cues, original timestamps, complete metadata, caption provenance, and SponsorBlock lookup data.
 It does not store model-generated Markdown or credentials.
 CLI behavior remains uncached.
@@ -416,7 +421,8 @@ The payload budget allows integers from 10 through 500 MiB.
 Physical SQLite files can be larger than that budget.
 Individual snapshots are limited to 5 MiB.
 
-The location is `$XDG_CACHE_HOME/yt-transcript/transcripts.db` when XDG_CACHE_HOME is absolute, otherwise `~/.cache/yt-transcript/transcripts.db`.
+If XDG_CACHE_HOME is absolute, the location is `$XDG_CACHE_HOME/yt-transcript/transcripts.db`.
+Otherwise, the location is `~/.cache/yt-transcript/transcripts.db`.
 On POSIX, the app directory and database use owner-only permissions.
 Unsafe existing paths are rejected.
 Source captions and descriptions are untrusted text stored locally.
@@ -434,7 +440,7 @@ Paging requires a stored snapshot and returns `CACHE_UNAVAILABLE` if it cannot r
 Cache faults do not increase model calls or change the no-model default.
 Each Markdown request still calls the configured formatter.
 
-To clear saved source data, stop all yt-transcript servers first.
+Before you clear saved source data, stop all yt-transcript servers.
 Delete only the app's `yt-transcript` cache directory, including its SQLite sidecar files.
 Restart the server afterward.
 Keep unrelated cache directories and configuration files unchanged.

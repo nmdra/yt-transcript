@@ -20,7 +20,7 @@ The selected yt-dlp release supports Deno 2.3.0 or newer.
 
 The `yt-dlp[default]` dependency supplies EJS scripts.
 The locked yt-dlp 2026.8.19 release requires yt-dlp-ejs 0.8.0.
-Automatic remote EJS component downloads are disabled.
+The tool disables automatic remote EJS component downloads.
 
 For Markdown, install [Pi](https://pi.dev) separately.
 The formatter supports the Pi 1.0.4 CLI interface or newer compatible releases.
@@ -38,7 +38,7 @@ This wrapper never installs runtimes or changes credentials.
 
 ## Offline fidelity evaluation
 
-Evaluate saved synthetic responses without model or network execution:
+Evaluate saved synthetic responses without running a model or using the network:
 
 ```sh
 uv run --locked --offline --extra mcp python scripts/evaluate_fidelity.py \
@@ -63,7 +63,7 @@ Acquire real responses only with separate backend, call, and spend approval.
 ## Offline OpenRouter acceptance
 
 OpenRouter tests mock HTTP and use local helper processes.
-No real API key, model, YouTube request, or SponsorBlock lookup is needed.
+The tests do not need a real API key, model, YouTube request, or SponsorBlock lookup.
 The checkout's CLI doctor can read config and accepts `--provider`, `--model`, and config selection.
 For OpenRouter, doctor reports only whether an API key and model are present.
 Doctor never reports that authentication is valid.
@@ -126,7 +126,8 @@ uvx --from . yt-transcript --version
 
 The lockfile records exact development dependencies.
 Runtime execution never upgrades dependencies automatically.
-Automated tests use synthetic metadata and local child processes, without YouTube or Pi calls.
+Automated tests use synthetic metadata and local child processes.
+The tests do not call YouTube or Pi.
 
 Live checks require an operator-supplied public URL:
 

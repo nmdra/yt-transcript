@@ -28,7 +28,7 @@ Terminal stderr shows a spinner while the tool retrieves and filters captions.
 Then stderr shows a bar with completed model calls and elapsed time.
 Summarized mode includes the final synthesis call in this count.
 Progress does not estimate download bytes, tokens, cost, or completion time.
-Progress is disabled for redirected stderr, `TERM=dumb`, help/version, doctor, and MCP.
+The tool disables progress for redirected stderr, `TERM=dumb`, help/version, doctor, and MCP.
 Progress never appears in transcripts or files.
 
 Use `-o` for Python-generated YAML metadata.
@@ -46,7 +46,7 @@ yt-transcript URL --no-config --raw | wc -w
 The URL must contain an 11-character video ID.
 Supported hosts are `youtube.com`, `www.youtube.com`, `m.youtube.com`, and `youtu.be`.
 
-Watch, shorts, and embed URLs are supported.
+The tool supports watch, shorts, and embed URLs.
 A playlist parameter on a video URL does not enable playlist downloads.
 
 ## Configuration
@@ -140,7 +140,7 @@ Preview requires a selected OpenRouter model, but no API key.
 Preview does not make a model request.
 
 **TOML migration:** rename `[pi]` to `[formatting]`.
-The old table is rejected rather than merged.
+The wrapper rejects the old table instead of merging it.
 Add `provider = "openrouter"` or keep the default `"pi"`.
 The `[openrouter]` table accepts only `max_output_tokens`.
 Its default is 16384, and its range is 1–131072.
@@ -184,7 +184,8 @@ The summary body does not retain canonical chapter headings; source chapter meta
 
 One input chunk needs one summary call.
 Multiple input chunks need one factual-note call per chunk and one final synthesis call.
-Only the final summary is published; intermediate notes are not returned.
+The tool publishes only the final summary.
+The tool does not return intermediate notes.
 `--max-chunks` counts all these calls.
 For example, three input chunks require a cap of at least four.
 Notes are strict private claims objects with source IDs from the same call and qualification arrays.
@@ -223,7 +224,10 @@ Do not copy context into the document.
 Before splitting, planning reserves space for JSON framing and worst-case escapes.
 Planning then reports actual serialized sizes and call counts.
 This can increase calls or cause a planning-limit error.
-The tool never truncates the token.
+Context windows contain only whole words that fit their character limit.
+If an adjacent word does not fit, the tool omits it from that context window instead of truncating it.
+Current text is not omitted this way.
+If a current word cannot fit the remaining source budget after reserved context and framing, planning fails instead of truncating the word.
 At 1000 characters per side, a 12000-character source budget cannot cover worst-case context plus current text.
 A larger chunk limit is not a model capability or completion guarantee.
 Explicit context adds `boundary context characters per side` to preview.
@@ -277,7 +281,7 @@ Summarized mode uses bounded notes and a final synthesis call when there is more
 Preview includes that call.
 The call's exact input length depends on the generated notes.
 
-If a single token is larger than the chunk limit, formatting fails.
+If a single token exceeds the chunk limit, formatting fails.
 The formatter does not truncate the token.
 Character limits do not guarantee a compatible context window or output limit.
 

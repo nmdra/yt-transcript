@@ -7,11 +7,18 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-12
+
 ### Added
 
+- First stable release of the CLI and MCP interfaces, including Pi and OpenRouter Markdown backends
 - Shared private SQLite source-caption cache for MCP, with bounded retention and unchanged CLI behavior
 - Model-free MCP metadata, timestamp segment, literal search, and snapshot-bound paging tools while keeping `get_transcript` as the primary tool
 - Optional Markdown model-call progress notifications without new tool arguments, background tasks, or changed deadlines
+
+### Changed
+
+- Clarify source-cache reuse, duration alignment, caption availability, and read-only chunk context in the guides using Simplified Technical English principles
 
 ## [0.2.0-dev.9] - 2026-10-12
 
@@ -113,7 +120,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.9...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.9...v1.0.0
 [0.2.0-dev.9]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.8...v0.2.0-dev.9
 [0.2.0-dev.8]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.7...v0.2.0-dev.8
 [0.2.0-dev.7]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.6...v0.2.0-dev.7

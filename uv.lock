@@ -1011,7 +1011,7 @@ wheels = [
 
 [[package]]
 name = "yt-transcript"
-version = "0.2.0.dev9"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },
