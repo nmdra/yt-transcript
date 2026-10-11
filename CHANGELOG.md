@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.2.0-dev.9] - 2026-10-12
+
 ### Changed
 
 - Allow conservative ordinary-word spelling correction in Pi and OpenRouter Markdown prompts; preserve uncertain words, names, technical terms, protected literals, and source meaning without extra calls
@@ -105,7 +107,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.8...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.9...HEAD
+[0.2.0-dev.9]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.8...v0.2.0-dev.9
 [0.2.0-dev.8]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.7...v0.2.0-dev.8
 [0.2.0-dev.7]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.6...v0.2.0-dev.7
 [0.2.0-dev.6]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.5...v0.2.0-dev.6

@@ -22,11 +22,17 @@ mode = "markdown"
 verbose = false
 
 [formatting]
+# Default: "pi". Allowed: "pi", "openrouter".
+# OpenRouter requires an explicit model below and OPENROUTER_API_KEY in the process environment.
+# Never put the API key in this file. MCP uses the server-selected backend.
 provider = "pi"
 # Default: "standard". Allowed: "standard", "focused", "summarized".
 # Focused removes clearly separable non-substantive material, not a summary.
 # Summarized targets one 400–700-word overview, shorter for short videos.
 # Multiple input chunks use factual notes plus one final synthesis call.
+# All Markdown modes allow only clear ordinary-word spelling corrections from caption context.
+# Keep uncertain words, names, technical terms, numbers, URLs, code, and commands unchanged.
+# These model instructions do not guarantee spelling quality or factual accuracy.
 # CLI --editorial-mode overrides this. Raw and MCP plain_text ignore this.
 # Explicit MCP markdown uses the server-configured editorial mode.
 editorial_mode = "standard"
@@ -50,7 +56,8 @@ timeout_seconds = 600
 # Pi/provider retries can add requests, so this is not a hard billing cap.
 # max_chunks = 20
 
-# Optional. Default: omitted, preserving Pi's configured default model.
+# Optional for Pi. Default: omitted, preserving Pi's configured default model.
+# Required for OpenRouter. Use an exact OpenRouter model ID when provider = "openrouter".
 # Allowed: a nonempty model selector; a provider/model-id is recommended.
 # Replace the placeholder with a real selector before uncommenting.
 # Empty strings are invalid. CLI --model overrides this setting.
@@ -64,7 +71,10 @@ timeout_seconds = 600
 # URL, output path, preview, doctor, no-clobber, and MCP startup are CLI-only.
 
 [openrouter]
-# OpenRouter completion allowance; model-specific limits still apply.
+# Default: 16384 tokens per model call. Allowed: integers from 1 through 131072.
+# Sent as max_tokens. Reasoning tokens can consume this output allowance.
+# The selected model must support the limit; a larger allowance does not guarantee completion.
+# Incomplete output fails without automatic retry, repair, or partial publication.
 max_output_tokens = 16384
 
 [mcp]
