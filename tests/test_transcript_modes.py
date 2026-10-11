@@ -120,7 +120,7 @@ def test_description_is_independent_of_mode_and_editing(
         return "Edited captions."
 
     monkeypatch.setattr(formatter, "ensure_pi", lambda: "fake-pi")
-    monkeypatch.setattr(formatter, "format_with_pi", edit)
+    monkeypatch.setattr(formatter, "format_transcript", edit)
     payload = {
         "operation": "get_transcript",
         "url": URL,

@@ -15,6 +15,11 @@ class MCPConfig:
 
 
 @dataclass(frozen=True)
+class OpenRouterConfig:
+    max_output_tokens: int = 16384
+
+
+@dataclass(frozen=True)
 class AppConfig:
     mode: str = "markdown"
     verbose: bool = False
@@ -25,6 +30,8 @@ class AppConfig:
     editorial_mode: str = "standard"
     sponsorblock: SponsorBlockConfig = SponsorBlockConfig()
     mcp: MCPConfig = MCPConfig()
+    provider: str = "pi"
+    openrouter: OpenRouterConfig = OpenRouterConfig()
 
 
 def default_config_path() -> Path:
@@ -61,14 +68,30 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
         raise invalid("configuration file") from None
     except OSError, UnicodeError, tomllib.TOMLDecodeError:
         raise invalid("configuration file") from None
-    if set(data) - {"output", "pi", "sponsorblock", "mcp"}:
+    if "pi" in data:
+        raise ConfigError(
+            ErrorInfo(
+                "CONFIG_INVALID",
+                "The legacy pi table is not supported.",
+                "Rename [pi] to [formatting]; keep credentials outside TOML.",
+                "config",
+            )
+        )
+    if set(data) - {"output", "formatting", "openrouter", "sponsorblock", "mcp"}:
         raise invalid("configuration table")
     values = {}
     for table, allowed in (
         ("output", {"mode", "verbose"}),
         (
-            "pi",
-            {"model", "chunk_chars", "timeout_seconds", "max_chunks", "editorial_mode"},
+            "formatting",
+            {
+                "provider",
+                "model",
+                "chunk_chars",
+                "timeout_seconds",
+                "max_chunks",
+                "editorial_mode",
+            },
         ),
     ):
         entries = data.get(table, {})
@@ -81,6 +104,8 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
                     "raw",
                     "raw-vtt",
                 )
+            elif key == "provider":
+                valid = isinstance(value, str) and value in ("pi", "openrouter")
             elif key == "editorial_mode":
                 valid = isinstance(value, str) and value in (
                     "standard",
@@ -103,6 +128,13 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
             if not valid:
                 raise invalid(f"{table}.{key}")
             values[key] = value
+    openrouter = data.get("openrouter", {})
+    if not isinstance(openrouter, dict) or set(openrouter) - {"max_output_tokens"}:
+        raise invalid("openrouter")
+    tokens = openrouter.get("max_output_tokens", 16384)
+    if type(tokens) is not int or not 1 <= tokens <= 131072:
+        raise invalid("openrouter.max_output_tokens")
+    values["openrouter"] = OpenRouterConfig(tokens)
     mcp = data.get("mcp", {})
     if not isinstance(mcp, dict) or set(mcp) - {"markdown_timeout_seconds"}:
         raise invalid("mcp")
@@ -140,6 +172,7 @@ def resolve_config(
     *,
     mode: str | None = None,
     verbose: bool | None = None,
+    provider: str | None = None,
     model: str | None = None,
     max_chunks: int | None = None,
     sponsorblock: bool | None = None,
@@ -150,12 +183,15 @@ def resolve_config(
         for k, v in {
             "mode": mode,
             "verbose": verbose,
+            "provider": provider,
             "model": model,
             "max_chunks": max_chunks,
             "editorial_mode": editorial_mode,
         }.items()
         if v is not None
     }
+    if provider is not None and provider not in ("pi", "openrouter"):
+        raise invalid("provider")
     if editorial_mode is not None and editorial_mode not in (
         "standard",
         "focused",

@@ -28,8 +28,8 @@ def test_terminal_spinner_bar_and_cleanup():
     progress.close()
     text = stream.getvalue()
     assert "Fetching captions / filtering" in text
-    assert "Pi chunks 0/3" in text and "Pi chunks 1/3" in text
-    assert "[################] Pi chunks 3/3" in text
+    assert "Model calls 0/3" in text and "Model calls 1/3" in text
+    assert "[################] Model calls 3/3" in text
     assert "Writing output" in text and "elapsed" in text
     assert progress._thread is not None and not progress._thread.is_alive()
     assert progress._width == 0

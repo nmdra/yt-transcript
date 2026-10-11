@@ -152,9 +152,9 @@ def test_continuation_headers_removed_after_validation(tmp_path, monkeypatch):
     for argv, kwargs in calls:
         assert "--model" not in argv
         assert all(flag in argv for flag in formatter.ISOLATION_FLAGS)
-        assert (
-            argv[argv.index("--system-prompt") + 1] == formatter.EDITORIAL_SYSTEM_PROMPT
-        )
+        assert argv[
+            argv.index("--system-prompt") + 1
+        ] == formatter.get_editorial_prompt("standard")
         assert not Path(kwargs["cwd"]).exists()
 
 
@@ -220,10 +220,9 @@ def test_focused_empty_run_and_first_retained_continuation(tmp_path, monkeypatch
     )
     assert body == "## [00:00] Topic\n\ntechnical detail"
     assert len(calls) > 1
-    assert (
-        calls[0][0][calls[0][0].index("--system-prompt") + 1]
-        == formatter.FOCUSED_SYSTEM_PROMPT
-    )
+    assert calls[0][0][
+        calls[0][0].index("--system-prompt") + 1
+    ] == formatter.get_editorial_prompt("focused")
 
 
 def test_focused_examples_are_present_and_source_marker_stays_data(

@@ -3,7 +3,8 @@
 [README](../README.md) · [Installation](installation.md) · [CLI reference](cli.md)
 
 Start with `yt-transcript --doctor`.
-Doctor checks local readiness without fetching captions or calling a model.
+Doctor checks local readiness.
+Doctor does not fetch captions or call a model.
 
 ## Errors and recovery
 
@@ -29,22 +30,29 @@ Verbose mode uses only allowlisted diagnostic fields.
 | `PI_CONTEXT_MUTATED` | Pi attempted compaction or context changes. Complete formatting cannot be verified. Review Pi/model compatibility or request plain text. Do not accept summarized source as a complete transcript. |
 | `PI_TIMEOUT`, `PI_ABORTED`, `PI_FAILED` | Check provider/model setup or use deterministic output. |
 | `PI_PROTOCOL_INVALID`, `PI_OUTPUT_INVALID`, `PI_OUTPUT_LIMIT` | Check compatible Pi setup. Buffered output is discarded. |
+| `OPENROUTER_NOT_CONFIGURED` | Set an explicit model and OPENROUTER_API_KEY in the environment. No Pi is required. |
+| `OPENROUTER_AUTH_FAILED` | Review permitted authentication/access. A 403 can also be a guardrail rejection. |
+| `OPENROUTER_LIMITED` | Review rate, credit, and budget limits. No automatic retry occurs. |
+| `OPENROUTER_FAILED` | Review network/TLS access and model availability. Raw HTTP error bodies are not exposed. |
+| `OPENROUTER_OUTPUT_INVALID`, `OPENROUTER_OUTPUT_INCOMPLETE` | Output was discarded. Review model/token limits, or explicitly request raw/plain text. |
+| `OPENROUTER_TIMEOUT`, `OPENROUTER_CONTEXT_LIMIT` | Review formatting.chunk_chars, per-call limits, and the model. Completion and billing cancellation are not guaranteed. |
 | `CHUNK_LIMIT_EXCEEDED` | Preview the plan or explicitly change the cap. No text is truncated. |
 | `OUTPUT_EXISTS`, `OUTPUT_FAILED` | Select a usable path. Check filesystem support. |
-| `MCP_TIMEOUT` | The total worker deadline expired, including fetching and Pi calls. Review `mcp.markdown_timeout_seconds` and the client timeout, or explicitly request `output_format="plain_text"`. |
+| `MCP_TIMEOUT` | The total worker deadline expired, including fetching and model calls. Review `mcp.markdown_timeout_seconds` and the client timeout, or explicitly request `output_format="plain_text"`. |
 | `MCP_BUSY`, `MCP_RESPONSE_LIMIT`, `INTERNAL_ERROR` | Wait or use the deterministic CLI. |
 
-Pi-processing failures include a recovery warning.
+If model processing fails, the tool includes a recovery warning.
 CLI suggests `--raw`.
 MCP suggests `output_format="plain_text"`.
 The tool returns no partial document or automatic fallback.
-MCP errors show the failing chunk when available.
+If the failing chunk is known, MCP errors show that chunk.
 
-A new plain-text request fetches captions again but does not call Pi.
+A new plain-text request fetches captions again.
+The request does not call a model.
 The request can still fail because of network or caption errors.
 Timeouts do not undo model charges already incurred.
 
-Unknown upstream wording receives a generic error.
+If upstream wording is unknown, the tool returns a generic error.
 The tool does not guess an authentication or billing cause.
 Private causes and raw warnings never appear in CLI or MCP errors.
 
