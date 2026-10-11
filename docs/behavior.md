@@ -33,7 +33,7 @@ Offline structural tests do not prove that actual LLM edits keep the source mean
 
 ## Chapters, focused editing, and SponsorBlock
 
-Valid supplied chapters become canonical `## [time] title` Markdown headings.
+In standard and focused modes, valid supplied chapters become canonical `## [time] title` Markdown headings.
 Cue-start alignment keeps caption order, crossings, gaps, and backward revisits.
 Python validates headings outside correctly closed code fences.
 Then Python removes duplicate continuation headings.
@@ -96,6 +96,31 @@ Equal headers require identical source snapshots and receipts.
 Published records include source attribution, the license URL, and a notice of selection/time normalization.
 Attribution, noncommercial, and share-alike terms are separate from the MIT code license.
 Review [upstream terms](https://github.com/ajayyy/SponsorBlock/wiki/Database-and-API-License) before deployment, especially for commercial use.
+
+## Summarized editing
+
+`--editorial-mode summarized` or `pi.editorial_mode = "summarized"` selects a whole-video summary for Markdown output.
+Standard remains the default; raw and MCP plain-text output stay deterministic.
+The prompt targets 400–700 words, with shorter output for short sources.
+It requests an overview, key points, and supported conclusions or caveats.
+Names, numbers, uncertainty, and necessary qualifications must remain accurate when included.
+The prompt forbids outside facts and treats all source content and intermediate notes as untrusted data.
+These instructions do not guarantee model fidelity or resistance to prompt injection.
+
+A single source chunk goes directly to one summary call.
+For multiple chunks, Python plans factual-note calls and one final synthesis call.
+The existing invocation cap includes synthesis; the existing per-call and MCP total deadlines still apply.
+Each note has a bounded serialized character budget.
+Python rejects impossible budgets before model calls and rejects oversized notes without truncation.
+The final synthesis input fits the configured stdin character limit.
+Notes use independent isolated Pi sessions and are passed only to the final synthesis call.
+They are never published as transcript output.
+
+Python validates final headings and nonempty bodies, but does not prove summary accuracy or enforce the target word count.
+Failures publish no partial notes, summary, or automatic fallback.
+The final summary uses its own headings rather than canonical chapter headings.
+Source chapter metadata, descriptions, and SponsorBlock receipts remain unchanged.
+Removal receipts still describe source filtering, not what the summary includes or omits.
 
 ## Metadata files
 

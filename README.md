@@ -60,6 +60,9 @@ yt-transcript URL --no-config --max-chunks 3 -o transcript.md
 
 # Focused editing removes separable non-substantive passages
 yt-transcript URL --no-config --editorial-mode focused --max-chunks 3 -o focused.md
+
+# Whole-video summary; the cap includes the final synthesis call
+yt-transcript URL --no-config --editorial-mode summarized --max-chunks 3 -o summary.md
 ```
 
 Raw output does not require a model.
@@ -78,7 +81,8 @@ The MCP server provides `get_transcript`:
 - `full` skips SponsorBlock filtering
 - Plain-text output makes no model call
 - `output_format="markdown"` explicitly enables Pi editing
-- The tool keeps supplied chapters; otherwise, it adds timestamp context
+- Plain text keeps supplied chapters; otherwise, it adds timestamp context
+- Server-configured `summarized` mode produces a whole-video summary for explicit Markdown requests
 - The CLI writes progress to terminal stderr
 
 ## Install with an AI agent

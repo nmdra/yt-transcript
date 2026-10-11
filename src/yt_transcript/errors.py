@@ -372,7 +372,7 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         message, hint = safe.message, safe.hint
         if code == "CHUNK_LIMIT_EXCEEDED" and isinstance(payload["message"], str):
             counts = re.fullmatch(
-                r"formatting requires ([1-9][0-9]{0,5}) chunks, exceeding max-chunks "
+                r"formatting requires ([1-9][0-9]{0,5}) (?:chunks|Pi calls), exceeding max-chunks "
                 r"([1-9][0-9]{0,3}); use --preview, --raw, or explicitly raise the cap",
                 payload["message"],
             )

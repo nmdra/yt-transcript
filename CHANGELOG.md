@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in `summarized` editorial mode for whole-video Markdown summaries, with bounded factual notes, a final synthesis call for multi-chunk input, and preview/cap/progress accounting for all Pi calls
+
 ## [0.2.0-dev.7] - 2026-10-08
 
 ### Added

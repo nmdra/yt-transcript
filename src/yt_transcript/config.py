@@ -82,7 +82,11 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
                     "raw-vtt",
                 )
             elif key == "editorial_mode":
-                valid = isinstance(value, str) and value in ("standard", "focused")
+                valid = isinstance(value, str) and value in (
+                    "standard",
+                    "focused",
+                    "summarized",
+                )
             elif key == "verbose":
                 valid = type(value) is bool
             elif key == "model":
@@ -152,7 +156,11 @@ def resolve_config(
         }.items()
         if v is not None
     }
-    if editorial_mode is not None and editorial_mode not in ("standard", "focused"):
+    if editorial_mode is not None and editorial_mode not in (
+        "standard",
+        "focused",
+        "summarized",
+    ):
         raise invalid("editorial_mode")
     if model is not None:
         if not model.strip():

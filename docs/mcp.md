@@ -58,7 +58,8 @@ This request authorizes Pi calls and can incur charges.
 The result has `format="markdown"`, a Markdown document that contains only the transcript body, and structured metadata.
 The character count equals the document length.
 The request uses the shared CLI formatter, source chapter context, and selected SponsorBlock projection.
-The formatter validates chapter headings.
+Standard and focused modes validate canonical chapter headings.
+Summarized mode validates summary headings instead; source chapters remain in metadata.
 Inline fallback timestamp blocks apply only to plain-text output.
 Model fidelity is not guaranteed.
 
@@ -67,6 +68,25 @@ Pi uses its configured default model unless server TOML supplies `pi.model`.
 Server `pi.chunk_chars` and `pi.editorial_mode` apply.
 `pi.max_chunks` is finite and defaults to 20 when omitted.
 `pi.timeout_seconds` is limited to 120 seconds per call.
+
+For a whole-video summary, use server TOML:
+
+```toml
+[pi]
+editorial_mode = "summarized"
+max_chunks = 20
+```
+
+Start the server with that configuration and without `--no-config`, then reconnect it.
+Keep requesting `output_format="markdown"`; there is no caller-controlled `editorial_mode` tool argument.
+The shared formatter targets 400–700 words, shorter for short sources.
+One source chunk uses one summary call; multiple chunks use factual notes plus one final synthesis call.
+The cap includes synthesis, so the default cap allows at most 19 source chunks when synthesis is needed.
+An infeasible note budget fails before model calls.
+No intermediate notes, partial summary, automatic retry, or fallback are returned.
+Summary quality and target length are not guaranteed.
+Descriptions stay outside model input, and metadata and the four result fields stay unchanged.
+Plain-text requests still return captions without Pi.
 
 The total Markdown worker deadline defaults to 300 seconds.
 Set `mcp.markdown_timeout_seconds` to change this deadline (300–3600).
@@ -98,7 +118,7 @@ The server checks the cap before model calls.
 A formatting failure returns an error.
 The server never returns raw captions as a fallback or partial Markdown after a formatting failure.
 SponsorBlock fallback still keeps source captions before editing.
-Removal receipts describe source filtering, not later Pi deletions.
+Removal receipts describe source filtering, not later Pi deletions or summary omissions.
 Cancellation stops the supervised worker/Pi group.
 MCP disables CLI terminal progress so stdout contains only JSON-RPC.
 

@@ -36,6 +36,7 @@ def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
     if not isinstance(value["editorial_mode"], str) or value["editorial_mode"] not in (
         "standard",
         "focused",
+        "summarized",
     ):
         raise ValueError("Invalid MCP formatting policy.")
     return MCPFormattingPolicy(**value)

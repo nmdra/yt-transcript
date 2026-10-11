@@ -22,14 +22,16 @@ mode = "markdown"
 verbose = false
 
 [pi]
-# Default: "standard". Allowed: "standard", "focused".
+# Default: "standard". Allowed: "standard", "focused", "summarized".
 # Focused removes clearly separable non-substantive material, not a summary.
+# Summarized targets one 400–700-word overview, shorter for short videos.
+# Multiple input chunks use factual notes plus one final synthesis call.
 # CLI --editorial-mode overrides this. Raw and MCP plain_text ignore this.
 # Explicit MCP markdown uses the server-configured editorial mode.
 editorial_mode = "standard"
 
 # Default: 12000. Allowed: integers from 1000 through 50000.
-# Maximum stdin payload characters, including chapter/segment JSON framing.
+# Maximum stdin payload characters, including chapter/segment or summary-note JSON framing.
 # This is not a token/context-window limit.
 # Smaller values usually increase invocation count, latency, and possible cost.
 chunk_chars = 12000
@@ -42,6 +44,7 @@ timeout_seconds = 600
 # Optional. Default: omitted, meaning no wrapper invocation cap.
 # Allowed: integers from 1 through 1000; zero is not an unlimited value.
 # Reject formatting before the first Pi call if planning exceeds this cap.
+# Summarized counts the final synthesis call too; one input chunk uses one call.
 # Preview reports exceedance without calling Pi. CLI --max-chunks overrides it.
 # Pi/provider retries can add requests, so this is not a hard billing cap.
 # max_chunks = 20

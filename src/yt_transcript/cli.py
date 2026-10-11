@@ -34,7 +34,9 @@ def _parser() -> argparse.ArgumentParser:
     modes.add_argument("--raw-vtt", dest="mode", action="store_const", const="raw-vtt")
     parser.add_argument("--model")
     parser.add_argument("--max-chunks", type=int)
-    parser.add_argument("--editorial-mode", choices=("standard", "focused"))
+    parser.add_argument(
+        "--editorial-mode", choices=("standard", "focused", "summarized")
+    )
     sponsor = parser.add_mutually_exclusive_group()
     sponsor.add_argument("--sponsorblock", action="store_true", default=None)
     sponsor.add_argument("--no-sponsorblock", dest="sponsorblock", action="store_false")
@@ -137,6 +139,7 @@ def _transcribe(
                 sections=downloaded.effective_sections,
                 chunk_chars=config.chunk_chars,
                 max_chunks=config.max_chunks,
+                editorial_mode=config.editorial_mode,
             )
             lines = [
                 f"canonical URL: {canonical}",
@@ -144,7 +147,7 @@ def _transcribe(
                 f"retained input characters: {len(body)}",
                 f"SponsorBlock status: {lookup.status}",
                 f"removed cues: {downloaded.projection.receipt.removed_cue_count if downloaded.projection else 0}",
-                f"planned formatter invocations: {len(plan.chunks)}",
+                f"planned formatter invocations: {plan.call_count}",
                 f"largest chunk characters: {max(plan.character_counts, default=0)}",
                 f"configured chunk limit: {config.chunk_chars}",
                 f"maximum chunks: {config.max_chunks if config.max_chunks is not None else 'unlimited'}",
