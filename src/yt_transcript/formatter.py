@@ -15,7 +15,8 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from .chapters import ChapterSection
-from .errors import FormattingError, classify_pi_failure
+from .config import OpenRouterConfig
+from .errors import FormattingError, classify_pi_failure, translate_formatting_error
 from .pi_events import PiEventParser
 from .sponsorblock import AnnotatedCue
 
@@ -294,31 +295,41 @@ def plan_transcript_formatting(
     chunk_chars: int = 12000,
     max_chunks: int | None = None,
     editorial_mode: str = "standard",
+    provider: str = "pi",
 ) -> FormattingPlan | ContextFormattingPlan:
-    get_editorial_prompt(editorial_mode)
-    contextual = sections and any(
-        s.chapter_count
-        or any(
-            isinstance(c, AnnotatedCue) and c.sponsorblock_overlaps for c in s.fragments
+    if provider not in ("pi", "openrouter"):
+        raise ValueError("Unsupported formatting provider.")
+    try:
+        get_editorial_prompt(editorial_mode)
+        contextual = sections and any(
+            s.chapter_count
+            or any(
+                isinstance(c, AnnotatedCue) and c.sponsorblock_overlaps
+                for c in s.fragments
+            )
+            for s in sections
         )
-        for s in sections
-    )
-    plan = (
-        plan_context_formatting(
-            sections, chunk_chars=chunk_chars, max_chunks=max_chunks
+        plan = (
+            plan_context_formatting(
+                sections, chunk_chars=chunk_chars, max_chunks=max_chunks
+            )
+            if contextual and sections is not None
+            else plan_formatting(
+                transcript, chunk_chars=chunk_chars, max_chunks=max_chunks
+            )
         )
-        if contextual and sections is not None
-        else plan_formatting(transcript, chunk_chars=chunk_chars, max_chunks=max_chunks)
-    )
-    if editorial_mode == "summarized" and len(plan.chunks) > 1:
-        plan = replace(
-            plan,
-            synthesis_required=True,
-            within_cap=max_chunks is None or len(plan.chunks) + 1 <= max_chunks,
-        )
-        if plan.within_cap:
-            _summary_note_limit(len(plan.chunks), chunk_chars)
-    return plan
+        if editorial_mode == "summarized" and len(plan.chunks) > 1:
+            plan = replace(
+                plan,
+                synthesis_required=True,
+                within_cap=max_chunks is None or len(plan.chunks) + 1 <= max_chunks,
+            )
+            if plan.within_cap:
+                _summary_note_limit(len(plan.chunks), chunk_chars)
+        return plan
+
+    except FormattingError as exc:
+        raise translate_formatting_error(exc, provider) from None
 
 
 def _chapter_parts(
@@ -493,7 +504,7 @@ def _build_chunk_request(
 
 
 def _run_chunk(
-    executable: str,
+    executable: str | None,
     chunk: str,
     *,
     index: int,
@@ -506,6 +517,8 @@ def _run_chunk(
     own_process_group: bool = True,
     summary_stage: str | None = None,
     summary_note_chars: int | None = None,
+    provider: str = "pi",
+    openrouter: OpenRouterConfig | None = None,
 ) -> str:
     request = _build_chunk_request(
         chunk,
@@ -520,6 +533,12 @@ def _run_chunk(
         summary_stage=summary_stage,
         summary_note_chars=summary_note_chars,
     )
+    if provider == "openrouter":
+        from .openrouter_backend import complete
+
+        return validate_chunk_body(complete(request, openrouter))
+    if provider != "pi" or executable is None:
+        raise ValueError("Unsupported formatting provider.")
     return validate_chunk_body(_run_pi_chunk(executable, request))
 
 
@@ -664,7 +683,7 @@ def _validate_summary_output(result: str, *, final: bool) -> None:
 
 
 def _summarize_transcript(
-    executable: str,
+    executable: str | None,
     plan: FormattingPlan | ContextFormattingPlan,
     *,
     chunk_chars: int,
@@ -672,6 +691,8 @@ def _summarize_transcript(
     timeout_seconds: int,
     own_process_group: bool,
     on_progress: Callable[[int, int], None] | None,
+    provider: str,
+    openrouter: OpenRouterConfig | None,
 ) -> str:
     if not plan.chunks:
         raise classify_pi_failure(code="PI_OUTPUT_INVALID")
@@ -707,6 +728,8 @@ def _summarize_transcript(
                 if plan.synthesis_required
                 else None,
                 summary_note_chars=note_limit // 2 if note_limit is not None else None,
+                provider=provider,
+                openrouter=openrouter,
             )
             final = synthesis or not plan.synthesis_required
             _validate_summary_output(result, final=final)
@@ -726,10 +749,12 @@ def _summarize_transcript(
     return result
 
 
-def format_transcript(
+def _format_transcript(
     transcript: str,
     model: str | None = None,
     *,
+    provider: str = "pi",
+    openrouter: OpenRouterConfig | None = None,
     chunk_chars: int = 12000,
     timeout_seconds: int = 600,
     max_chunks: int | None = None,
@@ -754,7 +779,7 @@ def format_transcript(
             message=f"formatting requires {plan.call_count} {unit}, exceeding max-chunks {max_chunks}; use --preview, --raw, or explicitly raise the cap",
         )
         raise exc
-    executable = ensure_pi()
+    executable = ensure_formatter(provider, model)
     if editorial_mode == "summarized":
         return _summarize_transcript(
             executable,
@@ -764,6 +789,8 @@ def format_transcript(
             timeout_seconds=timeout_seconds,
             own_process_group=own_process_group,
             on_progress=on_progress,
+            provider=provider,
+            openrouter=openrouter,
         )
     bodies: list[str] = []
     retained_runs: list[ContextRun] = []
@@ -789,6 +816,8 @@ def format_transcript(
                 chapter_mode=chapter_mode,
                 contextual=isinstance(plan, ContextFormattingPlan),
                 own_process_group=own_process_group,
+                provider=provider,
+                openrouter=openrouter,
             )
             if OMISSION_MARKER in result and not (
                 editorial_mode == "focused" and result == OMISSION_MARKER
@@ -823,6 +852,49 @@ def format_transcript(
     if retained_runs:
         _chapter_parts(result, tuple(retained_runs))
     return result
+
+
+def ensure_formatter(provider: str, model: str | None) -> str | None:
+    if provider == "pi":
+        return ensure_pi()
+    if provider == "openrouter":
+        from .openrouter_backend import ensure_openrouter
+
+        ensure_openrouter(model)
+        return None
+    raise ValueError("Unsupported formatting provider.")
+
+
+def format_transcript(
+    transcript: str,
+    model: str | None = None,
+    *,
+    provider: str = "pi",
+    openrouter: OpenRouterConfig | None = None,
+    chunk_chars: int = 12000,
+    timeout_seconds: int = 600,
+    max_chunks: int | None = None,
+    sections: tuple[ChapterSection, ...] | None = None,
+    editorial_mode: str = "standard",
+    on_progress: Callable[[int, int], None] | None = None,
+    own_process_group: bool = True,
+) -> str:
+    try:
+        return _format_transcript(
+            transcript,
+            model,
+            provider=provider,
+            openrouter=openrouter,
+            chunk_chars=chunk_chars,
+            timeout_seconds=timeout_seconds,
+            max_chunks=max_chunks,
+            sections=sections,
+            editorial_mode=editorial_mode,
+            on_progress=on_progress,
+            own_process_group=own_process_group,
+        )
+    except FormattingError as exc:
+        raise translate_formatting_error(exc, provider) from None
 
 
 def format_with_pi(
