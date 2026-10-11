@@ -36,6 +36,26 @@ Authenticate directly in Pi through `/login`.
 Select or save a default model through `/model`.
 This wrapper never installs runtimes or changes credentials.
 
+## Offline fidelity evaluation
+
+Evaluate saved synthetic responses without model or network execution:
+
+```sh
+uv run --locked --offline --extra mcp python scripts/evaluate_fidelity.py \
+  --cases tests/fixtures/editorial/fidelity_cases.json \
+  --responses tests/fixtures/editorial/fidelity_responses.json \
+  --output dist/fidelity/report.json
+```
+
+The versioned fixtures include deliberate loss, valid omissions, repeated details, commands, and injection bait.
+The report separates annotated expectations from advisory literal differences.
+It includes source/response/input hashes and declared prompt hashes/provenance, not an overall fidelity score.
+Prompt/acquisition declarations are not verified. Synthetic fixtures are not real-model benchmarks.
+Inputs and report are each bounded to 8 MiB. Duplicate keys, nonfinite JSON, unknown schemas/IDs, and path aliases fail safely.
+Only the requested report's parent directories are created; atomic publication preserves an old report on failure.
+Report excerpts are untrusted local review data, not MCP output or production sidecars.
+Acquire real responses only with separate backend, call, and spend approval.
+
 ## Offline OpenRouter acceptance
 
 OpenRouter tests mock HTTP and use local helper processes.
