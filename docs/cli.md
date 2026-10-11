@@ -3,7 +3,7 @@
 [README](../README.md) · [Installation](installation.md) · [Troubleshooting](troubleshooting.md)
 
 These commands use the installed executable.
-In a development checkout, use `uv run yt-transcript` instead.
+If you use a development checkout, use `uv run yt-transcript` instead.
 
 ## Output modes
 
@@ -24,7 +24,7 @@ Stdout contains only the transcript body.
 File output leaves stdout empty.
 All non-VTT bodies end with one newline.
 
-Terminal stderr shows a spinner during caption retrieval/filtering.
+Terminal stderr shows a spinner while the tool retrieves and filters captions.
 Then stderr shows a bar with completed model calls and elapsed time.
 Summarized mode includes the final synthesis call in this count.
 Progress does not estimate download bytes, tokens, cost, or completion time.
@@ -62,7 +62,10 @@ If the default file is missing, the wrapper uses built-in defaults.
 `--no-config` disables wrapper configuration.
 These flags do not change Pi configuration or credentials.
 
-The wrapper applies settings in this order of priority: explicit CLI flags, the selected TOML file, then built-in defaults.
+The wrapper applies settings in this priority order:
+- Explicit CLI flags
+- The selected TOML file
+- Built-in defaults
 
 ```toml
 [output]
@@ -106,7 +109,7 @@ The wrapper does not create configuration files.
 `--raw`, `--raw-vtt`, `--model`, `--max-chunks`, and `-v` override their corresponding defaults.
 There is no `--markdown` or `--quiet` flag.
 
-Raw modes ignore saved formatting preferences after schema checks.
+After schema checks, raw modes ignore saved formatting preferences.
 An explicit model, chunk cap, or editorial-mode flag conflicts with raw output.
 `--editorial-mode` overrides TOML.
 The mutually exclusive `--sponsorblock` / `--no-sponsorblock` flags also override TOML.
@@ -116,39 +119,48 @@ Without an explicit model in TOML or CLI, every Pi call omits `--model`.
 Pi selects its configured default.
 The wrapper never selects a fallback model.
 
-Help and version ignore wrapper TOML. Doctor loads the selected TOML without network requests.
+Help and version ignore wrapper TOML.
+Doctor loads the selected TOML without network requests.
 A malformed configuration still blocks raw mode unless you supply `--no-config`.
 
-## Providers (unreleased checkout)
+## Providers
 
-Pi remains the default. Select OpenRouter explicitly:
+Pi remains the default.
+To use OpenRouter, select it explicitly:
 
 ```sh
 uv run yt-transcript URL --no-config --provider openrouter --model openai/gpt-4o -o transcript.md
 ```
 
-Set `OPENROUTER_API_KEY` in the process environment, never TOML or command arguments.
+Set `OPENROUTER_API_KEY` in the process environment.
+Never put the key in TOML or command arguments.
 OpenRouter requires an explicit model and no Pi installation.
 Raw modes require neither a model nor credentials.
-Preview needs a selected OpenRouter model but no key and makes no model request.
+Preview requires a selected OpenRouter model, but no API key.
+Preview does not make a model request.
 
 **TOML migration:** rename `[pi]` to `[formatting]`.
 The old table is rejected rather than merged.
 Add `provider = "openrouter"` or keep the default `"pi"`.
-The `[openrouter]` table accepts only `max_output_tokens`, default 8192, range 1–131072.
-This is sent as `max_tokens`; supported limits depend on the model.
-Reasoning tokens can consume the allowance. Truncated or empty output fails without repair.
+The `[openrouter]` table accepts only `max_output_tokens`.
+Its default is 8192, and its range is 1–131072.
+The wrapper sends this value as `max_tokens`.
+The supported limits depend on the model.
+Reasoning tokens can use the allowance.
+Truncated or empty output causes failure without repair.
 
 The wrapper sends one nonstreaming HTTPS request per completion through a supervised Python helper.
 It rejects redirects, HTTP error bodies, tool calls, and incomplete output.
-A monotonic deadline covers the helper and HTTP work; socket timeouts alone are not the deadline.
+A monotonic deadline applies to the helper and HTTP work.
+Socket timeouts alone do not enforce this deadline.
 The wrapper does not retry or change providers automatically.
 Requests disable OpenRouter upstream fallback, require parameter support, and request providers with `data_collection="deny"`.
-This can leave no available route. It does not guarantee zero retention, accuracy, or a fixed upstream identity.
+These settings can leave no available route.
+The settings do not guarantee zero retention, accuracy, or a fixed upstream identity.
 Transcript text reaches OpenRouter and its selected upstream provider.
 Calls can incur charges, including work completed after a local timeout.
 
-These features are not in the pinned dev7 release. Existing dev7 installations still use `[pi]`.
+These features are included in dev8. When updating from dev7, rename `[pi]` to `[formatting]` and keep your existing settings.
 
 ## Editorial modes
 
@@ -175,36 +187,48 @@ Multiple input chunks need one factual-note call per chunk and one final synthes
 Only the final summary is published; intermediate notes are not returned.
 `--max-chunks` counts all these calls.
 For example, three input chunks require a cap of at least four.
-Notes are strict private claims objects with same-call source IDs and qualification arrays. Per-chunk budgets include schema/ID framing and JSON escaping, with at least 256 usable serialized characters after minimum claim framing.
+Notes are strict private claims objects with source IDs from the same call and qualification arrays.
+Per-chunk budgets include schema and ID framing and JSON escaping.
+After minimum claim framing, at least 256 usable serialized characters must remain.
 The final synthesis input must fit `formatting.chunk_chars`.
 An infeasible note budget fails with `PI_CONTEXT_LIMIT` or `OPENROUTER_CONTEXT_LIMIT` before model calls.
-Oversized or invalid notes fail without truncation, a repair call, or a partial summary. All-empty evidence fails before synthesis; canonical internal IDs are rejected in final output. Reference validity does not prove factual support or caveat completeness.
+Oversized or invalid notes cause failure without truncation, a repair call, or a partial summary.
+If all evidence is empty, processing fails before synthesis.
+The formatter rejects final output that contains canonical internal IDs.
+Valid references do not prove factual support or complete caveats.
 Small chunks can create too many notes for one bounded synthesis input.
-Use preview to check the plan; a larger cap alone does not solve this input limit.
+Use preview to check the plan.
+A larger cap alone does not solve this input limit.
 
 All modes keep the existing isolation, per-call timeout, metadata, and atomic file-output rules.
 Raw modes and MCP plain text do not summarize.
 
-## Read-only chunk continuity (unreleased checkout)
+## Read-only chunk continuity
 
 ```sh
 uv run yt-transcript URL --no-config --boundary-context-chars 100 --preview
 uv run yt-transcript URL --no-config --editorial-mode focused --boundary-context-chars 100 -o transcript.md
 ```
 
-The integer range is 0–1000 characters per neighboring side; the default is zero.
+The integer range is 0–1000 characters per neighboring side.
+The default is zero.
 The explicit flag requires standard/focused Markdown, including preview.
 It is invalid with raw output, summarized mode, doctor, or MCP launch, even when set to zero.
-There is no TOML key or public MCP argument for context; MCP retains zero context.
+There is no TOML key or public MCP argument for context.
+MCP retains zero context.
 
 Read-only windows contain adjacent retained caption words, not earlier model output.
-Only the current payload owns output. Context must not be copied into the document.
-Planning reserves JSON framing and worst-case escapes before splitting, then reports actual serialized sizes and call counts.
-This can increase calls or cause a planning-limit error; the token is never truncated.
+Only the current payload owns output.
+Do not copy context into the document.
+Before splitting, planning reserves space for JSON framing and worst-case escapes.
+Planning then reports actual serialized sizes and call counts.
+This can increase calls or cause a planning-limit error.
+The tool never truncates the token.
 At 1000 characters per side, a 12000-character source budget cannot cover worst-case context plus current text.
 A larger chunk limit is not a model capability or completion guarantee.
 Explicit context adds `boundary context characters per side` to preview.
-Model context leakage is not fully detectable; see [fidelity limits](behavior.md#internal-summary-evidence-and-continuity-unreleased-checkout).
+Model context leakage cannot be fully detected.
+See [fidelity limits](behavior.md#internal-summary-evidence-and-continuity).
 
 ## Preview and cost controls
 
@@ -240,14 +264,18 @@ A later run downloads captions again.
 Invocation counts are not token counts, dollar estimates, or exact provider-request counts.
 
 The formatter splits text on sentence boundaries or whitespace.
-The formatter does not split tokens. Output-owned current chunks do not overlap; opt-in read-only source windows can repeat neighboring words.
-Pi sends chunks sequentially through independent in-memory sessions; OpenRouter uses independent HTTP completions.
+The formatter does not split tokens.
+Current chunks that own output do not overlap.
+Optional read-only source windows can repeat neighboring words.
+Pi sends chunks in sequence through independent in-memory sessions.
+OpenRouter uses independent HTTP completions.
 
 Standard and focused modes join completed bodies without a final synthesis call.
 They do not summarize or remove duplicates across the complete Markdown document.
 They do not send earlier generated chunks to Pi.
 Summarized mode uses bounded notes and a final synthesis call when there is more than one source chunk.
-Preview includes that call; its exact input length depends on generated notes.
+Preview includes that call.
+The call's exact input length depends on the generated notes.
 
 If a single token is larger than the chunk limit, formatting fails.
 The formatter does not truncate the token.
@@ -277,11 +305,16 @@ yt-transcript --doctor
 yt-transcript URL --no-config --raw -o transcript.txt --no-clobber
 ```
 
-Doctor is local and loads the selected wrapper TOML; use --no-config to skip it.
-Doctor reports Python, package versions, EJS compatibility, Deno, and selected-backend readiness without network requests. It accepts --provider, --model, --config, and --no-config. OpenRouter checks key/model presence, not authentication.
+Doctor is local and loads the selected wrapper TOML.
+To skip this file, use --no-config.
+Doctor reports Python, package versions, EJS compatibility, Deno, and selected-backend readiness without network requests.
+Doctor accepts --provider, --model, --config, and --no-config.
+For OpenRouter, doctor checks that an API key and model are present.
+Doctor does not check OpenRouter authentication.
 
 Version commands use isolated directories and five-second deadlines.
-Doctor does not run a model, access YouTube, or run authentication commands. It checks OpenRouter key presence without displaying the key.
+Doctor does not run a model, access YouTube, or run authentication commands.
+Doctor checks that the OpenRouter key is present without displaying the key.
 
 A healthy report shows local readiness only.
 The report does not verify video access, provider authentication, caption completeness, or model accuracy.

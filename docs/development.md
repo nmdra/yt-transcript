@@ -49,10 +49,14 @@ uv run --locked --offline --extra mcp python scripts/evaluate_fidelity.py \
 
 The versioned fixtures include deliberate loss, valid omissions, repeated details, commands, and injection bait.
 The report separates annotated expectations from advisory literal differences.
-It includes source/response/input hashes and declared prompt hashes/provenance, not an overall fidelity score.
-Prompt/acquisition declarations are not verified. Synthetic fixtures are not real-model benchmarks.
-Inputs and report are each bounded to 8 MiB. Duplicate keys, nonfinite JSON, unknown schemas/IDs, and path aliases fail safely.
-Only the requested report's parent directories are created; atomic publication preserves an old report on failure.
+The report includes source, response, and input hashes, and declared prompt hashes and provenance.
+The report does not include an overall fidelity score.
+Prompt and acquisition declarations are not verified.
+Synthetic fixtures are not real-model benchmarks.
+Each input and the report are bounded to 8 MiB.
+Duplicate keys, nonfinite JSON, unknown schemas or IDs, and path aliases cause safe failure.
+The evaluator creates only the requested report's parent directories.
+If the operation fails, atomic publication keeps the old report.
 Report excerpts are untrusted local review data, not MCP output or production sidecars.
 Acquire real responses only with separate backend, call, and spend approval.
 
@@ -61,9 +65,11 @@ Acquire real responses only with separate backend, call, and spend approval.
 OpenRouter tests mock HTTP and use local helper processes.
 No real API key, model, YouTube request, or SponsorBlock lookup is needed.
 The checkout's CLI doctor can read config and accepts `--provider`, `--model`, and config selection.
-For OpenRouter it reports key/model presence only, never authentication validity.
-Pi is checked only for the Pi backend; an OpenRouter-only CLI does not require the MCP extra.
-Real model evaluation still needs fresh explicit call/spend approval.
+For OpenRouter, doctor reports only whether an API key and model are present.
+Doctor never reports that authentication is valid.
+Doctor checks Pi only for the Pi backend.
+An OpenRouter-only CLI does not require the MCP extra.
+Real model evaluation still requires new explicit approval for calls and charges.
 
 ## Public GitHub releases
 
@@ -94,10 +100,11 @@ Before tagging, complete these steps:
 - Push the tag.
 
 The workflow rejects version or changelog mismatches.
-The workflow runs only offline checks, then builds packages.
+The workflow runs only offline checks.
+Then the workflow builds packages.
 The workflow publishes only after checks pass.
 Development releases do not replace the latest stable release.
-The workflow does not overwrite existing releases/assets.
+The workflow does not overwrite existing releases or assets.
 The publish job verifies artifact checksums.
 Then the job creates a normal GitHub release with the workflow token.
 No private-repository guard or manual public-release exception is required.
@@ -127,7 +134,7 @@ Live checks require an operator-supplied public URL:
 YT_TRANSCRIPT_TEST_URL='https://youtu.be/VIDEO_ID' uv run pytest -m integration tests/test_integration.py
 ```
 
-A live Pi check requires fresh spend approval.
+A live Pi check requires new approval for charges.
 Set `YT_TRANSCRIPT_TEST_PI=1`.
 Use `YT_TRANSCRIPT_TEST_EDITORIAL_MODE=standard` or `focused`.
 The check requires a preview-approved `YT_TRANSCRIPT_TEST_MAX_CHUNKS` from 1 through 1000.

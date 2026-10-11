@@ -31,7 +31,7 @@ Add this entry to `mcpServers`:
 Replace the command placeholder with the installed path.
 The 330-second client timeout allows time beyond the server's 300-second operation deadline.
 `--no-config` uses server defaults instead of your saved CLI TOML settings.
-Omit this flag if you want to use saved SponsorBlock and Pi preferences.
+If you want to use saved SponsorBlock and Pi preferences, omit this flag.
 The `codemode` exposure setting lets Pi's codemode find and call the tool.
 
 In an existing Pi session, run `/reload`.
@@ -45,9 +45,10 @@ Alternatively, initialize the server and list its tools through an MCP client.
 Do not call `get_transcript` during an offline installation check.
 If the installed Pi configuration format differs from this example, read the installed Pi MCP documentation.
 
-## OpenRouter server backend (unreleased checkout)
+## OpenRouter server backend
 
-Keep `get_transcript` arguments unchanged. Select the backend only in server TOML:
+Keep `get_transcript` arguments unchanged.
+Select the backend only in server TOML:
 
 ```toml
 [formatting]
@@ -61,14 +62,15 @@ max_output_tokens = 8192
 
 Launch without `--no-config` and make `OPENROUTER_API_KEY` available in the server environment.
 Do not put the key in tool arguments, private worker JSON, or TOML.
-Reconnect the MCP server after an approved configuration/installation update.
-Explicit Markdown uses OpenRouter without Pi; plain text remains usable without a key or model.
+After an approved configuration or installation update, reconnect the MCP server.
+Explicit Markdown uses OpenRouter without Pi.
+Plain text remains usable without a key or model.
 Pi as an MCP client is separate from the server's formatting backend.
 Both backends retain the POSIX restriction for supervised MCP Markdown.
 Deadlines, one-active-worker behavior, result sizes, metadata, and safe errors remain unchanged.
-See [CLI provider limits](cli.md#providers-unreleased-checkout) for routing, privacy, and output-token limits.
+See [CLI provider limits](cli.md#providers) for routing, privacy, and output-token limits.
 
-The pinned dev7 release still uses `[pi]` and Pi-only Markdown.
+When updating from dev7, rename `[pi]` to `[formatting]`. Pi remains the default backend.
 
 ## Explicit model-processed Markdown output
 
@@ -84,12 +86,14 @@ The result has `format="markdown"`, a Markdown document that contains only the t
 The character count equals the document length.
 The request uses the shared CLI formatter, source chapter context, and selected SponsorBlock projection.
 Standard and focused modes validate canonical chapter headings.
-Summarized mode validates summary headings instead; source chapters remain in metadata.
+Summarized mode validates summary headings instead.
+Source chapters remain in metadata.
 Inline fallback timestamp blocks apply only to plain-text output.
 Model fidelity is not guaranteed.
 
 MCP Markdown currently requires POSIX process supervision.
-With Pi, the configured default model applies unless server TOML supplies `formatting.model`. OpenRouter always requires an explicit model.
+If server TOML does not supply `formatting.model`, Pi uses its configured default model.
+OpenRouter always requires an explicit model.
 Server `formatting.chunk_chars` and `formatting.editorial_mode` apply.
 `formatting.max_chunks` is finite and defaults to 20 when omitted.
 `formatting.timeout_seconds` is limited to 120 seconds per call.
@@ -102,16 +106,23 @@ editorial_mode = "summarized"
 max_chunks = 20
 ```
 
-Start the server with that configuration and without `--no-config`, then reconnect it.
-Keep requesting `output_format="markdown"`; there is no caller-controlled `editorial_mode` tool argument.
+Start the server with that configuration and without `--no-config`.
+Then reconnect the server.
+Continue to request `output_format="markdown"`.
+There is no caller-controlled `editorial_mode` tool argument.
 The shared formatter targets 400–700 words, shorter for short sources.
-One source chunk uses one summary call; multiple chunks use factual notes plus one final synthesis call.
+One source chunk uses one summary call.
+Multiple chunks use factual notes plus one final synthesis call.
 The cap includes synthesis, so the default cap allows at most 19 source chunks when synthesis is needed.
 An infeasible note budget fails before model calls.
-No intermediate notes, private source IDs, partial summary, automatic retry, or fallback are returned. Summary notes use strict same-call references and qualification arrays internally; valid references do not establish factual support.
+The server returns no intermediate notes, private source IDs, partial summary, automatic retry, or fallback.
+Summary notes use strict references from the same call and qualification arrays internally.
+Valid references do not establish factual support.
 Summary quality and target length are not guaranteed.
 Descriptions stay outside model input, and metadata and the four result fields stay unchanged.
-Plain-text requests still return captions without an AI model. Read-only boundary context remains zero for MCP; there is no new caller or server setting for it.
+Plain-text requests still return captions without an AI model.
+Read-only boundary context remains zero for MCP.
+There is no new caller or server setting for boundary context.
 
 The total Markdown worker deadline defaults to 300 seconds.
 Set `mcp.markdown_timeout_seconds` to change this deadline (300–3600).
@@ -132,7 +143,7 @@ Where supported, use a client timeout of at least 1830 seconds.
 In Pi, update its `timeout` field.
 Other clients use their own settings.
 Then reconnect the server.
-If a client disconnects earlier, the disconnection still cancels the work.
+If a client disconnects earlier, the work is still canceled.
 
 This setting does not extend the individual model-call deadline or guarantee completion.
 A larger chunk cap permits more calls but does not extend any deadline.
@@ -176,7 +187,7 @@ Configuration locations, scope, field names, timeout units, and reload steps dep
 
 For Pi, use [Configure Pi](#configure-pi) above and the installed Pi documentation.
 For another MCP client, read its official local-server setup guide before you edit configuration.
-Initialization and tool listing are sufficient for an offline connection check.
+To check an offline connection, initialize the server and list its tools.
 
 For a development checkout, use an absolute project path:
 
@@ -209,7 +220,7 @@ This mode attempts SponsorBlock unless you explicitly disable it.
 The mode returns full captions when no usable segments exist or lookup fails.
 Expected failures include a safe warning in metadata.
 `full` skips SponsorBlock completely.
-With the default `plain_text` output, neither mode calls Pi.
+If you use the default `plain_text` output, neither mode calls Pi.
 
 **Breaking change:** MCP `preview_transcript` and `doctor` are removed.
 Use CLI `--preview` and `--doctor` instead.
@@ -220,7 +231,7 @@ CLI file output still includes YAML frontmatter.
 
 Metadata includes an always-present `description` field: extractor text or `null`.
 Both modes and output formats include the same description for the same source snapshot.
-The SDK compatibility JSON includes it too.
+The SDK compatibility JSON also includes the description.
 Descriptions stay out of `document`, `character_count`, and model input.
 Clients that reject unknown metadata keys must update for this additional field.
 See [Metadata files](behavior.md#metadata-files) for normalization and source-data limits.
@@ -288,7 +299,7 @@ The event loop remains responsive during downloads.
 Descriptions count toward the serialized result limit, including their compatibility JSON copy.
 A long description can exceed this limit even when the document fits its own limit.
 Oversized results fail without truncation.
-For Markdown, a result-size error can occur after model calls.
+For Markdown, model calls can finish before a result-size error occurs.
 The deterministic CLI supports larger transcripts.
 
 Timeout, cancellation, disconnect, and shutdown stop workers.

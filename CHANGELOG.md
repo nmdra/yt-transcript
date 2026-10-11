@@ -7,6 +7,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.2.0-dev.8] - 2026-10-12
+
 ### Added
 
 - Direct OpenRouter formatting for CLI and MCP Markdown without Pi, with an explicit model, environment-only API key, bounded responses, and supervised deadlines
@@ -98,7 +100,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.7...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.8...HEAD
+[0.2.0-dev.8]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.7...v0.2.0-dev.8
 [0.2.0-dev.7]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.6...v0.2.0-dev.7
 [0.2.0-dev.6]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.5...v0.2.0-dev.6
 [0.2.0-dev.5]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.4...v0.2.0-dev.5
