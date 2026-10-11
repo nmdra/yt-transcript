@@ -9,6 +9,7 @@ import pytest
 def isolated_defaults(monkeypatch, tmp_path, request):
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     if request.node.get_closest_marker("integration"):
         return
 

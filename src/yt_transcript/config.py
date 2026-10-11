@@ -4,6 +4,7 @@ import os
 import tomllib
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 from .errors import ConfigError, ErrorInfo
 from .sponsorblock import CATEGORIES, SponsorBlockConfig
@@ -20,6 +21,13 @@ class OpenRouterConfig:
 
 
 @dataclass(frozen=True)
+class CacheConfig:
+    enabled: bool = True
+    ttl_hours: int = 24
+    max_size_mb: int = 50
+
+
+@dataclass(frozen=True)
 class AppConfig:
     mode: str = "markdown"
     verbose: bool = False
@@ -32,6 +40,7 @@ class AppConfig:
     mcp: MCPConfig = MCPConfig()
     provider: str = "pi"
     openrouter: OpenRouterConfig = OpenRouterConfig()
+    cache: CacheConfig = CacheConfig()
 
 
 def default_config_path() -> Path:
@@ -49,6 +58,25 @@ def invalid(key: str = "configuration") -> ConfigError:
             "config",
         )
     )
+
+
+def validate_cache_policy(value: object) -> CacheConfig:
+    if not isinstance(value, dict) or set(value) - {
+        "enabled",
+        "ttl_hours",
+        "max_size_mb",
+    }:
+        raise invalid("cache")
+    enabled = value.get("enabled", True)
+    ttl = value.get("ttl_hours", 24)
+    size = value.get("max_size_mb", 50)
+    if type(enabled) is not bool:
+        raise invalid("cache.enabled")
+    if type(ttl) is not int or not 1 <= ttl <= 168:
+        raise invalid("cache.ttl_hours")
+    if type(size) is not int or not 10 <= size <= 500:
+        raise invalid("cache.max_size_mb")
+    return CacheConfig(enabled, ttl, size)
 
 
 def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfig:
@@ -77,9 +105,16 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
                 "config",
             )
         )
-    if set(data) - {"output", "formatting", "openrouter", "sponsorblock", "mcp"}:
+    if set(data) - {
+        "output",
+        "formatting",
+        "openrouter",
+        "sponsorblock",
+        "mcp",
+        "cache",
+    }:
         raise invalid("configuration table")
-    values = {}
+    values: dict[str, Any] = {"cache": validate_cache_policy(data.get("cache", {}))}
     for table, allowed in (
         ("output", {"mode", "verbose"}),
         (

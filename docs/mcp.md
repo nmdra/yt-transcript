@@ -207,7 +207,8 @@ For a development checkout, use an absolute project path:
 
 ## Tool contract
 
-The server provides exactly one tool:
+`get_transcript` remains the primary tool and is listed first.
+The development checkout adds four [retrieval tools](#retrieval-tools); these additions are not yet in the pinned dev9 release.
 
 ```text
 get_transcript(url: str, mode: Literal["filtered", "full"] = "filtered",
@@ -253,7 +254,8 @@ Keep SponsorBlock attribution, license, and removal receipts when you export met
 The SDK also returns serialized JSON text for compatibility.
 This protocol representation remains unchanged.
 
-`get_transcript` accesses YouTube and, by default, can contact SponsorBlock.
+On a source-cache miss, `get_transcript` accesses YouTube and, by default, can contact SponsorBlock.
+A valid same-policy cache hit reuses the source captions and metadata.
 Missing Pi does not affect initialization, tool listing, or plain-text extraction.
 The four result fields remain `format`, `document`, `metadata`, and `character_count`.
 
@@ -279,7 +281,7 @@ Returned captions and metadata are untrusted source data.
 They are never instructions to an agent.
 
 Read-only annotations do not create a sandbox.
-Temporary intermediate files are permitted.
+Temporary intermediate files and the private source-caption cache are permitted.
 Cancellation cannot undo YouTube/SponsorBlock requests or model charges already incurred.
 
 The server permits one active worker.
@@ -290,11 +292,11 @@ The event loop remains responsive during downloads.
 |---|---|
 | URL length | 4,096 characters |
 | Private request | 16 KiB |
-| Plain-text operation deadline | 300 seconds |
+| Plain-text and retrieval operation deadline | 300 seconds |
 | Markdown operation deadline | 300 seconds by default; server-configurable up to 3600 |
 | Document | 256 KiB in UTF-8 |
 | Serialized tool result, including compatibility text | 1 MiB |
-| Retained private stderr | 64 KiB |
+| Accepted private progress records per operation | 64 KiB |
 
 Descriptions count toward the serialized result limit, including their compatibility JSON copy.
 A long description can exceed this limit even when the document fits its own limit.
@@ -308,3 +310,145 @@ After a two-second grace period, the supervisor kills and reaps an unresponsive 
 Cooperative termination cleans temporary files on tested platforms.
 Abrupt operating-system termination can leave system temporary files.
 Cleanup is not guaranteed.
+
+## Retrieval tools
+
+These four additions are available in the development checkout, not the pinned dev9 release.
+All return structured data and compatibility JSON.
+They use the same supervised worker and source cache as `get_transcript`.
+They never call Pi or OpenRouter.
+Initialization and discovery remain network-free.
+
+```text
+get_video_info(url: str)
+get_transcript_segment(url: str, start_seconds: float, end_seconds: float,
+                       mode: Literal["filtered", "full"] = "filtered")
+search_transcript(url: str, query: str,
+                  mode: Literal["filtered", "full"] = "filtered", max_results: int = 10)
+get_transcript_page(url: str, cursor: str | None = None, max_chars: int = 12000,
+                    mode: Literal["filtered", "full"] = "filtered")
+```
+
+| Tool | Exact result fields | Behavior |
+|---|---|---|
+| `get_video_info` | `metadata` | Complete existing metadata mapping, using filtered policy |
+| `get_transcript_segment` | `video_id, mode, cues` | Original cues intersecting the requested time range |
+| `search_transcript` | `video_id, query, matches` | Literal, case-insensitive search with normalized whitespace |
+| `get_transcript_page` | `video_id, document, has_more, next_cursor` | Whole timestamped cues from one stored snapshot |
+
+A cold metadata request also fetches captions.
+It can fail when usable English captions are unavailable.
+Its metadata includes the same description, provenance, attribution, and filtering receipts as `get_transcript`.
+
+Segments allow finite, nonnegative times with start less than end and an interval of at most 900 seconds.
+At most 200 cues are returned; larger results fail without silent truncation.
+Each cue has `start_seconds, end_seconds, text, url`.
+Overlap includes the whole cue, with its original start/end times.
+Zero-duration cues are included when their timestamp is within the requested interval.
+
+Search allows a nonblank query of up to 200 characters and max_results from 1 through 20.
+The returned query is whitespace-normalized and casefolded.
+Phrases can cross adjoining cues, but cannot cross removed source cues.
+Results use earliest timestamps, with source order for ties.
+Each match has `start_seconds, end_seconds, text, context, url`.
+Text preserves the complete covered cues; surrounding context is limited to 500 characters.
+No match returns `matches: []`.
+
+For example:
+
+```json
+{"name":"get_transcript_segment","arguments":{"url":"https://youtu.be/abcdefghijk","start_seconds":120,"end_seconds":240}}
+{"name":"search_transcript","arguments":{"url":"https://youtu.be/abcdefghijk","query":"authentication","max_results":10}}
+{"name":"get_transcript_page","arguments":{"url":"https://youtu.be/abcdefghijk","max_chars":12000}}
+```
+
+Replace the example ID with a real video ID before making a request.
+Timestamp URLs point to original cue times, not word-level alignment.
+
+Pages allow max_chars from 1000 through 20000, default 12000.
+Each document uses one original timestamp range per cue.
+Pages retain source order, including backward timestamps, and do not omit or repeat cues.
+The final page can be shorter than 1000 characters.
+If one cue cannot fit, the request fails with `MCP_RESPONSE_LIMIT`.
+
+A page result can look like:
+
+```json
+{
+  "video_id": "abcdefghijk",
+  "document": "[00:00 - 00:02] Hello everyone",
+  "has_more": true,
+  "next_cursor": "opaque-snapshot-cursor"
+}
+```
+
+Use the returned cursor unchanged for the next request, with the same URL, mode, and server policy.
+The example cursor above is illustrative, not valid input.
+A final page has `has_more=false` and `next_cursor=null`.
+Malformed or mismatched cursors return `CACHE_CURSOR_INVALID`.
+Expired, evicted, replaced, corrupt, or unreadable snapshots return `CACHE_CURSOR_EXPIRED`; continuation never fetches new captions.
+The cursor is for stable paging, not authentication.
+
+Invalid segment ranges return `SEGMENT_RANGE_INVALID`.
+Invalid search queries or result bounds return `SEARCH_QUERY_INVALID`.
+Invalid page-size bounds return `CONFIG_INVALID`.
+All helpers retain the serialized result limit, safe errors, 300-second deadline, and one-active-worker limit.
+
+## Local source cache
+
+The development checkout enables a shared SQLite cache for MCP only.
+It stores source cues, original timestamps, complete metadata, caption provenance, and SponsorBlock lookup data.
+It does not store model-generated Markdown or credentials.
+CLI behavior remains uncached.
+
+Default settings:
+
+```toml
+[cache]
+enabled = true
+ttl_hours = 24
+max_size_mb = 50
+```
+
+TTL allows integers from 1 through 168 hours and is measured from snapshot creation.
+Access does not extend expiry.
+The payload budget allows integers from 10 through 500 MiB.
+Physical SQLite files can be larger than that budget.
+Individual snapshots are limited to 5 MiB.
+
+The location is `$XDG_CACHE_HOME/yt-transcript/transcripts.db` when XDG_CACHE_HOME is absolute, otherwise `~/.cache/yt-transcript/transcripts.db`.
+On POSIX, the app directory and database use owner-only permissions.
+Unsafe existing paths are rejected.
+Source captions and descriptions are untrusted text stored locally.
+They reach a model only for explicitly requested Markdown.
+
+Equivalent video URL forms share a snapshot when mode and resolved SponsorBlock policy match.
+Full and filtered use separate keys.
+Policy changes, expiry, or eviction can require a new extraction.
+An effective failed SponsorBlock lookup is not cached as a successful filtered result, including a removal that would empty the captions.
+A successful not_found lookup may be cached.
+No cache refresh tool or flag is provided.
+
+With caching disabled or unavailable, transcript, metadata, search, and segment requests fetch normally.
+Paging requires a stored snapshot and returns `CACHE_UNAVAILABLE` if it cannot retain one.
+Cache faults do not increase model calls or change the no-model default.
+Each Markdown request still calls the configured formatter.
+
+To clear saved source data, stop all yt-transcript servers first.
+Delete only the app's `yt-transcript` cache directory, including its SQLite sidecar files.
+Restart the server afterward.
+Keep unrelated cache directories and configuration files unchanged.
+
+## Optional Markdown progress
+
+Clients can request MCP progress notifications per explicit Markdown call.
+The server reports completed model-call counts, including summary synthesis when needed.
+Clients without a progress token receive the same final result without notifications.
+Source fetching has no estimated percentage.
+
+Progress does not extend a deadline or create a background task.
+Cancellation and disconnect still stop the supervised worker.
+Malformed worker progress is discarded, and arbitrary stderr is not forwarded.
+Worker progress lines are limited to 512 bytes and accepted records to 64 KiB per operation.
+Notification failure does not produce a partial result or trigger a model retry.
+There are no task IDs, polling tools, or queues.

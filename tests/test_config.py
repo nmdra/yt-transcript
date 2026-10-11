@@ -6,6 +6,7 @@ import pytest
 
 from yt_transcript.config import (
     AppConfig,
+    CacheConfig,
     MCPConfig,
     SponsorBlockConfig,
     default_config_path,
@@ -36,6 +37,15 @@ def test_discovery(monkeypatch, tmp_path, xdg):
         "[formatting]\nother=1",
         "[other]",
         "mcp = 2",
+        "cache = 2",
+        "[cache]\nextra=true",
+        "[cache]\nenabled=1",
+        "[cache]\nttl_hours=true",
+        "[cache]\nttl_hours=0",
+        "[cache]\nttl_hours=169",
+        "[cache]\nmax_size_mb=9",
+        "[cache]\nmax_size_mb=501",
+        "[cache]\nmax_size_mb=50.0",
         "[mcp]\nunknown=300",
         "[mcp]\nmarkdown_timeout_seconds=true",
         "[mcp]\nmarkdown_timeout_seconds=299",
@@ -84,10 +94,18 @@ def test_example_documents_all_supported_settings(tmp_path):
     text = example.read_text(encoding="utf-8")
     complete = re.sub(r"^# (?=(?:max_chunks|model|enabled) =)", "", text, flags=re.M)
     tables = tomllib.loads(complete)
-    assert set(tables) == {"output", "formatting", "openrouter", "sponsorblock", "mcp"}
+    assert set(tables) == {
+        "output",
+        "formatting",
+        "openrouter",
+        "sponsorblock",
+        "mcp",
+        "cache",
+    }
+    assert set(tables["cache"]) == set(CacheConfig.__dataclass_fields__)
     assert set(tables["output"]) | set(tables["formatting"]) == set(
         AppConfig.__dataclass_fields__
-    ) - {"sponsorblock", "mcp", "openrouter"}
+    ) - {"sponsorblock", "mcp", "openrouter", "cache"}
     assert set(tables["sponsorblock"]) == set(SponsorBlockConfig.__dataclass_fields__)
     assert set(tables["mcp"]) == set(MCPConfig.__dataclass_fields__)
     selected = tmp_path / "complete.toml"

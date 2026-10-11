@@ -77,6 +77,16 @@ timeout_seconds = 600
 # Incomplete output fails without automatic retry, repair, or partial publication.
 max_output_tokens = 16384
 
+# MCP-only source caption cache. CLI does not read or create it.
+# Local snapshots are private source data; model-generated Markdown is not cached.
+# Disable caching to fetch each time. Paging requires available cache storage.
+[cache]
+enabled = true
+# Allowed: integer 1–168. Expiration is based on creation, not last access.
+ttl_hours = 24
+# Allowed: integer 10–500. MiB of retained payload; database files can be larger.
+max_size_mb = 50
+
 [mcp]
 # Default: 300. Allowed: integers from 300 through 3600.
 # Total Markdown worker deadline, including caption fetching and all model calls.

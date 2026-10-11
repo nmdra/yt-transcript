@@ -64,6 +64,12 @@ def test_dispatch_uses_explicit_formatting_options(monkeypatch, markdown):
 
     monkeypatch.setattr(service, "fetch_transcript_document", fetch)
     assert dispatch(validate_request(request)) is expected
+    from yt_transcript.mcp_worker import report_progress
+    from yt_transcript.transcript_cache import TranscriptCache
+
+    assert isinstance(captured[0][2].pop("cache"), TranscriptCache)
+    if markdown:
+        assert captured[0][2].pop("on_progress") is report_progress
     assert captured == [
         (
             request["url"],
@@ -398,3 +404,149 @@ def test_response_limit_reaps(tmp_path, monkeypatch):
         assert processes[0].returncode is not None
 
     asyncio.run(check())
+
+
+def test_progress_parser_bounds_and_monotonicity():
+    async def check():
+        pipe = asyncio.StreamReader()
+        records = []
+
+        async def progress(done, total):
+            records.append((done, total))
+
+        def record(done, total=4, **extra):
+            return (
+                b"YT_PROGRESS\t"
+                + json.dumps(
+                    {"done": done, "total": total, "stage": "formatting", **extra}
+                ).encode()
+                + b"\n"
+            )
+
+        pipe.feed_data(b"PRIVATE_NOISE" * 100000 + b"\n")
+        pipe.feed_data(record(0) + record(1) + record(1) + record(0))
+        pipe.feed_data(record(True) + record(2, total=5) + record(2, secret="PRIVATE"))
+        pipe.feed_data(
+            b'YT_PROGRESS\t{"done":2,"done":3,"total":4,"stage":"formatting"}\n'
+        )
+        pipe.feed_data(b"YT_PROGRESS\t" + b"x" * 1000 + b"\n")
+        pipe.feed_data(record(2) + record(4) + b"unfinished")
+        pipe.feed_eof()
+        await WorkerRunner()._read_progress(pipe, progress)
+        assert records == [(0, 4), (1, 4), (2, 4), (4, 4)]
+
+    asyncio.run(check())
+
+
+def test_progress_budget_and_optional_callback_failure(caplog):
+    async def check():
+        records = []
+
+        async def progress(done, total):
+            records.append(done)
+
+        pipe = asyncio.StreamReader()
+        for i in range(3000):
+            pipe.feed_data(
+                b"YT_PROGRESS\t"
+                + json.dumps({"done": i, "total": 3000, "stage": "formatting"}).encode()
+                + b"\n"
+            )
+        pipe.feed_eof()
+        await WorkerRunner()._read_progress(pipe, progress)
+        assert 0 < len(records) < 3000
+        calls = []
+
+        async def fail(done, total):
+            calls.append(done)
+            raise RuntimeError("PRIVATE_PROGRESS_TRANSPORT")
+
+        pipe = asyncio.StreamReader()
+        pipe.feed_data(
+            b'YT_PROGRESS\t{"done":0,"total":2,"stage":"formatting"}\nYT_PROGRESS\t{"done":1,"total":2,"stage":"formatting"}\n'
+        )
+        pipe.feed_eof()
+        await WorkerRunner()._read_progress(pipe, fail)
+        assert calls == [0]
+
+    asyncio.run(check())
+    assert "PRIVATE_PROGRESS_TRANSPORT" not in caplog.text
+
+
+def test_progress_callback_timeout_reaps_worker(tmp_path, monkeypatch):
+    processes = install_child(
+        tmp_path,
+        monkeypatch,
+        'import sys,time\nsys.stdin.buffer.read()\nsys.stderr.write(\'YT_PROGRESS\\t{"done":0,"total":1,"stage":"formatting"}\\n\');sys.stderr.flush()\ntime.sleep(30)\n',
+    )
+
+    async def check():
+        async def slow(done, total):
+            await asyncio.sleep(30)
+
+        request = {
+            "operation": "get_transcript",
+            "url": "https://youtu.be/abcdefghijk",
+            "mode": "full",
+            "sponsorblock": {
+                "enabled": False,
+                "categories": ["sponsor"],
+                "timeout_seconds": 10,
+            },
+        }
+        runner = WorkerRunner(timeout_seconds=0.1)
+        with pytest.raises(AppError) as exc:
+            await runner.run(request, on_progress=slow)
+        assert exc.value.info.code == "MCP_TIMEOUT"
+        assert not runner._busy and runner._process is None
+        assert processes[0].returncode is not None
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize(
+    "operation,extra,code",
+    [
+        (
+            "get_transcript_segment",
+            {"start_seconds": True, "end_seconds": 4},
+            "SEGMENT_RANGE_INVALID",
+        ),
+        (
+            "get_transcript_segment",
+            {"start_seconds": 0, "end_seconds": 901},
+            "SEGMENT_RANGE_INVALID",
+        ),
+        (
+            "search_transcript",
+            {"query": " ", "max_results": 10},
+            "SEARCH_QUERY_INVALID",
+        ),
+        (
+            "search_transcript",
+            {"query": "x", "max_results": True},
+            "SEARCH_QUERY_INVALID",
+        ),
+        (
+            "get_transcript_page",
+            {"cursor": "private", "max_chars": 1000},
+            "CACHE_CURSOR_INVALID",
+        ),
+        ("get_transcript_page", {"cursor": None, "max_chars": True}, "CONFIG_INVALID"),
+    ],
+)
+def test_retrieval_request_rejects_invalid_parameters(operation, extra, code):
+    request = {
+        "operation": operation,
+        "url": "https://youtu.be/abcdefghijk",
+        "mode": "filtered",
+        "sponsorblock": {
+            "enabled": False,
+            "categories": ["sponsor"],
+            "timeout_seconds": 10,
+        },
+        **extra,
+    }
+    with pytest.raises(AppError) as exc:
+        validate_request(request)
+    assert exc.value.info.code == code

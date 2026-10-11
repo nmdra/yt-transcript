@@ -115,6 +115,12 @@ The MCP server provides `get_transcript`:
 - Server-configured `summarized` mode produces a whole-video summary for explicit Markdown requests
 - The CLI writes progress to terminal stderr
 
+**Unreleased MCP upgrade:** The development checkout also provides `get_video_info`, `get_transcript_segment`, `search_transcript`, and `get_transcript_page`.
+They share a private local source-caption cache with `get_transcript`, enabled for 24 hours by default.
+The helpers do not call a model; Markdown still makes model calls on each request and can send optional progress notifications.
+See [retrieval tools and cache](docs/mcp.md#retrieval-tools).
+The pinned dev9 installation does not yet include this upgrade.
+
 ## Install with an AI agent
 
 Copy this prompt into an agent that has local shell and file access:

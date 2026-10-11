@@ -216,7 +216,7 @@ def test_sdk_two_mode_schema_and_omitted_equivalence():
         async def close(self):
             pass
 
-        async def run(self, payload):
+        async def run(self, payload, *, on_progress=None):
             self.calls.append(payload)
             cleaned = service.CleanedTranscript(
                 "ok", VideoMetadata(URL, "abcdefghijk"), "en", False

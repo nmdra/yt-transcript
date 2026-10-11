@@ -7,7 +7,9 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
+from .config import validate_cache_policy
 from .errors import AppError, ErrorInfo
+from .json_tools import strict_json_loads
 
 REQUEST_LIMIT = 16 * 1024
 DOCUMENT_LIMIT = 256 * 1024
@@ -18,17 +20,26 @@ def validate_request(request: object) -> dict:
     if not isinstance(request, dict):
         raise ValueError
     operation = request.get("operation")
-    required_fields = {"operation", "url", "mode", "sponsorblock"}
-    if (
-        not isinstance(operation, str)
-        or operation != "get_transcript"
-        or set(request)
-        not in (
-            required_fields,
-            required_fields | {"output_format", "formatting"},
-        )
-    ):
+    fields = {"operation", "url", "mode", "sponsorblock"}
+    if operation == "get_transcript":
+        if "output_format" in request or "formatting" in request:
+            fields |= {"output_format", "formatting"}
+    elif operation == "get_video_info":
+        if request.get("mode") != "filtered":
+            raise ValueError
+    elif operation == "get_transcript_segment":
+        fields |= {"start_seconds", "end_seconds"}
+    elif operation == "search_transcript":
+        fields |= {"query", "max_results"}
+    elif operation == "get_transcript_page":
+        fields |= {"cursor", "max_chars"}
+    else:
         raise ValueError
+    if "cache" in request:
+        fields.add("cache")
+    if set(request) != fields:
+        raise ValueError
+    validate_cache_policy(request.get("cache", {}))
     from .downloader import validate_youtube_url
 
     if not isinstance(request["url"], str):
@@ -42,6 +53,18 @@ def validate_request(request: object) -> dict:
     ):
         raise ValueError
     validate_policy(request["sponsorblock"])
+    from .service import (
+        validate_page_request,
+        validate_search_query,
+        validate_segment_range,
+    )
+
+    if operation == "get_transcript_segment":
+        validate_segment_range(request["start_seconds"], request["end_seconds"])
+    elif operation == "search_transcript":
+        validate_search_query(request["query"], request["max_results"])
+    elif operation == "get_transcript_page":
+        validate_page_request(request["cursor"], request["max_chars"])
     if "output_format" in request:
         from .mcp_policy import validate_formatting_policy
 
@@ -52,20 +75,65 @@ def validate_request(request: object) -> dict:
 
 
 def dispatch(request: dict) -> Mapping[str, Any]:
+    from . import service
     from .mcp_policy import validate_formatting_policy
-    from .service import fetch_transcript_document
     from .sponsorblock import validate_policy
+    from .transcript_cache import TranscriptCache
 
     sponsorblock = validate_policy(request["sponsorblock"])
-    markdown = request.get("output_format") == "markdown"
-    formatting = validate_formatting_policy(request["formatting"]) if markdown else None
-    return fetch_transcript_document(
-        request["url"],
-        request["mode"],
-        sponsorblock=sponsorblock,
-        output_format="markdown" if markdown else "plain_text",
-        formatting=formatting,
-        supervised=markdown,
+    cache = TranscriptCache(**asdict(validate_cache_policy(request.get("cache", {}))))
+    options: dict[str, Any] = {"sponsorblock": sponsorblock, "cache": cache}
+    operation = request["operation"]
+    if operation == "get_transcript":
+        markdown = request.get("output_format") == "markdown"
+        formatting = (
+            validate_formatting_policy(request["formatting"]) if markdown else None
+        )
+        if markdown:
+            options["on_progress"] = report_progress
+        return service.fetch_transcript_document(
+            request["url"],
+            request["mode"],
+            output_format="markdown" if markdown else "plain_text",
+            formatting=formatting,
+            supervised=markdown,
+            **options,
+        )
+    if operation == "get_video_info":
+        return service.get_video_info(request["url"], **options)
+    if operation == "get_transcript_segment":
+        return service.get_transcript_segment(
+            request["url"],
+            request["start_seconds"],
+            request["end_seconds"],
+            request["mode"],
+            **options,
+        )
+    if operation == "search_transcript":
+        return service.search_transcript(
+            request["url"],
+            request["query"],
+            request["mode"],
+            request["max_results"],
+            **options,
+        )
+    if operation == "get_transcript_page":
+        return service.get_transcript_page(
+            request["url"],
+            request["cursor"],
+            request["max_chars"],
+            request["mode"],
+            **options,
+        )
+    raise ValueError
+
+
+def report_progress(done: int, total: int) -> None:
+    record = {"done": done, "total": total, "stage": "formatting"}
+    print(
+        "YT_PROGRESS\t" + json.dumps(record, separators=(",", ":")),
+        file=sys.stderr,
+        flush=True,
     )
 
 
@@ -78,7 +146,7 @@ def main() -> int:
         raw = sys.stdin.buffer.read(REQUEST_LIMIT + 1)
         if len(raw) > REQUEST_LIMIT:
             raise ValueError
-        request = validate_request(json.loads(raw.decode("utf-8")))
+        request = validate_request(strict_json_loads(raw.decode("utf-8")))
         result = dispatch(request)
         if len(result.get("document", "").encode("utf-8")) > DOCUMENT_LIMIT:
             raise AppError(
@@ -100,6 +168,9 @@ def main() -> int:
                     "mcp_worker",
                 )
             )
+        from .service import validate_service_result
+
+        validate_service_result(request["operation"], result)
     except AppError as exc:
         encoded = json.dumps({"error": asdict(exc.info)}).encode()
     except ValueError, UnicodeError:

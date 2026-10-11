@@ -347,3 +347,14 @@ Authentication and unavailable-video errors might not be retryable.
 YouTube can block extraction or require PO tokens.
 Full runtime setup does not guarantee access.
 The wrapper provides no cookies, bypass flags, or token provisioning.
+
+
+## MCP source retrieval and caching
+
+The unreleased development checkout adds deterministic metadata, segment, search, and page tools.
+They share source-caption snapshots with MCP `get_transcript`, without calling a model.
+Cache rehydration preserves original cues, chapters, descriptions, filtering receipts, and source order.
+A failed effective SponsorBlock lookup is not persisted as a successful filtered snapshot.
+Markdown is formatted again on each explicit request; only source data is cached.
+CLI processing remains unchanged.
+See [MCP retrieval tools](mcp.md#retrieval-tools) and [cache privacy and limits](mcp.md#local-source-cache).

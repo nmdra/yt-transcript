@@ -26,7 +26,7 @@ class Runner:
     async def close(self):
         pass
 
-    async def run(self, payload):
+    async def run(self, payload, *, on_progress=None):
         self.calls.append(payload)
         if payload.get("url") == "invalid":
             raise AppError(
@@ -63,7 +63,18 @@ def test_tools_schemas_and_success(description):
             raise_exceptions=True,
         ) as client:
             tools = (await client.list_tools()).tools
-            assert [tool.name for tool in tools] == ["get_transcript"]
+            assert [tool.name for tool in tools] == [
+                "get_transcript",
+                "get_video_info",
+                "get_transcript_segment",
+                "search_transcript",
+                "get_transcript_page",
+            ]
+            assert set(tools[0].input_schema["properties"]) == {
+                "url",
+                "mode",
+                "output_format",
+            }
             assert not runner.calls
             tool = tools[0]
             assert tool.output_schema
@@ -146,7 +157,7 @@ def test_schema_errors_never_echo_arguments(caplog):
 
 def test_invalid_description_does_not_reach_sdk(caplog):
     class InvalidRunner(Runner):
-        async def run(self, payload):
+        async def run(self, payload, *, on_progress=None):
             result = await super().run(payload)
             if len(self.calls) == 1:
                 result["metadata"]["description"] = {
@@ -175,7 +186,7 @@ def test_invalid_description_does_not_reach_sdk(caplog):
 
 def test_unexpected_worker_error_is_safe(caplog):
     class BrokenRunner(Runner):
-        async def run(self, payload):
+        async def run(self, payload, *, on_progress=None):
             raise RuntimeError("Bearer private-key caption excerpt")
 
     async def check():
@@ -191,7 +202,7 @@ def test_unexpected_worker_error_is_safe(caplog):
 
 def test_response_limit_has_no_partial_result_or_source_leak(caplog):
     class LimitedRunner(Runner):
-        async def run(self, payload):
+        async def run(self, payload, *, on_progress=None):
             result = await super().run(payload)
             if len(self.calls) == 1:
                 raise AppError(
@@ -239,3 +250,43 @@ def test_expected_failure_and_server_reuse():
             assert not success.is_error
 
     asyncio.run(check())
+
+
+@pytest.mark.parametrize(
+    "name,arguments,code",
+    [
+        (
+            "get_transcript_segment",
+            {"start_seconds": True, "end_seconds": 3},
+            "SEGMENT_RANGE_INVALID",
+        ),
+        (
+            "get_transcript_segment",
+            {"start_seconds": float("nan"), "end_seconds": 3},
+            "SEGMENT_RANGE_INVALID",
+        ),
+        (
+            "search_transcript",
+            {"query": "x", "max_results": True},
+            "SEARCH_QUERY_INVALID",
+        ),
+        ("search_transcript", {"query": "PRIVATE_QUERY" * 20}, "SEARCH_QUERY_INVALID"),
+        ("get_transcript_page", {"max_chars": True}, "CONFIG_INVALID"),
+        ("get_transcript_page", {"cursor": "PRIVATE_CURSOR"}, "CACHE_CURSOR_INVALID"),
+        ("get_video_info", {"provider": "PRIVATE_PROVIDER"}, "CONFIG_INVALID"),
+    ],
+)
+def test_helper_invalid_arguments_are_safe_before_worker(name, arguments, code, caplog):
+    async def check():
+        runner = Runner()
+        async with Client(create_server(AppConfig(), runner=runner)) as client:
+            result = await client.call_tool(
+                name, {"url": "https://youtu.be/abcdefghijk", **arguments}
+            )
+            assert result.is_error and result.structured_content is None
+            assert code in text_content(result)
+            assert "PRIVATE" not in text_content(result)
+            assert runner.calls == []
+
+    asyncio.run(check())
+    assert "PRIVATE" not in caplog.text

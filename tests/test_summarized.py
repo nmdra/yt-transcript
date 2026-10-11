@@ -449,7 +449,7 @@ def test_mcp_server_summary_policy_and_compatibility_round_trip(tmp_path, monkey
         async def close(self):
             pass
 
-        async def run(self, payload):
+        async def run(self, payload, *, on_progress=None):
             return dict(dispatch(validate_request(payload)))
 
     async def check():

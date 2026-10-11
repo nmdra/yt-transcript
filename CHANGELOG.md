@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Shared private SQLite source-caption cache for MCP, with bounded retention and unchanged CLI behavior
+- Model-free MCP metadata, timestamp segment, literal search, and snapshot-bound paging tools while keeping `get_transcript` as the primary tool
+- Optional Markdown model-call progress notifications without new tool arguments, background tasks, or changed deadlines
+
 ## [0.2.0-dev.9] - 2026-10-12
 
 ### Changed

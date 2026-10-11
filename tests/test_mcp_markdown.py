@@ -144,7 +144,7 @@ def test_sdk_formatting_failure_advises_plain_text(source, monkeypatch, code):
         async def close(self):
             pass
 
-        async def run(self, payload):
+        async def run(self, payload, *, on_progress=None):
             return dict(dispatch(validate_request(payload)))
 
     calls = []
@@ -239,7 +239,7 @@ def test_server_default_chunk_cap_is_20(source, monkeypatch):
         async def close(self):
             pass
 
-        async def run(self, payload):
+        async def run(self, payload, *, on_progress=None):
             self.calls.append(payload)
             return dict(dispatch(validate_request(payload)))
 
@@ -268,7 +268,7 @@ def test_sdk_schema_and_server_controls(source, monkeypatch):
         async def close(self):
             pass
 
-        async def run(self, payload):
+        async def run(self, payload, *, on_progress=None):
             self.calls.append(payload)
             return dict(dispatch(validate_request(payload)))
 
@@ -280,7 +280,7 @@ def test_sdk_schema_and_server_controls(source, monkeypatch):
         runner = Runner()
         config = AppConfig(model="saved-model", timeout_seconds=600, max_chunks=2)
         async with Client(create_server(config, runner=runner)) as client:
-            (tool,) = (await client.list_tools()).tools
+            tool = (await client.list_tools()).tools[0]
             schema = tool.input_schema["properties"]["output_format"]
             assert schema["default"] == "plain_text"
             assert schema["enum"] == ["plain_text", "markdown"]

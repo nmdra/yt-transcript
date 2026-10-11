@@ -28,7 +28,7 @@ class Runner:
     async def close(self):
         pass
 
-    async def run(self, request):
+    async def run(self, request, *, on_progress=None):
         return dict(dispatch(validate_request(request)))
 
 
@@ -75,7 +75,7 @@ def test_mcp_provider_is_server_owned(monkeypatch, mode, editorial):
 
     async def check():
         async with Client(create_server(config, runner=Runner())) as client:
-            (tool,) = (await client.list_tools()).tools
+            tool = (await client.list_tools()).tools[0]
             assert set(tool.input_schema["properties"]) == {
                 "url",
                 "mode",

@@ -91,13 +91,25 @@ def test_multichunk_stdio_longer_deadline_and_no_retry(tmp_path, mutation):
     )
 
     async def check():
+        notifications = []
+
+        async def report(progress, total, message):
+            notifications.append((progress, total))
+
         async with Client(
             StdioServerParameters(command=sys.executable, args=[str(server)])
         ) as client:
             result = await client.call_tool(
                 "get_transcript",
                 {"url": payload()["url"], "mode": "full", "output_format": "markdown"},
+                progress_callback=report,
             )
+            expected = [(i, 4) for i in range(2 if mutation else 5)]
+            for _ in range(50):
+                if len(notifications) == len(expected):
+                    break
+                await asyncio.sleep(0.01)
+            assert notifications == expected
             text = json.dumps(result.model_dump(mode="json"))
             assert "Bearer secret" not in text and "private-model-error" not in text
             calls = (tmp_path / "calls").read_text().splitlines()
@@ -116,7 +128,7 @@ def test_multichunk_stdio_longer_deadline_and_no_retry(tmp_path, mutation):
                 assert not document.startswith("---")
                 assert len(document) == result.structured_content["character_count"]
             # Failure does not stop the server or launch another Pi process.
-            assert len((await client.list_tools()).tools) == 1
+            assert len((await client.list_tools()).tools) == 5
         assert marker.exists()
 
     asyncio.run(check())
@@ -138,7 +150,7 @@ def test_real_stdio_markdown_worker_and_plain_default(tmp_path):
         async with Client(
             StdioServerParameters(command=sys.executable, args=[str(server)])
         ) as client:
-            (tool,) = (await client.list_tools()).tools
+            tool = (await client.list_tools()).tools[0]
             assert (
                 tool.input_schema["properties"]["output_format"]["default"]
                 == "plain_text"
