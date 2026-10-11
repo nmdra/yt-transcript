@@ -3,16 +3,16 @@
 <img width="2172" height="724" alt="yt-transcript Workflow Overview" src="https://github.com/user-attachments/assets/c556b444-b47f-4afa-88c4-0aca64639cae" />
 
 Get English YouTube transcripts with chapter and timestamp context.
-Use the CLI for raw captions or Pi-edited Markdown.
-You can also connect the MCP server to an AI agent.
+Use the CLI to get raw captions or model-edited Markdown.
+You can also connect an AI agent to the MCP server.
 The tool does not download audio or video and does not require FFmpeg.
 
-- **CLI:** raw captions, previews, or Pi-edited Markdown
+- **CLI:** raw captions, previews, or model-edited Markdown
 - **MCP:** `get_transcript` with `filtered` and `full` modes
 - **Context:** keeps supplied chapters or adds timestamp blocks with original video times
 - **SponsorBlock:** enabled by default for MCP; opt-in for CLI; includes full-caption fallback
 - **No model required:** raw CLI output and MCP plain text make no model calls
-- **Optional Pi editing:** Markdown output uses Pi and can incur model charges
+- **Optional model editing:** Pi is the default; OpenRouter provides a direct API backend
 
 ## Install
 
@@ -21,26 +21,26 @@ Requirements:
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
 - Python **3.14.7**
 - [Deno](https://docs.deno.com/runtime/getting_started/installation/) **2.3.0+**
-- [Pi](https://pi.dev), installed separately, only for Markdown editing
+- [Pi](https://pi.dev), installed separately, for the default Markdown backend
 
 > [!NOTE]
-> `yt-transcript` uses Pi for Markdown editing and focused cleanup after caption extraction.
-> You must install and configure Pi separately to use these features.
+> The default backend uses Pi for Markdown editing and focused cleanup after caption extraction.
+> Install and configure Pi separately, or select OpenRouter with an explicit model and environment-only API key.
 > Raw transcript output and plain-text MCP output do not require Pi.
 
 Install the pinned release:
 
 ```sh
 uv tool install --python 3.14.7 \
-  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.7'
+  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v0.2.0-dev.8'
 
 yt-transcript --version
 yt-transcript --doctor
 ```
 
-This command pins the application to **0.2.0.dev7**.
+This command pins the application to **0.2.0.dev8**.
 
-For verified release assets, checksum verification, and exact dependency versions, see the [installation guide](docs/installation.md).
+See the [installation guide](docs/installation.md) for verified release assets, checksum checks, and exact dependency versions.
 
 > **Important:** `uvx yt-transcript` selects an unrelated PyPI project. Install this project from the pinned GitHub release instead.
 
@@ -67,9 +67,28 @@ yt-transcript URL --no-config --editorial-mode summarized --max-chunks 3 -o summ
 
 Raw output does not require a model.
 `--preview` fetches captions without calling Pi.
-The preview shows the planned call count before Markdown editing.
-With `-o`, the output file includes YAML metadata.
+The preview shows the number of planned calls before Markdown editing.
+If you use `-o`, the output file includes YAML metadata.
 Stdout contains only the transcript body.
+
+## OpenRouter
+
+Direct OpenRouter formatting does not require Pi:
+
+```sh
+# Set OPENROUTER_API_KEY in the environment first; do not store it in TOML.
+uv run yt-transcript URL --no-config --provider openrouter --model openai/gpt-4o -o transcript.md
+uv run yt-transcript URL --no-config --provider openrouter --model openai/gpt-4o --editorial-mode summarized --max-chunks 20 -o summary.md
+```
+
+Pi remains the default backend.
+Raw output and MCP plain text do not use a model.
+This release uses `[formatting]` instead of `[pi]`, with a separate `[openrouter]` token limit.
+The tool does not retry automatically or use a fallback provider.
+The tool does not return partial output.
+Transcript text is sent to OpenRouter and its upstream provider and can incur charges.
+See the [CLI provider guide](docs/cli.md#providers).
+When updating from dev7, rename `[pi]` to `[formatting]` and keep your existing Pi settings.
 
 ## MCP
 
@@ -80,17 +99,17 @@ The MCP server provides `get_transcript`:
 - `filtered` is the default and attempts SponsorBlock filtering
 - `full` skips SponsorBlock filtering
 - Plain-text output makes no model call
-- `output_format="markdown"` explicitly enables Pi editing
+- `output_format="markdown"` explicitly enables the server-selected model backend
 - Plain text keeps supplied chapters; otherwise, it adds timestamp context
 - Server-configured `summarized` mode produces a whole-video summary for explicit Markdown requests
 - The CLI writes progress to terminal stderr
 
 ## Install with an AI agent
 
-Copy the following prompt into an agent with local shell and file access:
+Copy this prompt into an agent that has local shell and file access:
 
 ```text
-Install `nmdra/yt-transcript` `v0.2.0-dev.7` for my user account with the MCP extra using Python `3.14.7`; first read the official installation guide, MCP guide, and release page at https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md, https://github.com/nmdra/yt-transcript/blob/main/docs/mcp.md, and https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.7. Use the GitHub release wheel, not the unrelated PyPI package `yt-transcript`; verify it against the release `SHA256SUMS` and stop if verification fails; constrain dependencies to the same release source archive's `uv.lock`; install it as an isolated user-level `uv tool` with the MCP extra and exactly Python `3.14.7`; ask before replacing or modifying any existing installation or installing missing runtimes/tools such as Python, Deno, or `uv`; keep unrelated tools, configs, environment variables, API keys, model credentials, and existing MCP servers unchanged; configure MCP only for the client(s) I select, after reading each client's official MCP documentation, using that client's native setup command or config format rather than another client's schema; if any required asset, checksum, lockfile, compatibility detail, or configuration is ambiguous, stop and explain instead of guessing; afterward, verify and report the installed version, Python version, checksum result, lockfile-constrained dependency setup, install location, MCP config changes, and a non-secret startup/connectivity check if supported.
+Install `nmdra/yt-transcript` `v0.2.0-dev.8` for my user account with the MCP extra using Python `3.14.7`; first read the official installation guide, MCP guide, and release page at https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md, https://github.com/nmdra/yt-transcript/blob/main/docs/mcp.md, and https://github.com/nmdra/yt-transcript/releases/tag/v0.2.0-dev.8. Use the GitHub release wheel, not the unrelated PyPI package `yt-transcript`; verify it against the release `SHA256SUMS` and stop if verification fails; constrain dependencies to the same release source archive's `uv.lock`; install it as an isolated user-level `uv tool` with the MCP extra and exactly Python `3.14.7`; ask before replacing or modifying any existing installation or installing missing runtimes/tools such as Python, Deno, or `uv`; keep unrelated tools, configs, environment variables, API keys, model credentials, and existing MCP servers unchanged; configure MCP only for the client(s) I select, after reading each client's official MCP documentation, using that client's native setup command or config format rather than another client's schema; if any required asset, checksum, lockfile, compatibility detail, or configuration is ambiguous, stop and explain instead of guessing; afterward, verify and report the installed version, Python version, checksum result, lockfile-constrained dependency setup, install location, MCP config changes, and a non-secret startup/connectivity check if supported.
 ```
 
 ## Documentation

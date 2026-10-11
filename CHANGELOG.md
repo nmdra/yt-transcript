@@ -7,9 +7,25 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Allow conservative ordinary-word spelling correction in Pi and OpenRouter Markdown prompts; preserve uncertain words, names, technical terms, protected literals, and source meaning without extra calls
+- Raise the default OpenRouter output allowance from 8192 to 16384 tokens per model call; reasoning tokens can consume the allowance, and model-specific limits still apply
+
+## [0.2.0-dev.8] - 2026-10-12
+
 ### Added
 
-- Opt-in `summarized` editorial mode for whole-video Markdown summaries, with bounded factual notes, a final synthesis call for multi-chunk input, and preview/cap/progress accounting for all Pi calls
+- Direct OpenRouter formatting for CLI and MCP Markdown without Pi, with an explicit model, environment-only API key, bounded responses, and supervised deadlines
+- Provider-aware offline doctor checks and preview output
+- Internal source-span IDs and strict bounded summary claims with same-call references, qualification arrays, all-empty-evidence rejection, and no public citations
+- Opt-in CLI/Python read-only chunk context with whole-token windows and complete serialized budget accounting
+- Synthetic offline fidelity fixtures, advisory comparison, and atomic saved-response evaluation reports; no live quality claim
+- Opt-in `summarized` editorial mode for whole-video Markdown summaries, with bounded factual notes, a final synthesis call for multi-chunk input, and preview/cap/progress accounting for all model calls
+
+### Changed
+
+- **Breaking:** Replace the `[pi]` TOML table with `[formatting]`; add provider selection and a separate `[openrouter]` output-token setting
 
 ## [0.2.0-dev.7] - 2026-10-08
 
@@ -89,7 +105,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.7...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.8...HEAD
+[0.2.0-dev.8]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.7...v0.2.0-dev.8
 [0.2.0-dev.7]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.6...v0.2.0-dev.7
 [0.2.0-dev.6]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.5...v0.2.0-dev.6
 [0.2.0-dev.5]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.4...v0.2.0-dev.5

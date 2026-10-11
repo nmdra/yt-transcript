@@ -4,14 +4,14 @@ import errno
 import re
 import socket
 import ssl
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 CODES = frozenset(
-    "INVALID_URL CONFIG_INVALID RUNTIME_MISSING RUNTIME_INCOMPATIBLE NO_ENGLISH_CAPTIONS NO_ENGLISH_VTT YOUTUBE_ACCESS_LIMITED VIDEO_UNAVAILABLE AUTH_REQUIRED AGE_RESTRICTED GEO_RESTRICTED UNSUPPORTED_LIVESTREAM REMOTE_RATE_LIMITED REMOTE_ACCESS_DENIED NETWORK_FAILED YOUTUBE_EXTRACT_FAILED SUBTITLE_DOWNLOAD_FAILED SUBTITLE_INVALID EMPTY_TRANSCRIPT PI_NOT_FOUND PI_LAUNCH_FAILED PI_INCOMPATIBLE PI_AUTH_FAILED PI_MODEL_UNAVAILABLE PI_RATE_LIMITED PI_QUOTA_EXCEEDED PI_CONTEXT_LIMIT PI_CONTEXT_MUTATED PI_OUTPUT_INCOMPLETE PI_TIMEOUT PI_ABORTED PI_FAILED PI_PROTOCOL_INVALID PI_OUTPUT_INVALID PI_OUTPUT_LIMIT CHUNK_LIMIT_EXCEEDED OUTPUT_EXISTS OUTPUT_FAILED MCP_BUSY MCP_TIMEOUT MCP_RESPONSE_LIMIT INTERNAL_ERROR".split()
+    "INVALID_URL CONFIG_INVALID RUNTIME_MISSING RUNTIME_INCOMPATIBLE NO_ENGLISH_CAPTIONS NO_ENGLISH_VTT YOUTUBE_ACCESS_LIMITED VIDEO_UNAVAILABLE AUTH_REQUIRED AGE_RESTRICTED GEO_RESTRICTED UNSUPPORTED_LIVESTREAM REMOTE_RATE_LIMITED REMOTE_ACCESS_DENIED NETWORK_FAILED YOUTUBE_EXTRACT_FAILED SUBTITLE_DOWNLOAD_FAILED SUBTITLE_INVALID EMPTY_TRANSCRIPT PI_NOT_FOUND PI_LAUNCH_FAILED PI_INCOMPATIBLE PI_AUTH_FAILED PI_MODEL_UNAVAILABLE PI_RATE_LIMITED PI_QUOTA_EXCEEDED PI_CONTEXT_LIMIT PI_CONTEXT_MUTATED PI_OUTPUT_INCOMPLETE PI_TIMEOUT PI_ABORTED PI_FAILED PI_PROTOCOL_INVALID PI_OUTPUT_INVALID PI_OUTPUT_LIMIT CHUNK_LIMIT_EXCEEDED OUTPUT_EXISTS OUTPUT_FAILED MCP_BUSY MCP_TIMEOUT MCP_RESPONSE_LIMIT INTERNAL_ERROR OPENROUTER_NOT_CONFIGURED OPENROUTER_AUTH_FAILED OPENROUTER_LIMITED OPENROUTER_FAILED OPENROUTER_OUTPUT_INVALID OPENROUTER_OUTPUT_INCOMPLETE OPENROUTER_TIMEOUT OPENROUTER_CONTEXT_LIMIT".split()
 )
 PHASES = frozenset(
-    "config runtime_check metadata_extract caption_select subtitle_download vtt_parse pi_start pi_response output mcp_worker".split()
+    "config runtime_check metadata_extract caption_select subtitle_download vtt_parse pi_start pi_response output mcp_worker openrouter_start openrouter_response".split()
 )
 
 
@@ -217,9 +217,9 @@ def classify_pi_failure(
         "PI_MODEL_UNAVAILABLE": "Check the selected or saved default model in Pi or use --raw.",
         "PI_RATE_LIMITED": "Wait before another attempt or use --raw.",
         "PI_QUOTA_EXCEEDED": "Check provider billing and quota or use --raw.",
-        "PI_CONTEXT_LIMIT": "Smaller pi.chunk_chars or a suitable model may help; smaller chunks increase calls. Or use --raw.",
-        "PI_CONTEXT_MUTATED": "Review Pi/model compatibility. Smaller pi.chunk_chars may help but increase calls. Or use --raw.",
-        "PI_OUTPUT_INCOMPLETE": "Reduce pi.chunk_chars in TOML, review the model choice, or use --raw.",
+        "PI_CONTEXT_LIMIT": "Smaller formatting.chunk_chars or a suitable model may help; smaller chunks increase calls. Or use --raw.",
+        "PI_CONTEXT_MUTATED": "Review Pi/model compatibility. Smaller formatting.chunk_chars may help but increase calls. Or use --raw.",
+        "PI_OUTPUT_INCOMPLETE": "Reduce formatting.chunk_chars in TOML, review the model choice, or use --raw.",
         "CHUNK_LIMIT_EXCEEDED": "Raise the chunk cap explicitly, or use raw/plain-text output.",
     }
     return FormattingError(
@@ -233,6 +233,56 @@ def classify_pi_failure(
             chunk_total,
         )
     )
+
+
+OPENROUTER_MESSAGES = {
+    "OPENROUTER_NOT_CONFIGURED": "OpenRouter requires an explicit model and an API key.",
+    "OPENROUTER_AUTH_FAILED": "OpenRouter rejected authentication or access.",
+    "OPENROUTER_LIMITED": "OpenRouter reported a rate, credit, or budget limit.",
+    "OPENROUTER_FAILED": "OpenRouter completion failed.",
+    "OPENROUTER_OUTPUT_INVALID": "OpenRouter returned an invalid completion.",
+    "OPENROUTER_OUTPUT_INCOMPLETE": "OpenRouter output stopped before completion.",
+    "OPENROUTER_TIMEOUT": "OpenRouter formatting exceeded the call deadline.",
+    "OPENROUTER_CONTEXT_LIMIT": "OpenRouter input exceeded a context or planning limit.",
+}
+
+
+def classify_openrouter_failure(
+    code: str = "OPENROUTER_FAILED", *, phase: str = "openrouter_response"
+) -> FormattingError:
+    if code not in OPENROUTER_MESSAGES:
+        raise ValueError("Invalid OpenRouter error code.")
+    hint = "Check the selected model, OpenRouter access, and limits, or use --raw."
+    if code == "OPENROUTER_NOT_CONFIGURED":
+        hint = "Set OPENROUTER_API_KEY and an explicit model, or use --raw."
+    elif code == "OPENROUTER_CONTEXT_LIMIT":
+        hint = "Review formatting.chunk_chars and the selected model, or use --raw."
+    return FormattingError(
+        ErrorInfo(
+            code,
+            OPENROUTER_MESSAGES[code],
+            hint,
+            phase,
+            code in ("OPENROUTER_TIMEOUT", "OPENROUTER_LIMITED"),
+        )
+    )
+
+
+def translate_formatting_error(exc: FormattingError, provider: str) -> FormattingError:
+    mapping = {
+        "PI_OUTPUT_INVALID": "OPENROUTER_OUTPUT_INVALID",
+        "PI_OUTPUT_LIMIT": "OPENROUTER_OUTPUT_INVALID",
+        "PI_CONTEXT_LIMIT": "OPENROUTER_CONTEXT_LIMIT",
+    }
+    if provider == "openrouter" and exc.info.code in mapping:
+        safe = classify_openrouter_failure(mapping[exc.info.code])
+        safe.info = replace(
+            safe.info,
+            chunk_index=exc.info.chunk_index,
+            chunk_total=exc.info.chunk_total,
+        )
+        return safe
+    return exc
 
 
 class WarningCollector:
@@ -262,7 +312,7 @@ class WarningCollector:
 
 
 def _is_formatting_failure(code: str) -> bool:
-    return code.startswith("PI_") or code == "CHUNK_LIMIT_EXCEEDED"
+    return code.startswith(("PI_", "OPENROUTER_")) or code == "CHUNK_LIMIT_EXCEEDED"
 
 
 def render_cli_error(exc: AppError) -> str:
@@ -274,7 +324,7 @@ def render_cli_error(exc: AppError) -> str:
     if info.hint:
         result += f"hint: {info.hint}\n"
     if _is_formatting_failure(info.code):
-        result += "warning: No Pi-processed transcript was returned. Retry with --raw for plain text without Pi.\n"
+        result += "warning: No model-processed transcript was returned. Retry with --raw for plain text without an AI model.\n"
     return result
 
 
@@ -294,12 +344,12 @@ def render_mcp_error(info: ErrorInfo) -> str:
         message = message.replace("--raw", 'output_format="plain_text"')
     if info.code == "CHUNK_LIMIT_EXCEEDED":
         message = message.split("; use --preview", 1)[0]
-        hint = 'Raise server pi.max_chunks explicitly, or request output_format="plain_text".'
+        hint = 'Raise server formatting.max_chunks explicitly, or request output_format="plain_text".'
     result = f"[{info.code}] {message}{position}" + (f"; hint: {hint}" if hint else "")
     if formatting_failure:
-        result += '; warning: No Pi-processed transcript was returned. Retry get_transcript with output_format="plain_text" for plain text without Pi.'
+        result += '; warning: No model-processed transcript was returned. Retry get_transcript with output_format="plain_text" for plain text without an AI model.'
     elif info.code == "MCP_TIMEOUT":
-        result += '; warning: No transcript was returned. If Markdown was requested, retry with output_format="plain_text" to skip Pi.'
+        result += '; warning: No transcript was returned. If Markdown was requested, retry with output_format="plain_text" to skip model processing.'
     return result
 
 
@@ -368,11 +418,15 @@ def decode_worker_error(payload: object) -> ErrorInfo:
     )
     code = payload["code"]
     if _is_formatting_failure(code):
-        safe = classify_pi_failure(code=code).info
+        safe = (
+            classify_openrouter_failure(code)
+            if code.startswith("OPENROUTER_")
+            else classify_pi_failure(code=code)
+        ).info
         message, hint = safe.message, safe.hint
         if code == "CHUNK_LIMIT_EXCEEDED" and isinstance(payload["message"], str):
             counts = re.fullmatch(
-                r"formatting requires ([1-9][0-9]{0,5}) (?:chunks|Pi calls), exceeding max-chunks "
+                r"formatting requires ([1-9][0-9]{0,5}) (?:chunks|model calls), exceeding max-chunks "
                 r"([1-9][0-9]{0,3}); use --preview, --raw, or explicitly raise the cap",
                 payload["message"],
             )

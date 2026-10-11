@@ -22,6 +22,7 @@ from .chapters import (
     render_timed_text,
 )
 from .cleaner import Cue, clean_vtt_timed
+from .config import OpenRouterConfig
 from .downloader import download_english_vtt
 from .errors import ErrorInfo, TranscriptError
 from .mcp_policy import MCPFormattingPolicy, validate_formatting_policy
@@ -292,12 +293,12 @@ def fetch_transcript_document(
                     "runtime_check",
                 )
             )
-        from .formatter import ensure_pi
+        from .formatter import ensure_formatter
 
         formatting = validate_formatting_policy(
             asdict(formatting or MCPFormattingPolicy())
         )
-        ensure_pi()
+        ensure_formatter(formatting.provider, formatting.model)
     policy = (sponsorblock or SponsorBlockConfig()).resolved(default=True)
     if mode == "full":
         policy = replace(policy, enabled=False)
@@ -305,13 +306,15 @@ def fetch_transcript_document(
     projection = cleaned.projection
     assert projection is not None
     if output_format == "markdown":
-        from .formatter import format_with_pi
+        from .formatter import format_transcript
 
         assert formatting is not None
-        body = format_with_pi(
+        body = format_transcript(
             cleaned.effective_body,
             sections=cleaned.effective_sections,
             model=formatting.model,
+            provider=formatting.provider,
+            openrouter=OpenRouterConfig(formatting.openrouter_max_output_tokens),
             chunk_chars=formatting.chunk_chars,
             timeout_seconds=formatting.timeout_seconds,
             max_chunks=formatting.max_chunks,

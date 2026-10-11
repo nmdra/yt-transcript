@@ -1,5 +1,6 @@
-"""Offline readiness checks. No provider, authentication, or video checks."""
+"""Offline readiness checks. No network, authentication, or video requests."""
 
+import os
 import re
 import shutil
 import subprocess
@@ -51,7 +52,13 @@ def _tool(name: str, minimum: tuple[int, int, int], flags: list[str]) -> DoctorC
         return DoctorCheck(name, "error", "version check failed")
 
 
-def run_doctor(*, include_pi: bool = True) -> DoctorReport:
+def run_doctor(
+    *,
+    include_pi: bool = True,
+    include_mcp: bool = False,
+    provider: str = "pi",
+    model: str | None = None,
+) -> DoctorReport:
     checks = [
         DoctorCheck(
             "Python",
@@ -60,7 +67,7 @@ def run_doctor(*, include_pi: bool = True) -> DoctorReport:
         )
     ]
     for name in ("yt-transcript", "yt-dlp", "PyYAML", "yt-dlp-ejs") + (
-        () if include_pi else ("mcp",)
+        ("mcp",) if include_mcp else ()
     ):
         try:
             value = metadata.version(name)
@@ -117,6 +124,18 @@ def run_doctor(*, include_pi: bool = True) -> DoctorReport:
         checks.append(_tool("pi", (1, 0, 4), flags))
     else:
         checks.append(DoctorCheck("Pi", "ok", "not required"))
+    if provider == "openrouter":
+        for name, present in (
+            ("OpenRouter model", bool(model and model.strip())),
+            ("OpenRouter key", bool(os.environ.get("OPENROUTER_API_KEY", "").strip())),
+        ):
+            checks.append(
+                DoctorCheck(
+                    name,
+                    "ok" if present else "error",
+                    "configured (not verified)" if present else "not configured",
+                )
+            )
     return DoctorReport(tuple(checks))
 
 

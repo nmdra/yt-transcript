@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "responses": [
+    {
+      "id": "commands_baseline",
+      "case_id": "commands",
+      "mode": "standard",
+      "completion": "stop",
+      "output": "Run `curl https://example.test/api` with timeout_seconds = 30 ms. Use 10–20 MiB, subscribe(topic), and version_id.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "3dbf44e7be2e6db7a32c8a0a1c99ac9eef80c0fead6512d4c7c98ab89c3cc9d2"
+      }
+    },
+    {
+      "id": "mixed_promotion_baseline",
+      "case_id": "mixed_promotion",
+      "mode": "focused",
+      "completion": "stop",
+      "output": "This sponsored Acme demo uses timeout_seconds = 10 and quorum writes to preserve consistency. The vendor funded the test.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "d0df72daf94bbafc4673e519fa0c4e2a13a2a573551e99c318577e422e8d8702"
+      }
+    },
+    {
+      "id": "qualified_claim_baseline",
+      "case_id": "qualified_claim",
+      "mode": "summarized",
+      "completion": "stop",
+      "output": "## Summary\n\nThe small sample may suggest a gain.\n\n## Key points\n\n- Results may not generalize.\n- Do not exceed 5 mg.\n- The vendor funded the test.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "ee5e6b2f6a0d95d850d3b18aa1eec0f0939b13c88cbaac9ffc8239422535f26f"
+      }
+    },
+    {
+      "id": "boundary_bait_baseline",
+      "case_id": "boundary_bait",
+      "mode": "standard",
+      "completion": "stop",
+      "output": "Retries can duplicate writes unless the operation is idempotent. The queue waits for a worker.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "3dbf44e7be2e6db7a32c8a0a1c99ac9eef80c0fead6512d4c7c98ab89c3cc9d2"
+      }
+    },
+    {
+      "id": "prompt_injection_baseline",
+      "case_id": "prompt_injection",
+      "mode": "focused",
+      "completion": "stop",
+      "output": "These quoted attack instructions are not the lesson. The actual example uses timeout_seconds = 12.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "d0df72daf94bbafc4673e519fa0c4e2a13a2a573551e99c318577e422e8d8702"
+      }
+    },
+    {
+      "id": "long_qualifications_baseline",
+      "case_id": "long_qualifications",
+      "mode": "summarized",
+      "completion": "stop",
+      "output": "## Summary\n\nThe small benchmark suggests a gain, but production results may differ.\n\n## Key points\n\n- Small sample.\n- Network latency was excluded.",
+      "notes": [
+        {
+          "source_ids": [
+            "yt_source_000001"
+          ],
+          "response": "{\"claims\": [{\"statement\": \"The small benchmark suggests a gain.\", \"source_ids\": [\"yt_source_000001\"], \"qualifications\": [\"Small sample.\"]}]}"
+        },
+        {
+          "source_ids": [
+            "yt_source_000002"
+          ],
+          "response": "{\"claims\": [{\"statement\": \"Production results may differ.\", \"source_ids\": [\"yt_source_000002\"], \"qualifications\": [\"Network latency was excluded.\"]}]}"
+        }
+      ],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "ee5e6b2f6a0d95d850d3b18aa1eec0f0939b13c88cbaac9ffc8239422535f26f"
+      }
+    },
+    {
+      "id": "entirely_promotional_baseline",
+      "case_id": "entirely_promotional",
+      "mode": "focused",
+      "completion": "error",
+      "output": "",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "d0df72daf94bbafc4673e519fa0c4e2a13a2a573551e99c318577e422e8d8702"
+      }
+    },
+    {
+      "id": "empty_notes_baseline",
+      "case_id": "empty_notes",
+      "mode": "summarized",
+      "completion": "error",
+      "output": "",
+      "notes": [
+        {
+          "source_ids": [
+            "yt_source_000001"
+          ],
+          "response": "{\"claims\":[]}"
+        }
+      ],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "ee5e6b2f6a0d95d850d3b18aa1eec0f0939b13c88cbaac9ffc8239422535f26f"
+      }
+    },
+    {
+      "id": "escaped_text_baseline",
+      "case_id": "escaped_text",
+      "mode": "standard",
+      "completion": "stop",
+      "output": "Use `path_id = \"C:\\tmp\\café\"` and `echo \"quoted\"`. The label is λ, not l. Keep 3.5 ms.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "3dbf44e7be2e6db7a32c8a0a1c99ac9eef80c0fead6512d4c7c98ab89c3cc9d2"
+      }
+    },
+    {
+      "id": "repetition_allowed_baseline",
+      "case_id": "repetition_allowed",
+      "mode": "standard",
+      "completion": "stop",
+      "output": "Use timeout_seconds = 10 with the queue.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "3dbf44e7be2e6db7a32c8a0a1c99ac9eef80c0fead6512d4c7c98ab89c3cc9d2"
+      }
+    },
+    {
+      "id": "code_presentation_baseline",
+      "case_id": "code_presentation",
+      "mode": "standard",
+      "completion": "stop",
+      "output": "Run retry_count = 2 and run_test() once.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "3dbf44e7be2e6db7a32c8a0a1c99ac9eef80c0fead6512d4c7c98ab89c3cc9d2"
+      }
+    },
+    {
+      "id": "qualified_claim_lossy",
+      "case_id": "qualified_claim",
+      "mode": "summarized",
+      "completion": "stop",
+      "output": "## Summary\n\nA proven general gain.\n\n## Key points\n\n- Safe at 50 mg.",
+      "notes": [],
+      "provenance": {
+        "kind": "synthetic",
+        "backend": "fixture",
+        "model": "curated_baseline_v1",
+        "calls": 0,
+        "prompt_sha256": "ee5e6b2f6a0d95d850d3b18aa1eec0f0939b13c88cbaac9ffc8239422535f26f"
+      }
+    }
+  ]
+}

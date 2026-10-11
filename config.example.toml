@@ -6,11 +6,11 @@
 # Use --config PATH to select a different file, or --no-config to skip loading.
 # Explicit CLI flags override TOML values. Project files are not auto-loaded.
 # Unknown tables/keys, invalid types, and files larger than 64 KiB are rejected.
-# Keep credentials out of this file; configure provider credentials in Pi.
+# Keep credentials out of this file; use Pi-managed credentials or OPENROUTER_API_KEY in the environment.
 
 [output]
 # Default: "markdown". Allowed: "markdown", "raw", "raw-vtt".
-# markdown: Pi-edited Markdown; sends caption text to the configured provider.
+# markdown: model-edited Markdown; sends caption text to the configured provider.
 # raw: deterministic plain text, with no model calls.
 # raw-vtt: downloaded VTT bytes unchanged, with no model calls.
 # CLI --raw and --raw-vtt override this setting.
@@ -21,7 +21,8 @@ mode = "markdown"
 # CLI --verbose overrides this setting to true.
 verbose = false
 
-[pi]
+[formatting]
+provider = "pi"
 # Default: "standard". Allowed: "standard", "focused", "summarized".
 # Focused removes clearly separable non-substantive material, not a summary.
 # Summarized targets one 400–700-word overview, shorter for short videos.
@@ -37,15 +38,15 @@ editorial_mode = "standard"
 chunk_chars = 12000
 
 # Default: 600. Allowed: integers from 1 through 3600.
-# Deadline in seconds for each Pi invocation, not for the complete transcript.
+# Deadline in seconds for each model invocation, not for the complete transcript.
 # A timeout cannot undo provider work or charges already incurred.
 timeout_seconds = 600
 
 # Optional. Default: omitted, meaning no wrapper invocation cap.
 # Allowed: integers from 1 through 1000; zero is not an unlimited value.
-# Reject formatting before the first Pi call if planning exceeds this cap.
+# Reject formatting before the first model call if planning exceeds this cap.
 # Summarized counts the final synthesis call too; one input chunk uses one call.
-# Preview reports exceedance without calling Pi. CLI --max-chunks overrides it.
+# Preview reports exceedance without calling a model. CLI --max-chunks overrides it.
 # Pi/provider retries can add requests, so this is not a hard billing cap.
 # max_chunks = 20
 
@@ -55,16 +56,20 @@ timeout_seconds = 600
 # Empty strings are invalid. CLI --model overrides this setting.
 # model = "provider/model-id"
 
-# Raw modes ignore Pi settings after validating the complete TOML file.
-# MCP plain_text ignores Pi settings. Explicit markdown uses these settings.
-# MCP defaults to max_chunks=20 when omitted; Pi timeout is at most 120 seconds.
+# Raw modes ignore formatting settings after validating the complete TOML file.
+# MCP plain_text ignores formatting settings. Explicit markdown uses these settings.
+# MCP defaults to max_chunks=20 when omitted; per-call timeout is at most 120 seconds.
 # The total MCP deadline is separate; see [mcp] below.
-# Help, version, and CLI doctor bypass TOML loading.
+# Help/version bypass TOML. Doctor reads selected config without network requests.
 # URL, output path, preview, doctor, no-clobber, and MCP startup are CLI-only.
+
+[openrouter]
+# OpenRouter completion allowance; model-specific limits still apply.
+max_output_tokens = 16384
 
 [mcp]
 # Default: 300. Allowed: integers from 300 through 3600.
-# Total Markdown worker deadline, including caption fetching and all Pi calls.
+# Total Markdown worker deadline, including caption fetching and all model calls.
 # Plain text always uses 300 seconds. CLI ignores this setting after validation.
 # Opt in to 1800 for longer work and set a supported client timeout to 1830.
 # Longer work can incur more charges; completion is not guaranteed.
