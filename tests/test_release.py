@@ -170,5 +170,8 @@ def test_backend_helpers_are_in_source_archive():
         "src/yt_transcript/openrouter_backend.py",
         "src/yt_transcript/openrouter_worker.py",
         "src/yt_transcript/json_tools.py",
+        "src/yt_transcript/summary_evidence.py",
+        "src/yt_transcript/fidelity.py",
+        "scripts/evaluate_fidelity.py",
     } <= paths
     assert not any(path.startswith(".agents/plans/") for path in paths)

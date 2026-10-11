@@ -11,6 +11,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Direct OpenRouter formatting for CLI and MCP Markdown without Pi, with an explicit model, environment-only API key, bounded responses, and supervised deadlines
 - Provider-aware offline doctor checks and preview output
+- Internal source-span IDs and strict bounded summary claims with same-call references, qualification arrays, all-empty-evidence rejection, and no public citations
+- Opt-in CLI/Python read-only chunk context with whole-token windows and complete serialized budget accounting
+- Synthetic offline fidelity fixtures, advisory comparison, and atomic saved-response evaluation reports; no live quality claim
 - Opt-in `summarized` editorial mode for whole-video Markdown summaries, with bounded factual notes, a final synthesis call for multi-chunk input, and preview/cap/progress accounting for all model calls
 
 ### Changed

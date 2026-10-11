@@ -175,15 +175,36 @@ Multiple input chunks need one factual-note call per chunk and one final synthes
 Only the final summary is published; intermediate notes are not returned.
 `--max-chunks` counts all these calls.
 For example, three input chunks require a cap of at least four.
-Notes have per-chunk budgets that include JSON escaping.
+Notes are strict private claims objects with same-call source IDs and qualification arrays. Per-chunk budgets include schema/ID framing and JSON escaping, with at least 256 usable serialized characters after minimum claim framing.
 The final synthesis input must fit `formatting.chunk_chars`.
 An infeasible note budget fails with `PI_CONTEXT_LIMIT` or `OPENROUTER_CONTEXT_LIMIT` before model calls.
-Oversized or invalid notes fail without truncation, a repair call, or a partial summary.
+Oversized or invalid notes fail without truncation, a repair call, or a partial summary. All-empty evidence fails before synthesis; canonical internal IDs are rejected in final output. Reference validity does not prove factual support or caveat completeness.
 Small chunks can create too many notes for one bounded synthesis input.
 Use preview to check the plan; a larger cap alone does not solve this input limit.
 
 All modes keep the existing isolation, per-call timeout, metadata, and atomic file-output rules.
 Raw modes and MCP plain text do not summarize.
+
+## Read-only chunk continuity (unreleased checkout)
+
+```sh
+uv run yt-transcript URL --no-config --boundary-context-chars 100 --preview
+uv run yt-transcript URL --no-config --editorial-mode focused --boundary-context-chars 100 -o transcript.md
+```
+
+The integer range is 0–1000 characters per neighboring side; the default is zero.
+The explicit flag requires standard/focused Markdown, including preview.
+It is invalid with raw output, summarized mode, doctor, or MCP launch, even when set to zero.
+There is no TOML key or public MCP argument for context; MCP retains zero context.
+
+Read-only windows contain adjacent retained caption words, not earlier model output.
+Only the current payload owns output. Context must not be copied into the document.
+Planning reserves JSON framing and worst-case escapes before splitting, then reports actual serialized sizes and call counts.
+This can increase calls or cause a planning-limit error; the token is never truncated.
+At 1000 characters per side, a 12000-character source budget cannot cover worst-case context plus current text.
+A larger chunk limit is not a model capability or completion guarantee.
+Explicit context adds `boundary context characters per side` to preview.
+Model context leakage is not fully detectable; see [fidelity limits](behavior.md#internal-summary-evidence-and-continuity-unreleased-checkout).
 
 ## Preview and cost controls
 
@@ -219,7 +240,7 @@ A later run downloads captions again.
 Invocation counts are not token counts, dollar estimates, or exact provider-request counts.
 
 The formatter splits text on sentence boundaries or whitespace.
-The formatter does not split tokens or overlap chunks.
+The formatter does not split tokens. Output-owned current chunks do not overlap; opt-in read-only source windows can repeat neighboring words.
 Pi sends chunks sequentially through independent in-memory sessions; OpenRouter uses independent HTTP completions.
 
 Standard and focused modes join completed bodies without a final synthesis call.

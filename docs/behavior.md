@@ -88,7 +88,7 @@ Segment receipts use `removed`, `partial`, `kept`, `no_matching_captions`, or `n
 Receipts include removed/retained-overlap cue counts.
 Aggregate counts use unique fragments, not sums across overlapping segments.
 `removed` refers to matching caption fragments, not every spoken promotional word.
-Pi receipts describe source filtering before the model, not later model deletions.
+SponsorBlock receipts describe source filtering before the model, not later model deletions.
 Raw and filtered headers can differ in receipt fields.
 Equal headers require identical source snapshots and receipts.
 
@@ -113,7 +113,7 @@ The existing invocation cap includes synthesis; the existing per-call and MCP to
 Each note has a bounded serialized character budget.
 Python rejects impossible budgets before model calls and rejects oversized notes without truncation.
 The final synthesis input fits the configured stdin character limit.
-Notes use independent backend calls and are passed only to the final synthesis call.
+Notes use independent backend calls and are passed only to the final synthesis call as validated private evidence objects.
 They are never published as transcript output.
 
 Python validates final headings and nonempty bodies, but does not prove summary accuracy or enforce the target word count.
@@ -121,6 +121,50 @@ Failures publish no partial notes, summary, or automatic fallback.
 The final summary uses its own headings rather than canonical chapter headings.
 Source chapter metadata, descriptions, and SponsorBlock receipts remain unchanged.
 Removal receipts still describe source filtering, not what the summary includes or omits.
+
+## Internal summary evidence and continuity (unreleased checkout)
+
+Summary source spans have Python-assigned private IDs and one source-call owner.
+Timed origins retain source indices, run order, original cue times, and split-word ranges.
+Untimed origins use normalized-text offsets and null timestamps.
+The ID namespace is absent from retained caption text.
+Removed captions and descriptions are never added to the registry.
+A split cue keeps its original interval; no finer timing is inferred.
+
+Multi-chunk note calls return strict JSON with exactly `claims`.
+Each claim has `statement`, unique same-call `source_ids`, and a `qualifications` array.
+Limits are 64 claims per call, 16 IDs per claim, and 16 qualifications per claim.
+Empty claims are allowed, but all-empty evidence fails before synthesis.
+Duplicate keys, forged/cross-call references, invalid schemas, fences, commentary, and oversized notes fail without repair.
+Validated objects, IDs, and qualifications are serialized directly into the final notes envelope, not quoted Markdown strings.
+
+Planning counts source IDs, claim/schema framing, JSON escapes, and chunk indices.
+Each note call must have at least 256 serialized characters available after minimum claim framing.
+An infeasible synthesis budget fails before model execution.
+ID framing can change source partitions and call counts.
+One planned source chunk still uses one direct summary call; N chunks use N note calls plus one synthesis.
+No hierarchical synthesis, judging, repair, or retry calls are added.
+Final summaries reject canonical private IDs rather than remove them silently.
+Only the validated final Markdown is published; metadata and public MCP fields remain unchanged.
+
+Reference membership does not establish entailment or truth.
+Empty qualification arrays are structurally valid and can omit a needed caveat.
+The final synthesis still has a fixed compression budget and sees notes rather than all captions.
+Offline annotations and human review remain necessary; real-model fidelity is unverified.
+
+CLI/Python standard/focused formatting can opt in to bounded read-only neighboring captions.
+The default zero keeps their old source payload shapes without private ID fields.
+Nonzero context wraps existing current data with `previous_context` and `following_context`.
+Only current words own output; only current runs determine canonical headings.
+Windows use whole tokens, never chapter titles, descriptions, removed captions, or earlier model output.
+Worst-case JSON escaping is reserved before deterministic repartitioning.
+A neighbor token larger than its window is omitted, not truncated.
+Context can increase calls or leave no room for a current token.
+A model can still echo context; prompts and heading validation do not prove output ownership.
+The wrapper does not repair duplication automatically.
+
+`compare_fidelity` and the [offline evaluator](development.md#offline-fidelity-evaluation) report advisory literal/annotation differences.
+They never reject a production transcript, launch a model, retry, or publish a sidecar.
 
 ## Backend-independent formatting (unreleased checkout)
 

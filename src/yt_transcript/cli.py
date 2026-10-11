@@ -35,6 +35,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider", choices=("pi", "openrouter"))
     parser.add_argument("--model")
     parser.add_argument("--max-chunks", type=int)
+    parser.add_argument("--boundary-context-chars", type=int)
     parser.add_argument(
         "--editorial-mode", choices=("standard", "focused", "summarized")
     )
@@ -106,6 +107,13 @@ def _transcribe(
         config.mode != "markdown" or args.output is not None or args.no_clobber
     ):
         raise _invalid("--preview requires Markdown mode and no output path.")
+    if args.boundary_context_chars is not None:
+        if config.mode != "markdown" or config.editorial_mode == "summarized":
+            raise _invalid("Boundary context requires standard/focused Markdown mode.")
+        if not 0 <= args.boundary_context_chars <= 1000:
+            raise _invalid(
+                "Boundary context must be from 0 through 1000 characters per side."
+            )
     if args.output:
         validate_output(args.output, no_clobber=args.no_clobber)
     if config.mode == "markdown" and not args.preview:
@@ -153,6 +161,7 @@ def _transcribe(
                 max_chunks=config.max_chunks,
                 editorial_mode=config.editorial_mode,
                 provider=config.provider,
+                boundary_context_chars=args.boundary_context_chars or 0,
             )
             lines = [
                 f"canonical URL: {canonical}",
@@ -169,6 +178,10 @@ def _transcribe(
                 f"model selection: {config.model or 'Pi configured default'}",
                 f"editorial mode: {config.editorial_mode}",
             ]
+            if args.boundary_context_chars is not None:
+                lines.append(
+                    f"boundary context characters per side: {args.boundary_context_chars}"
+                )
             progress.close()
             _emit(("\n".join(lines) + "\n").encode("utf-8"))
             return
@@ -185,6 +198,7 @@ def _transcribe(
                 sections=downloaded.effective_sections,
                 editorial_mode=config.editorial_mode,
                 on_progress=progress.chunks if progress.enabled else None,
+                boundary_context_chars=args.boundary_context_chars or 0,
             )
         document = (
             downloaded.document(body, effective=effective)
@@ -224,6 +238,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             or args.output is not None
             or args.no_clobber
             or args.mode is not None
+            or args.boundary_context_chars is not None
             or args.provider is not None
             or args.model is not None
             or args.max_chunks is not None
@@ -241,6 +256,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 or args.sponsorblock is not None
                 or args.editorial_mode is not None
                 or args.mcp
+                or args.boundary_context_chars is not None
             ):
                 raise _invalid(
                     "--doctor permits provider, model, config selection, and --verbose."

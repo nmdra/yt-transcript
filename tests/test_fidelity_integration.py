@@ -13,6 +13,60 @@ SUMMARY = "## Summary\n\nThe small benchmark suggests a gain.\n\n## Key points\n
 
 
 @pytest.mark.parametrize("provider", ["pi", "openrouter"])
+@pytest.mark.parametrize("mode", ["standard", "focused"])
+def test_chapter_revisits_omissions_and_ambiguous_content_match(
+    provider, mode, monkeypatch
+):
+    from yt_transcript import openrouter_backend
+
+    cues = (
+        Cue(0, 1000, "Like and subscribe!"),
+        Cue(4000, 5000, "The vendor funded this technical demo. The sample is small."),
+        Cue(
+            1000, 2000, "This ambiguous sponsored demonstration explains quorum writes."
+        ),
+    )
+    sections = build_chapter_sections(
+        cues, (Chapter("Earlier", 0, 3000), Chapter("Later", 3000, 6000))
+    )
+    calls = []
+    monkeypatch.setattr(
+        formatter, "ensure_formatter", lambda p, m: "fake" if p == "pi" else None
+    )
+
+    def echo(request):
+        data = json.loads(request.source)
+        calls.append(data)
+        blocks = []
+        for run in data["runs"]:
+            text = " ".join(f["text"] for f in run["fragments"])
+            if mode == "focused" and text == "Like and subscribe!":
+                continue
+            blocks.append(run["heading"] + "\n\n" + text)
+        return "\n\n".join(blocks) if blocks else formatter.OMISSION_MARKER
+
+    monkeypatch.setattr(
+        formatter, "_run_pi_chunk", lambda executable, request: echo(request)
+    )
+    monkeypatch.setattr(
+        openrouter_backend, "complete", lambda request, settings=None: echo(request)
+    )
+    result = formatter.format_transcript(
+        " ".join(c.text for c in cues),
+        sections=sections,
+        chunk_chars=380,
+        provider=provider,
+        model="fake/model",
+        editorial_mode=mode,
+    )
+    assert result.count(sections[0].heading) == (1 if mode == "focused" else 2)
+    assert "vendor funded" in result and "sample is small" in result
+    assert "ambiguous sponsored demonstration" in result and "quorum writes" in result
+    assert ("Like and subscribe!" in result) == (mode == "standard")
+    assert [run["run_id"] for chunk in calls for run in chunk["runs"]] == [0, 1, 2]
+
+
+@pytest.mark.parametrize("provider", ["pi", "openrouter"])
 @pytest.mark.parametrize("repeats", [1, 80])
 def test_source_driven_summary_parity(provider, repeats, monkeypatch):
     from yt_transcript import openrouter_backend

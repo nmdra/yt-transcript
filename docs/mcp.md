@@ -108,10 +108,10 @@ The shared formatter targets 400–700 words, shorter for short sources.
 One source chunk uses one summary call; multiple chunks use factual notes plus one final synthesis call.
 The cap includes synthesis, so the default cap allows at most 19 source chunks when synthesis is needed.
 An infeasible note budget fails before model calls.
-No intermediate notes, partial summary, automatic retry, or fallback are returned.
+No intermediate notes, private source IDs, partial summary, automatic retry, or fallback are returned. Summary notes use strict same-call references and qualification arrays internally; valid references do not establish factual support.
 Summary quality and target length are not guaranteed.
 Descriptions stay outside model input, and metadata and the four result fields stay unchanged.
-Plain-text requests still return captions without Pi.
+Plain-text requests still return captions without an AI model. Read-only boundary context remains zero for MCP; there is no new caller or server setting for it.
 
 The total Markdown worker deadline defaults to 300 seconds.
 Set `mcp.markdown_timeout_seconds` to change this deadline (300–3600).
@@ -143,7 +143,7 @@ The server checks the cap before model calls.
 A formatting failure returns an error.
 The server never returns raw captions as a fallback or partial Markdown after a formatting failure.
 SponsorBlock fallback still keeps source captions before editing.
-Removal receipts describe source filtering, not later Pi deletions or summary omissions.
+Removal receipts describe source filtering, not later model deletions or summary omissions.
 Cancellation stops the supervised worker/model-helper group.
 MCP disables CLI terminal progress so stdout contains only JSON-RPC.
 
