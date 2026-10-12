@@ -90,6 +90,11 @@ max_output_tokens = 16384
 # Disable caching to fetch each time. Paging requires available cache storage.
 [cache]
 enabled = true
+# Default: empty string keeps the existing XDG_CACHE_HOME/HOME cache location.
+# Optional absolute SQLite database filename; ~ expands to the user home directory.
+# Use a dedicated private parent directory. Existing unsafe paths are rejected, not chmodded.
+# Example: path = "~/private/yt-transcript/transcripts.db"
+path = ""
 # Allowed: integer 1–168. Expiration is based on creation, not last access.
 ttl_hours = 24
 # Allowed: integer 10–500. MiB of retained payload; database files can be larger.

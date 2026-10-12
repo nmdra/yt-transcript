@@ -183,7 +183,7 @@ class WorkerRunner:
             and self.markdown_timeout_seconds is not None
             else self.timeout_seconds
         )
-        raw = json.dumps(request).encode("utf-8")
+        raw = json.dumps(request, ensure_ascii=False).encode("utf-8")
         if len(raw) > REQUEST_LIMIT:
             raise AppError(
                 ErrorInfo(

@@ -417,6 +417,7 @@ Default settings:
 ```toml
 [cache]
 enabled = true
+path = ""
 ttl_hours = 24
 max_size_mb = 50
 ```
@@ -427,8 +428,23 @@ The payload budget allows integers from 10 through 500 MiB.
 Physical SQLite files can be larger than that budget.
 Individual snapshots are limited to 5 MiB.
 
-If XDG_CACHE_HOME is absolute, the location is `$XDG_CACHE_HOME/yt-transcript/transcripts.db`.
-Otherwise, the location is `~/.cache/yt-transcript/transcripts.db`.
+Omitting `cache.path` or setting it to an empty string keeps the existing default location.
+If XDG_CACHE_HOME is absolute, the default is `$XDG_CACHE_HOME/yt-transcript/transcripts.db`.
+Otherwise, the default is `~/.cache/yt-transcript/transcripts.db`.
+To select a different SQLite database file, set an absolute filename in server TOML:
+
+```toml
+[cache]
+path = "~/private/yt-transcript/transcripts.db"
+```
+
+The wrapper expands `~` to the user home directory.
+Relative paths, control characters, and paths longer than 4,096 UTF-8 bytes are rejected.
+Use a dedicated private parent directory.
+Existing database files and SQLite sidecar files must also meet the privacy checks.
+Changing the path does not move or delete the old database.
+Restart the MCP server after changing the setting.
+There is no caller-controlled cache-path tool argument.
 On POSIX, the app directory and database use owner-only permissions.
 Unsafe existing paths are rejected.
 Source captions and descriptions are untrusted text stored locally.
@@ -447,7 +463,9 @@ Cache faults do not increase model calls or change the no-model default.
 Each Markdown request still calls the configured formatter.
 
 Before you clear saved source data, stop all yt-transcript servers.
-Delete only the app's `yt-transcript` cache directory, including its SQLite sidecar files.
+For the default location, delete only the app's `yt-transcript` cache directory, including its SQLite sidecar files.
+For a custom location, delete only the selected database and its `-journal`, `-wal`, and `-shm` files.
+Do not delete an entire custom parent directory unless it contains only this app's cache.
 Restart the server afterward.
 Keep unrelated cache directories and configuration files unchanged.
 

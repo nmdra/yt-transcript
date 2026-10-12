@@ -10,6 +10,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - Bounded `formatting.summary_synthesis_chars` setting for multi-chunk summary input, independent of source chunk size
+- Server-controlled `cache.path` configuration for the SQLite database, preserving the existing cache location by default
 
 ### Changed
 

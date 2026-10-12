@@ -2,6 +2,7 @@
 
 import os
 import tomllib
+import unicodedata
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ class CacheConfig:
     enabled: bool = True
     ttl_hours: int = 24
     max_size_mb: int = 50
+    path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,7 @@ def validate_cache_policy(value: object) -> CacheConfig:
         "enabled",
         "ttl_hours",
         "max_size_mb",
+        "path",
     }:
         raise invalid("cache")
     enabled = value.get("enabled", True)
@@ -77,7 +80,28 @@ def validate_cache_policy(value: object) -> CacheConfig:
         raise invalid("cache.ttl_hours")
     if type(size) is not int or not 10 <= size <= 500:
         raise invalid("cache.max_size_mb")
-    return CacheConfig(enabled, ttl, size)
+    path = value.get("path")
+    if path == "":
+        path = None
+    if path is not None:
+        if not isinstance(path, str) or any(
+            unicodedata.category(c) == "Cc" for c in path
+        ):
+            raise invalid("cache.path")
+        try:
+            expanded = Path(path).expanduser()
+            if (
+                not expanded.is_absolute()
+                or not expanded.name
+                or any(unicodedata.category(c) == "Cc" for c in str(expanded))
+                or len(path.encode("utf-8")) > 4096
+                or len(str(expanded).encode("utf-8")) > 4096
+            ):
+                raise invalid("cache.path")
+        except RuntimeError, UnicodeError, ValueError:
+            raise invalid("cache.path") from None
+        path = str(expanded)
+    return CacheConfig(enabled, ttl, size, path)
 
 
 def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfig:

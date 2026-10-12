@@ -103,6 +103,7 @@ The wrapper does not create configuration files.
 | `formatting.timeout_seconds` | Integer 1 through 3,600, per model call |
 | `formatting.max_chunks` | Integer 1 through 1,000, or omit for unlimited; includes summary synthesis |
 | `formatting.editorial_mode` | `standard` (default), `focused`, or `summarized` |
+| `cache.path` | Empty or omitted keeps the existing cache location; otherwise an absolute SQLite filename with optional `~` expansion; MCP only |
 | `mcp.markdown_timeout_seconds` | Integer 300 through 3,600; total MCP Markdown deadline, default 300; ignored by CLI |
 | `sponsorblock.enabled` | Optional boolean; unset means CLI off, MCP filtered on |
 | `sponsorblock.categories` | Nonempty unique list: `sponsor`, `selfpromo`, `interaction`, `intro`, `outro`, `preview` |
