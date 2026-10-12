@@ -31,6 +31,13 @@ class TerminalProgress:
         self._started = 0.0
         self._frame = 0
         self._width = 0
+        self._format_label = "Model calls via pi"
+
+    def set_provider(self, provider: str) -> None:
+        if provider not in {"pi", "openrouter"}:
+            raise ValueError("Invalid progress provider.")
+        with self._lock:
+            self._format_label = f"Model calls via {provider}"
 
     def stage(self, stage: Stage) -> None:
         if not self.enabled:
@@ -97,9 +104,12 @@ class TerminalProgress:
         if self._stage == "format" and self._total:
             filled = 16 * self._completed // self._total
             bar = "#" * filled + "-" * (16 - filled)
-            label = f"[{bar}] Model calls {self._completed}/{self._total}"
+            label = f"[{bar}] {self._format_label} {self._completed}/{self._total}"
         else:
-            label = f"{spinner} {LABELS[self._stage]}"
+            stage_label = (
+                self._format_label if self._stage == "format" else LABELS[self._stage]
+            )
+            label = f"{spinner} {stage_label}"
         text = f"{label} | {minutes:02}:{seconds:02} elapsed"
         try:
             available = self._line_width()

@@ -28,8 +28,8 @@ def test_terminal_spinner_bar_and_cleanup():
     progress.close()
     text = stream.getvalue()
     assert "Fetching captions / filtering" in text
-    assert "Model calls 0/3" in text and "Model calls 1/3" in text
-    assert "[################] Model calls 3/3" in text
+    assert "Model calls via pi 0/3" in text and "Model calls via pi 1/3" in text
+    assert "[################] Model calls via pi 3/3" in text
     assert "Writing output" in text and "elapsed" in text
     assert progress._thread is not None and not progress._thread.is_alive()
     assert progress._width == 0
@@ -133,3 +133,49 @@ def test_cli_failure_cleans_progress(monkeypatch, failure, code):
     monkeypatch.setattr(cli.sys, "stderr", stream)
     assert cli.main(["https://youtu.be/abcdefghijk", "--no-config"]) == code
     assert "elapsed" in stream.getvalue() and "error[" in stream.getvalue()
+
+
+@pytest.mark.parametrize("provider", ["pi", "openrouter"])
+def test_provider_label_in_spinner_and_count_bar(provider):
+    stream = io.StringIO()
+    progress = TerminalProgress(stream, enabled=True)
+    progress.set_provider(provider)
+    try:
+        progress.stage("format")
+        progress.chunks(1, 3)
+    finally:
+        progress.close()
+    assert f"Model calls via {provider}" in stream.getvalue()
+    assert f"Model calls via {provider} 1/3" in stream.getvalue()
+
+
+@pytest.mark.parametrize(
+    "saved,override,selected",
+    [
+        ("pi", "openrouter", "openrouter"),
+        ("openrouter", "pi", "pi"),
+        ("openrouter", None, "openrouter"),
+    ],
+)
+def test_cli_progress_uses_resolved_provider(
+    tmp_path, monkeypatch, saved, override, selected
+):
+    from yt_transcript import cli
+
+    config = tmp_path / "config.toml"
+    config.write_text(f'[formatting]\nprovider="{saved}"\nmodel="synthetic/model"\n')
+    stream = io.StringIO()
+    monkeypatch.setattr(stream, "isatty", lambda: True)
+    monkeypatch.setenv("TERM", "xterm")
+    monkeypatch.setattr(cli.sys, "stderr", stream)
+
+    def transcribe(args, config, progress):
+        progress.stage("format")
+        progress.chunks(1, 2)
+
+    monkeypatch.setattr(cli, "_transcribe", transcribe)
+    args = ["https://youtu.be/abcdefghijk", "--config", str(config)]
+    if override is not None:
+        args += ["--provider", override]
+    assert cli.main(args) == 0
+    assert f"Model calls via {selected} 1/2" in stream.getvalue()

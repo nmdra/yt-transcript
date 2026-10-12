@@ -320,6 +320,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     ) from None
                 raise
             return 0
+        progress.set_provider(config.provider)
         _transcribe(args, config, progress)
         return 0
     except AppError as exc:

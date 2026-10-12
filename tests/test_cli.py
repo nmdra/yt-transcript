@@ -220,8 +220,8 @@ def test_terminal_progress_stays_off_stdout(pipeline, monkeypatch, capsys):
     monkeypatch.setattr(formatter, "format_transcript", edit)
     assert main([URL, "--no-config"]) == 0
     assert capsys.readouterr().out == "## Edited\n\nhello world\n"
-    assert "Model calls 1/2" in stream.getvalue()
-    assert "Model calls 2/2" in stream.getvalue()
+    assert "Model calls via pi 1/2" in stream.getvalue()
+    assert "Model calls via pi 2/2" in stream.getvalue()
     assert "hello world" not in stream.getvalue()
 
 

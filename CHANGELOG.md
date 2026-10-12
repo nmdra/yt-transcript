@@ -15,6 +15,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 
 - Allocate summary notes against the separate synthesis budget and request compact JSON with a conservative response target, without retries or truncation
+- Show the selected Pi or OpenRouter backend in CLI model-call progress labels
 
 ### Fixed
 
