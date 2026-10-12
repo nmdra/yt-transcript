@@ -488,6 +488,7 @@ def create_server(config: AppConfig, *, runner: Runner | None = None):
                         provider=config.provider,
                         openrouter_max_output_tokens=config.openrouter.max_output_tokens,
                         chunk_chars=config.chunk_chars,
+                        summary_synthesis_chars=config.summary_synthesis_chars,
                         timeout_seconds=min(config.timeout_seconds, 120),
                         max_chunks=config.max_chunks or 20,
                         editorial_mode=config.editorial_mode,

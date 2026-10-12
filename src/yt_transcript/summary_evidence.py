@@ -18,6 +18,21 @@ class EvidenceLimitError(ValueError):
     """A source token or serialized evidence budget cannot fit."""
 
 
+class SummaryNotesError(ValueError):
+    """Fixed rejection category with locally measured character counts."""
+
+    def __init__(
+        self,
+        reason: str,
+        actual_chars: int | None = None,
+        allowed_chars: int | None = None,
+    ):
+        super().__init__(reason)
+        self.reason = reason
+        self.actual_chars = actual_chars
+        self.allowed_chars = allowed_chars
+
+
 @dataclass(frozen=True)
 class SpanOrigin:
     source_index: int | None = None
@@ -69,6 +84,7 @@ class EvidenceFormattingPlan:
     id_prefix: str
     within_cap: bool
     synthesis_required: bool
+    summary_note_chars: int | None = None
 
     @property
     def character_counts(self) -> tuple[int, ...]:
@@ -279,12 +295,15 @@ class SummaryClaim:
 
 def parse_claims(raw: str, supplied_ids: Sequence[str]) -> tuple[SummaryClaim, ...]:
     """Reject invalid schema and cross-call references without repairing output."""
-    value = strict_json_loads(raw)
+    try:
+        value = strict_json_loads(raw)
+    except ValueError, TypeError, RecursionError:
+        raise SummaryNotesError("invalid_json") from None
     if not isinstance(value, dict) or set(value) != {"claims"}:
-        raise ValueError("Invalid summary claims.")
+        raise SummaryNotesError("invalid_schema")
     claims = value["claims"]
     if not isinstance(claims, list) or len(claims) > 64:
-        raise ValueError("Invalid summary claims.")
+        raise SummaryNotesError("invalid_schema")
     allowed = set(supplied_ids)
     result = []
     for claim in claims:
@@ -293,28 +312,28 @@ def parse_claims(raw: str, supplied_ids: Sequence[str]) -> tuple[SummaryClaim, .
             "source_ids",
             "qualifications",
         }:
-            raise ValueError("Invalid summary claim.")
+            raise SummaryNotesError("invalid_schema")
         statement, ids, qualifications = (
             claim["statement"],
             claim["source_ids"],
             claim["qualifications"],
         )
         if not isinstance(statement, str) or not statement.strip():
-            raise ValueError("Invalid summary statement.")
+            raise SummaryNotesError("invalid_schema")
         if (
             not isinstance(ids, list)
             or not 1 <= len(ids) <= 16
             or any(not isinstance(i, str) for i in ids)
         ):
-            raise ValueError("Invalid summary references.")
+            raise SummaryNotesError("invalid_schema")
         if len(set(ids)) != len(ids) or set(ids) - allowed:
-            raise ValueError("Unknown or duplicate summary reference.")
+            raise SummaryNotesError("invalid_reference")
         if (
             not isinstance(qualifications, list)
             or len(qualifications) > 16
             or any(not isinstance(q, str) for q in qualifications)
         ):
-            raise ValueError("Invalid summary qualifications.")
+            raise SummaryNotesError("invalid_schema")
         result.append(SummaryClaim(statement, tuple(ids), tuple(qualifications)))
     return tuple(result)
 
@@ -349,8 +368,11 @@ def bounded_claims(
 ) -> tuple[SummaryClaim, ...]:
     empty_size = len(serialize(claims_payload([])))
     if len(raw) > capacity + empty_size:
-        raise ValueError("Summary notes exceed budget.")
+        raise SummaryNotesError("raw_budget", len(raw), capacity + empty_size)
     claims = parse_claims(raw, supplied_ids)
-    if len(serialize(claims_payload(claims))) - empty_size > capacity:
-        raise ValueError("Summary notes exceed budget.")
+    compact_size = len(serialize(claims_payload(claims)))
+    if compact_size - empty_size > capacity:
+        raise SummaryNotesError(
+            "serialized_budget", compact_size, capacity + empty_size
+        )
     return claims

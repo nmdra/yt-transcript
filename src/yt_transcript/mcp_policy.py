@@ -12,12 +12,14 @@ class MCPFormattingPolicy:
     editorial_mode: str = "standard"
     provider: str = "pi"
     openrouter_max_output_tokens: int = 16384
+    summary_synthesis_chars: int = 50000
 
 
 def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
     if not isinstance(value, dict) or set(value) != {
         "model",
         "chunk_chars",
+        "summary_synthesis_chars",
         "timeout_seconds",
         "max_chunks",
         "editorial_mode",
@@ -27,6 +29,7 @@ def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
         raise ValueError("Invalid MCP formatting policy.")
     for key, lower, upper in (
         ("chunk_chars", 1000, 50000),
+        ("summary_synthesis_chars", 1000, 500000),
         ("timeout_seconds", 1, 120),
         ("max_chunks", 1, 1000),
         ("openrouter_max_output_tokens", 1, 131072),

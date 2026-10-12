@@ -95,7 +95,8 @@ Model fidelity is not guaranteed.
 MCP Markdown currently requires POSIX process supervision.
 If server TOML does not supply `formatting.model`, Pi uses its configured default model.
 OpenRouter always requires an explicit model.
-Server `formatting.chunk_chars` and `formatting.editorial_mode` apply.
+Server `formatting.chunk_chars`, `formatting.summary_synthesis_chars`, and `formatting.editorial_mode` apply.
+These settings do not add caller-controlled tool arguments.
 `formatting.max_chunks` is finite and defaults to 20 when omitted.
 `formatting.timeout_seconds` is limited to 120 seconds per call.
 
@@ -104,6 +105,7 @@ For a whole-video summary, use server TOML:
 ```toml
 [formatting]
 editorial_mode = "summarized"
+summary_synthesis_chars = 50000
 max_chunks = 20
 ```
 
@@ -116,6 +118,10 @@ One source chunk uses one summary call.
 Multiple chunks use factual notes plus one final synthesis call.
 The cap includes synthesis.
 If synthesis is needed, the default cap allows at most 19 source chunks.
+Source chunks use `formatting.chunk_chars`.
+The final notes envelope uses `formatting.summary_synthesis_chars`, default 50,000 characters, allowed range 1,000 through 500,000.
+Both settings count characters, not tokens, and do not guarantee model context compatibility.
+The notes prompt requests compact JSON and targets 75% of each allocated hard response limit.
 An infeasible note budget fails before model calls.
 The server returns no intermediate notes, private source IDs, partial summary, automatic retry, or fallback.
 Summary notes use strict references from the same call and qualification arrays internally.

@@ -155,7 +155,7 @@ def test_multiple_chunks_produce_bounded_notes_then_one_summary(tmp_path, monkey
             for index, note in enumerate(notes, 1)
         ]
     }
-    assert len(inputs[-1]) <= 2000
+    assert len(inputs[-1]) <= 50000
     assert len(calls) == plan.call_count
     assert progress == [(n, plan.call_count) for n in range(plan.call_count + 1)]
     assert "notes" in calls[0][0][-1]
@@ -193,6 +193,7 @@ def test_summary_note_budget_is_checked_before_launch(monkeypatch):
             "word " * 10000,
             editorial_mode="summarized",
             chunk_chars=2000,
+            summary_synthesis_chars=2000,
         )
     assert exc.value.info.code == "PI_CONTEXT_LIMIT"
 
@@ -379,7 +380,12 @@ def test_summary_notes_fill_but_never_exceed_synthesis_budget(tmp_path, monkeypa
         notes[index] = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     calls, record = summary_pi(tmp_path, monkeypatch, [*notes, SUMMARY])
     assert (
-        formatter.format_with_pi(SOURCE, editorial_mode="summarized", chunk_chars=2000)
+        formatter.format_with_pi(
+            SOURCE,
+            editorial_mode="summarized",
+            chunk_chars=2000,
+            summary_synthesis_chars=2000,
+        )
         == SUMMARY
     )
     payload = json.loads(record.read_text().splitlines()[-1])

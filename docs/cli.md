@@ -74,6 +74,7 @@ verbose = false
 
 [formatting]
 chunk_chars = 12000
+summary_synthesis_chars = 50000
 timeout_seconds = 600
 editorial_mode = "standard"  # "standard", "focused", or "summarized"
 # max_chunks = 20
@@ -97,7 +98,8 @@ The wrapper does not create configuration files.
 | `formatting.provider` | `pi` (default) or `openrouter` |
 | `openrouter.max_output_tokens` | Integer 1 through 131072; default 16384 |
 | `formatting.model` | Nonempty selector string, or omit the key |
-| `formatting.chunk_chars` | Integer 1,000 through 50,000 |
+| `formatting.chunk_chars` | Integer 1,000 through 50,000; default 12,000; source input limit |
+| `formatting.summary_synthesis_chars` | Integer 1,000 through 500,000; default 50,000; multi-chunk summary synthesis input limit |
 | `formatting.timeout_seconds` | Integer 1 through 3,600, per model call |
 | `formatting.max_chunks` | Integer 1 through 1,000, or omit for unlimited; includes summary synthesis |
 | `formatting.editorial_mode` | `standard` (default), `focused`, or `summarized` |
@@ -108,6 +110,8 @@ The wrapper does not create configuration files.
 
 `--raw`, `--raw-vtt`, `--model`, `--max-chunks`, and `-v` override their corresponding defaults.
 There is no `--markdown` or `--quiet` flag.
+Set `chunk_chars` and `summary_synthesis_chars` in `[formatting]` in TOML.
+There is no `--chunk-chars` or `--summary-synthesis-chars` flag.
 
 After schema checks, raw modes ignore saved formatting preferences.
 An explicit model, chunk cap, or editorial-mode flag conflicts with raw output.
@@ -191,7 +195,10 @@ For example, three input chunks require a cap of at least four.
 Notes are strict private claims objects with source IDs from the same call and qualification arrays.
 Per-chunk budgets include schema and ID framing and JSON escaping.
 After minimum claim framing, at least 256 usable serialized characters must remain.
-The final synthesis input must fit `formatting.chunk_chars`.
+Source chunks must fit `formatting.chunk_chars`.
+The complete final notes envelope must fit the independent `formatting.summary_synthesis_chars` limit.
+The notes prompt requests compact JSON and targets 75% of each allocated hard response limit.
+The hard limit still applies to the raw response and the compact serialized claims.
 An infeasible note budget fails with `PI_CONTEXT_LIMIT` or `OPENROUTER_CONTEXT_LIMIT` before model calls.
 Oversized or invalid notes cause failure without truncation, a repair call, or a partial summary.
 If all evidence is empty, processing fails before synthesis.
@@ -200,6 +207,9 @@ Valid references do not prove factual support or complete caveats.
 Small chunks can create too many notes for one bounded synthesis input.
 Use preview to check the plan.
 A larger cap alone does not solve this input limit.
+Increase `formatting.summary_synthesis_chars` only when the selected model supports the larger request.
+The setting counts characters, not model tokens, and does not include instructions or the output allowance.
+It does not extend any deadline or guarantee valid notes.
 
 All modes keep the existing isolation, per-call timeout, metadata, and atomic file-output rules.
 Raw modes and MCP plain text do not summarize.
@@ -252,12 +262,15 @@ Preview shows these fields in a fixed order:
 5. Removed cue count
 6. Planned formatter invocations
 7. Largest serialized source chunk size
-8. Configured chunk limit
-9. Maximum chunks
-10. Cap result
-11. Provider
-12. Model selection
-13. Editorial mode
+8. Configured source chunk limit
+9. Configured summary synthesis limit
+10. Planned synthesis invocations
+11. Summary notes hard output limit, or `not applicable`
+12. Maximum chunks
+13. Cap result
+14. Provider
+15. Model selection
+16. Editorial mode
 
 Preview requires Markdown mode and no output path.
 If the plan exceeds the cap, preview still returns a successful report.

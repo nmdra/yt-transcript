@@ -24,6 +24,7 @@ def payload():
         "formatting": {
             "model": None,
             "chunk_chars": 12000,
+            "summary_synthesis_chars": 50000,
             "timeout_seconds": 120,
             "max_chunks": 3,
             "editorial_mode": "standard",

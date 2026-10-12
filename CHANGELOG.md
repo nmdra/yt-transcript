@@ -7,6 +7,18 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Bounded `formatting.summary_synthesis_chars` setting for multi-chunk summary input, independent of source chunk size
+
+### Changed
+
+- Allocate summary notes against the separate synthesis budget and request compact JSON with a conservative response target, without retries or truncation
+
+### Fixed
+
+- Identify summary validation stages and reasons with safe character counts instead of describing invalid JSON notes as a Markdown failure
+
 ## [1.0.0] - 2026-10-12
 
 ### Added

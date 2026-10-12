@@ -8,7 +8,8 @@ Pi receives cleaned text through stdin.
 With chapter or SponsorBlock boundary context, stdin contains JSON with applicable titles, times, annotations, and retained text.
 Each retained source word belongs to one current chunk in the plan.
 Optional read-only boundary context can repeat neighboring words as context, not as text that owns output.
-The complete serialized input counts toward the chunk limit.
+The complete serialized source input counts toward the source chunk limit.
+Multi-chunk summary synthesis uses a separate limit described below.
 Context overhead can increase the number of calls.
 Pi receives neither YAML nor the upstream metadata dictionary.
 
@@ -136,10 +137,20 @@ A single source chunk goes directly to one summary call.
 For multiple chunks, Python plans factual-note calls and one final synthesis call.
 The existing invocation cap includes synthesis.
 The existing per-call and MCP total deadlines still apply.
-Each note has a bounded serialized character budget.
+Source chunks use `formatting.chunk_chars`.
+Multi-chunk summaries use `formatting.summary_synthesis_chars` for the complete final notes envelope.
+The synthesis limit defaults to 50,000 characters and allows integers from 1,000 through 500,000.
+Python divides that limit among note calls after reserving JSON framing.
+The notes prompt requests compact JSON and targets 75% of each hard response limit to leave space for estimation errors.
+This prompt target is not a deterministic guarantee.
 Python rejects impossible budgets before model calls and rejects oversized notes without truncation.
-The final synthesis input fits the configured stdin character limit.
+The final synthesis input must fit the separate synthesis limit.
+Both settings count characters, not tokens, and exclude model instructions.
+A model must support the complete request and its output allowance.
+Character budgets do not override the existing UTF-8 transport and completion-size limits.
+Larger budgets can increase latency and cost or exceed the selected model's context window.
 Notes use independent backend calls.
+Completed note calls can incur charges even if synthesis later fails.
 Only the final synthesis call receives them as validated private evidence objects.
 They are never published as transcript output.
 

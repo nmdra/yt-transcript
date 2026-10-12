@@ -29,12 +29,13 @@ Verbose mode uses only allowlisted diagnostic fields.
 | `PI_CONTEXT_LIMIT`, `PI_OUTPUT_INCOMPLETE` | Smaller chunks or a suitable model can help. Smaller chunks increase calls and delay. Use CLI `--raw` or MCP `output_format="plain_text"` to avoid Pi. |
 | `PI_CONTEXT_MUTATED` | Pi attempted compaction or context changes. Complete formatting cannot be verified. Review Pi/model compatibility or request plain text. Do not accept summarized source as a complete transcript. |
 | `PI_TIMEOUT`, `PI_ABORTED`, `PI_FAILED` | Check provider/model setup or use deterministic output. |
-| `PI_PROTOCOL_INVALID`, `PI_OUTPUT_INVALID`, `PI_OUTPUT_LIMIT` | Check compatible Pi setup. The tool discards buffered output. |
+| `PI_PROTOCOL_INVALID`, `PI_OUTPUT_LIMIT` | Check compatible Pi setup. The tool discards buffered output. |
+| `PI_OUTPUT_INVALID` | Review the safe summary validation stage and reason when present. Invalid notes can be a JSON, schema, source-reference, or character-budget failure, not a Markdown failure. |
 | `OPENROUTER_NOT_CONFIGURED` | Set an explicit model and OPENROUTER_API_KEY in the environment. No Pi is required. |
 | `OPENROUTER_AUTH_FAILED` | Review permitted authentication/access. A 403 can also be a guardrail rejection. |
 | `OPENROUTER_LIMITED` | Review rate, credit, and budget limits. No automatic retry occurs. |
 | `OPENROUTER_FAILED` | Review network/TLS access and model availability. The tool does not expose raw HTTP error bodies. |
-| `OPENROUTER_OUTPUT_INVALID`, `OPENROUTER_OUTPUT_INCOMPLETE` | The tool discarded output. Review model/token limits, or explicitly request raw/plain text. |
+| `OPENROUTER_OUTPUT_INVALID`, `OPENROUTER_OUTPUT_INCOMPLETE` | The tool discarded output. Review safe summary validation details when present, and review model/token limits. Or explicitly request raw/plain text. |
 | `OPENROUTER_TIMEOUT`, `OPENROUTER_CONTEXT_LIMIT` | Review formatting.chunk_chars, per-call limits, and the model. Completion and billing cancellation are not guaranteed. |
 | `CHUNK_LIMIT_EXCEEDED` | Preview the plan or explicitly change the cap. The tool does not truncate text. |
 | `OUTPUT_EXISTS`, `OUTPUT_FAILED` | Select a usable path. Check filesystem support. |
@@ -46,6 +47,37 @@ CLI suggests `--raw`.
 MCP suggests `output_format="plain_text"`.
 The tool returns no partial document or automatic fallback.
 If the failing chunk is known, MCP errors show that chunk.
+
+## Summary note budget failures
+
+A single source chunk produces Markdown directly.
+Multiple source chunks produce private JSON notes before the final synthesis call.
+An early `PI_OUTPUT_INVALID` or `OPENROUTER_OUTPUT_INVALID` can therefore mean that notes failed validation.
+A successful short-video summary does not test the multi-chunk notes path.
+
+`formatting.chunk_chars` limits each source input.
+`formatting.summary_synthesis_chars` independently limits the complete final notes envelope.
+Python divides the synthesis budget among source-note calls, including JSON framing.
+Safe budget diagnostics report actual and allowed character counts, not response text.
+A large model context window does not override these application limits.
+
+Set both limits in `[formatting]` in TOML, not with `--chunk-chars`:
+
+```toml
+[formatting]
+chunk_chars = 30000
+summary_synthesis_chars = 50000
+```
+
+The synthesis setting allows integers from 1,000 through 500,000 and defaults to 50,000.
+Larger synthesis budgets require a model that supports the full request, instructions, and output allowance.
+Both settings count characters, not tokens.
+Smaller source chunks can increase calls and reduce the notes budget per call.
+Increasing `max_chunks` alone does not increase note capacity.
+The wrapper does not retry, repair, or truncate oversized notes.
+A manual retry can incur new charges.
+
+## Plain-text recovery
 
 A new MCP plain-text request can reuse a valid source snapshot from the shared cache when the video and resolved mode/SponsorBlock policy match.
 It fetches captions again if the cache is disabled or unavailable, or if no valid matching snapshot remains, including after expiry or eviction.

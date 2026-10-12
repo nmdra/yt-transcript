@@ -38,10 +38,18 @@ provider = "pi"
 editorial_mode = "standard"
 
 # Default: 12000. Allowed: integers from 1000 through 50000.
-# Maximum stdin payload characters, including chapter/segment or summary-note JSON framing.
+# Maximum source payload characters, including chapter/segment or summary-source JSON framing.
 # This is not a token/context-window limit.
 # Smaller values usually increase invocation count, latency, and possible cost.
 chunk_chars = 12000
+
+# Default: 50000. Allowed: integers from 1000 through 500000.
+# Multi-chunk summarized mode only: maximum synthesis input characters, including JSON framing.
+# Independent of source chunk_chars; also determines each chunk's hard factual-note allocation.
+# Single-chunk summaries and standard/focused modes do not use this allowance.
+# This is not a token limit. Select a model with enough context for this input and prompts.
+# Larger values do not guarantee model compliance; insufficient capacity fails before model calls.
+summary_synthesis_chars = 50000
 
 # Default: 600. Allowed: integers from 1 through 3600.
 # Deadline in seconds for each model invocation, not for the complete transcript.

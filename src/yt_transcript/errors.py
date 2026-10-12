@@ -24,6 +24,89 @@ class ErrorInfo:
     retryable: bool = False
     chunk_index: int | None = None
     chunk_total: int | None = None
+    summary_diagnostic: dict[str, Any] | None = None
+
+
+def validate_summary_diagnostic(value: object) -> dict[str, Any] | None:
+    """Accept only fixed summary stages/reasons and bounded local counts."""
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != {
+        "stage",
+        "reason",
+        "actual_chars",
+        "allowed_chars",
+    }:
+        raise ValueError("Invalid summary diagnostic")
+    pairs = {
+        "notes": {
+            "raw_budget",
+            "serialized_budget",
+            "invalid_json",
+            "invalid_schema",
+            "invalid_reference",
+        },
+        "synthesis": {"capacity", "payload_budget"},
+    }
+    stage, reason = value["stage"], value["reason"]
+    if (
+        not isinstance(stage, str)
+        or stage not in pairs
+        or not isinstance(reason, str)
+        or reason not in pairs[stage]
+    ):
+        raise ValueError("Invalid summary diagnostic")
+    counts = (value["actual_chars"], value["allowed_chars"])
+    if reason in {"raw_budget", "serialized_budget", "payload_budget"}:
+        if (
+            any(type(n) is not int or not 0 <= n <= 1048576 for n in counts)
+            or counts[0] <= counts[1]
+        ):
+            raise ValueError("Invalid summary diagnostic counts")
+    elif counts != (None, None):
+        raise ValueError("Invalid summary diagnostic counts")
+    return dict(value)
+
+
+def _summary_hint(diagnostic: dict[str, Any]) -> str:
+    if diagnostic["reason"] in {
+        "raw_budget",
+        "serialized_budget",
+        "capacity",
+        "payload_budget",
+    }:
+        return "Review formatting.summary_synthesis_chars and select a model with enough context for the synthesis input and prompts, or use --raw."
+    return "The model must return strict JSON notes with the required schema and only source IDs supplied in the same call, or use --raw."
+
+
+def summary_failure(
+    stage: str,
+    reason: str,
+    *,
+    actual_chars: int | None = None,
+    allowed_chars: int | None = None,
+    context: bool = False,
+) -> FormattingError:
+    diagnostic = validate_summary_diagnostic(
+        {
+            "stage": stage,
+            "reason": reason,
+            "actual_chars": actual_chars,
+            "allowed_chars": allowed_chars,
+        }
+    )
+    exc = classify_pi_failure(
+        code="PI_CONTEXT_LIMIT" if context else "PI_OUTPUT_INVALID"
+    )
+    exc.info = replace(
+        exc.info,
+        message="Summary synthesis capacity is insufficient."
+        if context
+        else "The formatter returned invalid summary notes.",
+        summary_diagnostic=diagnostic,
+        hint=_summary_hint(diagnostic) if diagnostic is not None else exc.info.hint,
+    )
+    return exc
 
 
 class AppError(Exception):
@@ -276,10 +359,23 @@ def translate_formatting_error(exc: FormattingError, provider: str) -> Formattin
     }
     if provider == "openrouter" and exc.info.code in mapping:
         safe = classify_openrouter_failure(mapping[exc.info.code])
+        diagnostic = validate_summary_diagnostic(exc.info.summary_diagnostic)
+        message = safe.info.message
+        if diagnostic is not None:
+            message = (
+                "Summary synthesis capacity is insufficient."
+                if diagnostic["stage"] == "synthesis"
+                else "The formatter returned invalid summary notes."
+            )
         safe.info = replace(
             safe.info,
+            message=message,
+            hint=_summary_hint(diagnostic)
+            if diagnostic is not None
+            else safe.info.hint,
             chunk_index=exc.info.chunk_index,
             chunk_total=exc.info.chunk_total,
+            summary_diagnostic=exc.info.summary_diagnostic,
         )
         return safe
     return exc
@@ -315,12 +411,27 @@ def _is_formatting_failure(code: str) -> bool:
     return code.startswith(("PI_", "OPENROUTER_")) or code == "CHUNK_LIMIT_EXCEEDED"
 
 
+def _summary_diagnostic_text(info: ErrorInfo) -> str:
+    try:
+        diagnostic = validate_summary_diagnostic(info.summary_diagnostic)
+    except ValueError:
+        return ""
+    if diagnostic is None:
+        return ""
+    return " ".join(
+        f"{key}={value}" for key, value in diagnostic.items() if value is not None
+    )
+
+
 def render_cli_error(exc: AppError) -> str:
     info = exc.info
     position = (
         f" (chunk {info.chunk_index}/{info.chunk_total})" if info.chunk_index else ""
     )
     result = f"error[{info.code}]: {info.message}{position}\n"
+    detail = _summary_diagnostic_text(info)
+    if detail:
+        result += f"diagnostic: {detail}\n"
     if info.hint:
         result += f"hint: {info.hint}\n"
     if _is_formatting_failure(info.code):
@@ -346,6 +457,9 @@ def render_mcp_error(info: ErrorInfo) -> str:
         message = message.split("; use --preview", 1)[0]
         hint = 'Raise server formatting.max_chunks explicitly, or request output_format="plain_text".'
     result = f"[{info.code}] {message}{position}" + (f"; hint: {hint}" if hint else "")
+    detail = _summary_diagnostic_text(info)
+    if detail:
+        result += f"; diagnostic: {detail}"
     if formatting_failure:
         result += '; warning: No model-processed transcript was returned. Retry get_transcript with output_format="plain_text" for plain text without an AI model.'
     elif info.code == "MCP_TIMEOUT":
@@ -423,6 +537,18 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         else None
     )
     code = payload["code"]
+    diagnostic = validate_summary_diagnostic(payload["summary_diagnostic"])
+    if diagnostic is not None and code not in {
+        "PI_OUTPUT_INVALID",
+        "PI_CONTEXT_LIMIT",
+        "OPENROUTER_OUTPUT_INVALID",
+        "OPENROUTER_CONTEXT_LIMIT",
+    }:
+        raise ValueError("Invalid summary diagnostic code")
+    if diagnostic is not None and (diagnostic["stage"] == "synthesis") != code.endswith(
+        "CONTEXT_LIMIT"
+    ):
+        raise ValueError("Invalid summary diagnostic stage")
     if _is_formatting_failure(code):
         safe = (
             classify_openrouter_failure(code)
@@ -444,6 +570,13 @@ def decode_worker_error(payload: object) -> ErrorInfo:
                 else:
                     if cap <= 1000 and cap < required <= 100000:
                         message = payload["message"]
+    if diagnostic is not None:
+        hint = _summary_hint(diagnostic)
+        message = (
+            "Summary synthesis capacity is insufficient."
+            if diagnostic["stage"] == "synthesis"
+            else "The formatter returned invalid summary notes."
+        )
     return ErrorInfo(
         code,
         message,
@@ -452,6 +585,7 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         payload["retryable"],
         payload["chunk_index"],
         payload["chunk_total"],
+        diagnostic,
     )
 
 
@@ -487,4 +621,7 @@ def render_diagnostics(exc: AppError, **fields: Any) -> str:
     value = fields.get("errno")
     if type(value) is int and value in errno.errorcode:
         safe["errno"] = errno.errorcode[value]
+    detail = _summary_diagnostic_text(exc.info)
+    if detail:
+        safe["summary"] = detail
     return "diagnostic: " + " ".join(f"{k}={v}" for k, v in safe.items()) + "\n"

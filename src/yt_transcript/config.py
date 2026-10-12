@@ -41,6 +41,7 @@ class AppConfig:
     provider: str = "pi"
     openrouter: OpenRouterConfig = OpenRouterConfig()
     cache: CacheConfig = CacheConfig()
+    summary_synthesis_chars: int = 50000
 
 
 def default_config_path() -> Path:
@@ -123,6 +124,7 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
                 "provider",
                 "model",
                 "chunk_chars",
+                "summary_synthesis_chars",
                 "timeout_seconds",
                 "max_chunks",
                 "editorial_mode",
@@ -156,6 +158,7 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
             else:
                 lo, hi = {
                     "chunk_chars": (1000, 50000),
+                    "summary_synthesis_chars": (1000, 500000),
                     "timeout_seconds": (1, 3600),
                     "max_chunks": (1, 1000),
                 }[key]

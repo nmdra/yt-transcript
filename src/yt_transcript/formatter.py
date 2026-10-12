@@ -16,12 +16,18 @@ from typing import Any
 
 from .chapters import ChapterSection
 from .config import OpenRouterConfig
-from .errors import FormattingError, classify_pi_failure, translate_formatting_error
+from .errors import (
+    FormattingError,
+    classify_pi_failure,
+    summary_failure,
+    translate_formatting_error,
+)
 from .pi_events import PiEventParser
 from .sponsorblock import AnnotatedCue
 from .summary_evidence import (
     EvidenceFormattingPlan,
     EvidenceLimitError,
+    SummaryNotesError,
     bounded_claims,
     claims_payload,
     note_capacity,
@@ -433,6 +439,7 @@ def plan_transcript_formatting(
     *,
     sections: tuple[ChapterSection, ...] | None = None,
     chunk_chars: int = 12000,
+    summary_synthesis_chars: int = 50000,
     max_chunks: int | None = None,
     editorial_mode: str = "standard",
     provider: str = "pi",
@@ -443,6 +450,11 @@ def plan_transcript_formatting(
     try:
         get_editorial_prompt(editorial_mode)
         _validate_boundary_context(boundary_context_chars)
+        if (
+            type(summary_synthesis_chars) is not int
+            or not 1000 <= summary_synthesis_chars <= 500000
+        ):
+            raise ValueError("Invalid summary synthesis budget.")
         if editorial_mode == "summarized" and boundary_context_chars:
             raise ValueError("Boundary context requires standard or focused mode.")
         if editorial_mode == "summarized":
@@ -456,14 +468,17 @@ def plan_transcript_formatting(
             except EvidenceLimitError:
                 raise classify_pi_failure(code="PI_CONTEXT_LIMIT") from None
             if evidence.synthesis_required and evidence.within_cap:
-                _summary_note_limit(
+                capacity = _summary_note_limit(
                     len(evidence.chunks),
-                    chunk_chars,
+                    summary_synthesis_chars,
                     source_id_chars=max(
                         len(s.source_id)
                         for spans in evidence.source_spans
                         for s in spans
                     ),
+                )
+                evidence = replace(
+                    evidence, summary_note_chars=capacity + len('{"claims":[]}')
                 )
             return evidence
         contextual = sections and any(
@@ -656,7 +671,9 @@ def _build_chunk_request(
             instruction = (
                 f"Extract factual notes from source chunk {index} for whole-video synthesis. "
                 f"Use at most {summary_note_chars} serialized JSON characters, including all framing. "
-                "Return only the claims JSON object; count all schema fields, IDs, and escaped text in the budget."
+                f"Aim for at most {summary_note_chars * 3 // 4 if summary_note_chars is not None else 0} characters as a conservative soft target. "
+                "Return only the claims JSON object, using compact JSON without unnecessary whitespace; count all schema fields, IDs, and escaped text in the hard budget. "
+                "Prioritize essential claims while preserving their qualifications, uncertainty, and safety or bias disclosures."
             )
         elif summary_stage == "synthesis":
             prompt += (
@@ -721,10 +738,12 @@ def _run_chunk(
     if provider == "openrouter":
         from .openrouter_backend import complete
 
-        return validate_chunk_body(complete(request, openrouter))
+        result = complete(request, openrouter)
+        return result if summary_stage == "notes" else validate_chunk_body(result)
     if provider != "pi" or executable is None:
         raise ValueError("Unsupported formatting provider.")
-    return validate_chunk_body(_run_pi_chunk(executable, request))
+    result = _run_pi_chunk(executable, request)
+    return result if summary_stage == "notes" else validate_chunk_body(result)
 
 
 def _run_pi_chunk(executable: str, request: ChunkRequest) -> str:
@@ -844,7 +863,7 @@ def _summary_note_limit(
     try:
         return note_capacity(chunk_count, chunk_chars, source_id_chars=source_id_chars)
     except EvidenceLimitError:
-        raise classify_pi_failure(code="PI_CONTEXT_LIMIT") from None
+        raise summary_failure("synthesis", "capacity", context=True) from None
 
 
 def _validate_summary_output(result: str, *, final: bool) -> None:
@@ -871,6 +890,7 @@ def _summarize_transcript(
     plan: EvidenceFormattingPlan,
     *,
     chunk_chars: int,
+    summary_synthesis_chars: int,
     model: str | None,
     timeout_seconds: int,
     own_process_group: bool,
@@ -884,7 +904,7 @@ def _summarize_transcript(
     note_limit = (
         _summary_note_limit(
             len(plan.chunks),
-            chunk_chars,
+            summary_synthesis_chars,
             source_id_chars=max(
                 len(s.source_id) for spans in plan.source_spans for s in spans
             ),
@@ -902,8 +922,16 @@ def _summarize_transcript(
         try:
             if synthesis and not any(note["claims"] for note in notes):
                 raise classify_pi_failure(code="PI_OUTPUT_INVALID")
-            if len(payload) > chunk_chars:
+            if not synthesis and len(payload) > chunk_chars:
                 raise classify_pi_failure(code="PI_CONTEXT_LIMIT")
+            if synthesis and len(payload) > summary_synthesis_chars:
+                raise summary_failure(
+                    "synthesis",
+                    "payload_budget",
+                    actual_chars=len(payload),
+                    allowed_chars=summary_synthesis_chars,
+                    context=True,
+                )
             result = _run_chunk(
                 executable,
                 payload,
@@ -938,8 +966,13 @@ def _summarize_transcript(
                         [s.source_id for s in plan.source_spans[index - 1]],
                         note_limit,
                     )
-                except ValueError, TypeError:
-                    raise classify_pi_failure(code="PI_OUTPUT_INVALID") from None
+                except SummaryNotesError as exc:
+                    raise summary_failure(
+                        "notes",
+                        exc.reason,
+                        actual_chars=exc.actual_chars,
+                        allowed_chars=exc.allowed_chars,
+                    ) from None
                 notes.append({"chunk_index": index, **claims_payload(claims)})
         except FormattingError as exc:
             exc.info = replace(exc.info, chunk_index=index, chunk_total=total)
@@ -956,6 +989,7 @@ def _format_transcript(
     provider: str = "pi",
     openrouter: OpenRouterConfig | None = None,
     chunk_chars: int = 12000,
+    summary_synthesis_chars: int = 50000,
     timeout_seconds: int = 600,
     max_chunks: int | None = None,
     sections: tuple[ChapterSection, ...] | None = None,
@@ -969,6 +1003,7 @@ def _format_transcript(
         transcript,
         sections=sections,
         chunk_chars=chunk_chars,
+        summary_synthesis_chars=summary_synthesis_chars,
         max_chunks=max_chunks,
         editorial_mode=editorial_mode,
         boundary_context_chars=boundary_context_chars,
@@ -988,6 +1023,7 @@ def _format_transcript(
             executable,
             plan,
             chunk_chars=chunk_chars,
+            summary_synthesis_chars=summary_synthesis_chars,
             model=model,
             timeout_seconds=timeout_seconds,
             own_process_group=own_process_group,
@@ -1076,6 +1112,7 @@ def format_transcript(
     provider: str = "pi",
     openrouter: OpenRouterConfig | None = None,
     chunk_chars: int = 12000,
+    summary_synthesis_chars: int = 50000,
     timeout_seconds: int = 600,
     max_chunks: int | None = None,
     sections: tuple[ChapterSection, ...] | None = None,
@@ -1091,6 +1128,7 @@ def format_transcript(
             provider=provider,
             openrouter=openrouter,
             chunk_chars=chunk_chars,
+            summary_synthesis_chars=summary_synthesis_chars,
             timeout_seconds=timeout_seconds,
             max_chunks=max_chunks,
             sections=sections,
@@ -1108,6 +1146,7 @@ def format_with_pi(
     model: str | None = None,
     *,
     chunk_chars: int = 12000,
+    summary_synthesis_chars: int = 50000,
     timeout_seconds: int = 600,
     max_chunks: int | None = None,
     sections: tuple[ChapterSection, ...] | None = None,
@@ -1121,6 +1160,7 @@ def format_with_pi(
         transcript,
         model,
         chunk_chars=chunk_chars,
+        summary_synthesis_chars=summary_synthesis_chars,
         timeout_seconds=timeout_seconds,
         max_chunks=max_chunks,
         sections=sections,

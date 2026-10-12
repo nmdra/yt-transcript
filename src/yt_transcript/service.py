@@ -449,6 +449,7 @@ def fetch_transcript_document(
             provider=formatting.provider,
             openrouter=OpenRouterConfig(formatting.openrouter_max_output_tokens),
             chunk_chars=formatting.chunk_chars,
+            summary_synthesis_chars=formatting.summary_synthesis_chars,
             timeout_seconds=formatting.timeout_seconds,
             max_chunks=formatting.max_chunks,
             editorial_mode=formatting.editorial_mode,
