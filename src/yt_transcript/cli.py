@@ -6,10 +6,10 @@ import sys
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from . import __version__
-from .config import AppConfig, load_config, resolve_config
+from .config import AppConfig, load_config, resolve_config, resolve_thinking
 from .errors import AppError, ErrorInfo, render_cli_error, render_diagnostics
 from .progress import TerminalProgress
 
@@ -32,7 +32,7 @@ def _parser() -> argparse.ArgumentParser:
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--raw", dest="mode", action="store_const", const="raw")
     modes.add_argument("--raw-vtt", dest="mode", action="store_const", const="raw-vtt")
-    parser.add_argument("--provider", choices=("pi", "openrouter"))
+    parser.add_argument("--provider", choices=("pi", "openrouter", "deepseek"))
     parser.add_argument("--model")
     parser.add_argument("--max-chunks", type=int)
     parser.add_argument("--boundary-context-chars", type=int)
@@ -118,9 +118,17 @@ def _transcribe(
         validate_output(args.output, no_clobber=args.no_clobber)
     if config.mode == "markdown" and not args.preview:
         ensure_formatter(config.provider, config.model)
-    if args.preview and config.provider == "openrouter" and not config.model:
-        from .errors import classify_openrouter_failure
+    if (
+        args.preview
+        and config.provider in ("openrouter", "deepseek")
+        and not config.model
+    ):
+        from .errors import classify_deepseek_failure, classify_openrouter_failure
 
+        if config.provider == "deepseek":
+            raise classify_deepseek_failure(
+                "DEEPSEEK_NOT_CONFIGURED", phase="runtime_check"
+            )
         raise classify_openrouter_failure(
             "OPENROUTER_NOT_CONFIGURED", phase="runtime_check"
         )
@@ -164,6 +172,15 @@ def _transcribe(
                 provider=config.provider,
                 boundary_context_chars=args.boundary_context_chars or 0,
             )
+            thinking, thinking_level = resolve_thinking(
+                config.provider,
+                config.editorial_mode,
+                config.thinking,
+                config.thinking_level,
+            )
+            thinking_label = (
+                "backend default" if thinking is None else "on" if thinking else "off"
+            )
             lines = [
                 f"canonical URL: {canonical}",
                 f"cleaned characters: {len(downloaded.body)}",
@@ -181,7 +198,11 @@ def _transcribe(
                 f"provider: {config.provider}",
                 f"model selection: {config.model or 'Pi configured default'}",
                 f"editorial mode: {config.editorial_mode}",
+                f"requested thinking: {thinking_label}",
+                f"requested thinking level: {thinking_level or 'not selected'}",
             ]
+            if config.provider == "deepseek" and thinking_level == "medium":
+                lines.append("DeepSeek effort mapping: medium -> high")
             if args.boundary_context_chars is not None:
                 lines.append(
                     f"boundary context characters per side: {args.boundary_context_chars}"
@@ -191,6 +212,13 @@ def _transcribe(
             return
         if config.mode == "markdown":
             progress.stage("format")
+            thinking_kwargs: dict[str, Any] = {}
+            if config.provider == "deepseek":
+                thinking_kwargs["deepseek"] = config.deepseek
+            if config.thinking is not None:
+                thinking_kwargs["thinking"] = config.thinking
+            if config.thinking_level is not None:
+                thinking_kwargs["thinking_level"] = config.thinking_level
             body = format_transcript(
                 body,
                 model=config.model,
@@ -204,6 +232,7 @@ def _transcribe(
                 editorial_mode=config.editorial_mode,
                 on_progress=progress.chunks if progress.enabled else None,
                 boundary_context_chars=args.boundary_context_chars or 0,
+                **thinking_kwargs,
             )
         document = (
             downloaded.document(body, effective=effective)
@@ -304,6 +333,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         verbose = config.verbose
         if args.mcp:
+            resolve_thinking(
+                config.provider,
+                config.editorial_mode,
+                config.thinking,
+                config.thinking_level,
+            )
             try:
                 from .mcp_server import run_stdio_server
 

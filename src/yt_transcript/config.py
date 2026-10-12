@@ -22,6 +22,11 @@ class OpenRouterConfig:
 
 
 @dataclass(frozen=True)
+class DeepSeekConfig:
+    max_output_tokens: int = 16384
+
+
+@dataclass(frozen=True)
 class CacheConfig:
     enabled: bool = True
     ttl_hours: int = 24
@@ -44,6 +49,9 @@ class AppConfig:
     openrouter: OpenRouterConfig = OpenRouterConfig()
     cache: CacheConfig = CacheConfig()
     summary_synthesis_chars: int = 50000
+    deepseek: DeepSeekConfig = DeepSeekConfig()
+    thinking: bool | None = None
+    thinking_level: str | None = None
 
 
 def default_config_path() -> Path:
@@ -61,6 +69,41 @@ def invalid(key: str = "configuration") -> ConfigError:
             "config",
         )
     )
+
+
+def resolve_thinking(
+    provider: str,
+    editorial_mode: str,
+    thinking: bool | None = None,
+    thinking_level: str | None = None,
+) -> tuple[bool | None, str | None]:
+    """Resolve requested thinking, without checking remote model capabilities."""
+    if not isinstance(provider, str) or provider not in (
+        "pi",
+        "openrouter",
+        "deepseek",
+    ):
+        raise invalid("formatting.provider")
+    if not isinstance(editorial_mode, str) or editorial_mode not in (
+        "standard",
+        "focused",
+        "summarized",
+    ):
+        raise invalid("formatting.editorial_mode")
+    if thinking is not None and type(thinking) is not bool:
+        raise invalid("formatting.thinking")
+    if thinking_level is not None and (
+        not isinstance(thinking_level, str)
+        or thinking_level not in ("low", "medium", "high")
+    ):
+        raise invalid("formatting.thinking_level")
+    if thinking is False:
+        return False, None
+    if thinking is True or editorial_mode == "summarized":
+        return True, thinking_level or "medium"
+    if thinking_level is not None:
+        raise invalid("formatting.thinking_level without enabled thinking")
+    return (False, None) if provider == "deepseek" else (None, None)
 
 
 def validate_cache_policy(value: object) -> CacheConfig:
@@ -134,6 +177,7 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
         "output",
         "formatting",
         "openrouter",
+        "deepseek",
         "sponsorblock",
         "mcp",
         "cache",
@@ -152,6 +196,8 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
                 "timeout_seconds",
                 "max_chunks",
                 "editorial_mode",
+                "thinking",
+                "thinking_level",
             },
         ),
     ):
@@ -166,15 +212,21 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
                     "raw-vtt",
                 )
             elif key == "provider":
-                valid = isinstance(value, str) and value in ("pi", "openrouter")
+                valid = isinstance(value, str) and value in (
+                    "pi",
+                    "openrouter",
+                    "deepseek",
+                )
             elif key == "editorial_mode":
                 valid = isinstance(value, str) and value in (
                     "standard",
                     "focused",
                     "summarized",
                 )
-            elif key == "verbose":
+            elif key in ("verbose", "thinking"):
                 valid = type(value) is bool
+            elif key == "thinking_level":
+                valid = isinstance(value, str) and value in ("low", "medium", "high")
             elif key == "model":
                 valid = isinstance(value, str) and bool(value.strip())
                 if valid:
@@ -197,6 +249,13 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
     if type(tokens) is not int or not 1 <= tokens <= 131072:
         raise invalid("openrouter.max_output_tokens")
     values["openrouter"] = OpenRouterConfig(tokens)
+    deepseek = data.get("deepseek", {})
+    if not isinstance(deepseek, dict) or set(deepseek) - {"max_output_tokens"}:
+        raise invalid("deepseek")
+    tokens = deepseek.get("max_output_tokens", 16384)
+    if type(tokens) is not int or not 1 <= tokens <= 393216:
+        raise invalid("deepseek.max_output_tokens")
+    values["deepseek"] = DeepSeekConfig(tokens)
     mcp = data.get("mcp", {})
     if not isinstance(mcp, dict) or set(mcp) - {"markdown_timeout_seconds"}:
         raise invalid("mcp")
@@ -252,7 +311,7 @@ def resolve_config(
         }.items()
         if v is not None
     }
-    if provider is not None and provider not in ("pi", "openrouter"):
+    if provider is not None and provider not in ("pi", "openrouter", "deepseek"):
         raise invalid("provider")
     if editorial_mode is not None and editorial_mode not in (
         "standard",
@@ -273,6 +332,10 @@ def resolve_config(
         result = replace(
             result, sponsorblock=replace(result.sponsorblock, enabled=sponsorblock)
         )
+    # Validate against the selected editorial mode before raw output resets it.
+    resolve_thinking(
+        result.provider, result.editorial_mode, result.thinking, result.thinking_level
+    )
     if result.mode != "markdown":
         result = replace(result, model=None, max_chunks=None, editorial_mode="standard")
     return result

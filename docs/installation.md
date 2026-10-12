@@ -51,13 +51,13 @@ Install from the pinned source tag:
 
 ```sh
 uv tool install --python 3.14.7 \
-  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v1.0.0'
+  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v1.1.0'
 yt-transcript --version
 yt-transcript --help
 yt-transcript --doctor
 ```
 
-This command installs `1.0.0` with the MCP extra.
+This command installs `1.1.0` with the MCP extra.
 The command pins the application source to the stable release tag.
 uv selects compatible dependencies from package metadata.
 uv does not use the repository lockfile for this installation.
@@ -70,7 +70,7 @@ Always specify this repository or its verified release wheel.
 
 Use this method for the agent installation prompt in the README.
 The method requires the [GitHub CLI](https://cli.github.com/).
-This repository and the approved `v1.0.0` release are public.
+This repository and the approved `v1.1.0` release are public.
 Authenticate if the CLI requests authentication or access is unavailable.
 Do not put tokens in commands or download URLs.
 
@@ -80,9 +80,9 @@ Alternatively, select a new directory.
 `gh release download` does not overwrite existing files.
 
 ```sh
-release_dir="$HOME/.local/share/yt-transcript/releases/v1.0.0"
+release_dir="$HOME/.local/share/yt-transcript/releases/v1.1.0"
 mkdir -p "$release_dir"
-gh release download v1.0.0 --repo nmdra/yt-transcript --dir "$release_dir"
+gh release download v1.1.0 --repo nmdra/yt-transcript --dir "$release_dir"
 (cd "$release_dir" && sha256sum --check SHA256SUMS)
 ```
 
@@ -102,12 +102,12 @@ import tarfile
 import tomllib
 
 folder = Path(sys.argv[1])
-with tarfile.open(folder / "yt_transcript-1.0.0.tar.gz") as archive:
-    stream = archive.extractfile("yt_transcript-1.0.0/uv.lock")
+with tarfile.open(folder / "yt_transcript-1.1.0.tar.gz") as archive:
+    stream = archive.extractfile("yt_transcript-1.1.0/uv.lock")
     assert stream is not None
     lock = tomllib.loads(stream.read().decode("utf-8"))
 packages = {row["name"]: row["version"] for row in lock["package"]}
-assert packages.pop("yt-transcript") == "1.0.0"
+assert packages.pop("yt-transcript") == "1.1.0"
 (folder / "runtime-constraints.txt").write_text(
     "".join(f"{name}=={version}\n" for name, version in sorted(packages.items())),
     encoding="utf-8",
@@ -120,7 +120,7 @@ Install the verified wheel with the MCP extra:
 ```sh
 wheel_url=$("$python_path" -c \
   'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve().as_uri())' \
-  "$release_dir/yt_transcript-1.0.0-py3-none-any.whl")
+  "$release_dir/yt_transcript-1.1.0-py3-none-any.whl")
 uv tool install --no-config --no-python-downloads --python "$python_path" \
   --constraints "$release_dir/runtime-constraints.txt" \
   "yt-transcript[mcp] @ $wheel_url"

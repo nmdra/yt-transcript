@@ -282,3 +282,99 @@ def test_safe_rendering():
         "\x1b",
     ):
         assert value not in rendered
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "DEEPSEEK_NOT_CONFIGURED",
+        "DEEPSEEK_FAILED",
+        "DEEPSEEK_AUTH_FAILED",
+        "DEEPSEEK_LIMITED",
+        "DEEPSEEK_TIMEOUT",
+        "DEEPSEEK_OUTPUT_INCOMPLETE",
+        "DEEPSEEK_OUTPUT_INVALID",
+        "DEEPSEEK_CONTEXT_LIMIT",
+    ],
+)
+def test_deepseek_exact_decoder_and_recovery(code):
+    from dataclasses import asdict, replace
+
+    from yt_transcript.errors import (
+        classify_deepseek_failure,
+        decode_worker_error,
+        render_mcp_error,
+    )
+
+    expected = classify_deepseek_failure(code).info
+    decoded = decode_worker_error(
+        asdict(replace(expected, message="PRIVATE_REASONING", hint="Bearer secret"))
+    )
+    assert decoded == expected
+    cli = render_cli_error(AppError(decoded))
+    mcp = render_mcp_error(decoded)
+    assert "warning: No model-processed transcript was returned." in cli
+    assert "warning: No model-processed transcript was returned." in mcp
+    assert "--raw" not in mcp and 'output_format="plain_text"' in mcp
+    assert "PRIVATE_REASONING" not in cli + mcp
+
+
+@pytest.mark.parametrize(
+    "stage,reason,context,counts",
+    [
+        ("notes", "raw_budget", False, (11, 10)),
+        ("notes", "serialized_budget", False, (11, 10)),
+        ("notes", "invalid_json", False, (None, None)),
+        ("notes", "invalid_schema", False, (None, None)),
+        ("notes", "invalid_reference", False, (None, None)),
+        ("synthesis", "capacity", True, (None, None)),
+        ("synthesis", "payload_budget", True, (11, 10)),
+    ],
+)
+def test_deepseek_summary_translation_and_exact_decoder(stage, reason, context, counts):
+    from dataclasses import asdict, replace
+
+    from yt_transcript.errors import (
+        decode_worker_error,
+        render_mcp_error,
+        summary_failure,
+        translate_formatting_error,
+    )
+
+    exc = summary_failure(
+        stage, reason, actual_chars=counts[0], allowed_chars=counts[1], context=context
+    )
+    exc.info = replace(exc.info, chunk_index=2, chunk_total=3)
+    translated = translate_formatting_error(exc, "deepseek")
+    assert translated.info.code == (
+        "DEEPSEEK_CONTEXT_LIMIT" if context else "DEEPSEEK_OUTPUT_INVALID"
+    )
+    assert translated.info.summary_diagnostic == exc.info.summary_diagnostic
+    assert decode_worker_error(asdict(translated.info)) == translated.info
+    assert "(chunk 2/3)" in render_mcp_error(translated.info)
+    bad = asdict(translated.info)
+    bad["summary_diagnostic"]["reason"] = "PRIVATE_REASONING"
+    with pytest.raises(ValueError):
+        decode_worker_error(bad)
+
+
+def test_deepseek_summary_decoder_rejects_wrong_code_or_stage():
+    from dataclasses import asdict
+
+    from yt_transcript.errors import classify_deepseek_failure, decode_worker_error
+
+    value = asdict(classify_deepseek_failure("DEEPSEEK_FAILED").info)
+    value["summary_diagnostic"] = {
+        "stage": "notes",
+        "reason": "invalid_json",
+        "actual_chars": None,
+        "allowed_chars": None,
+    }
+    with pytest.raises(ValueError):
+        decode_worker_error(value)
+    value["code"] = "DEEPSEEK_CONTEXT_LIMIT"
+    with pytest.raises(ValueError):
+        decode_worker_error(value)
+    value["phase"] = "PRIVATE_REASONING"
+    with pytest.raises(ValueError):
+        decode_worker_error(value)

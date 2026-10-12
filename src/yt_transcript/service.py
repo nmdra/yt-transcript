@@ -31,7 +31,7 @@ from .chapters import (
     render_timed_text,
 )
 from .cleaner import Cue, clean_vtt_timed
-from .config import OpenRouterConfig
+from .config import DeepSeekConfig, OpenRouterConfig
 from .downloader import download_english_vtt, validate_youtube_url
 from .errors import ErrorInfo, TranscriptError
 from .json_tools import strict_json_loads
@@ -442,6 +442,14 @@ def fetch_transcript_document(
         progress_kwargs: dict[str, Any] = (
             {"on_progress": on_progress} if on_progress is not None else {}
         )
+        if formatting.provider == "deepseek":
+            progress_kwargs["deepseek"] = DeepSeekConfig(
+                formatting.deepseek_max_output_tokens
+            )
+        if formatting.thinking is not None:
+            progress_kwargs["thinking"] = formatting.thinking
+        if formatting.thinking_level is not None:
+            progress_kwargs["thinking_level"] = formatting.thinking_level
         body = format_transcript(
             cleaned.effective_body,
             sections=cleaned.effective_sections,

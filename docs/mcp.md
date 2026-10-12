@@ -66,12 +66,63 @@ After an approved configuration or installation update, reconnect the MCP server
 Explicit Markdown uses OpenRouter without Pi.
 Plain text remains usable without a key or model.
 Pi as an MCP client is separate from the server's formatting backend.
-Both backends retain the POSIX restriction for supervised MCP Markdown.
+All three backends retain the POSIX restriction for supervised MCP Markdown.
 Deadlines, one-active-worker behavior, result sizes, metadata, and safe errors remain unchanged.
 See [CLI provider limits](cli.md#providers) for routing, privacy, and output-token limits.
 
 When you update from dev7, rename `[pi]` to `[formatting]`.
 Pi remains the default backend.
+
+## DeepSeek and server thinking policy
+
+Select DeepSeek only in server TOML, not in tool arguments:
+
+```toml
+[formatting]
+provider = "deepseek"
+model = "deepseek-flash"
+editorial_mode = "summarized"
+max_chunks = 20
+# Optional: false disables automatic summary thinking.
+# thinking = false
+# Optional scalar: low, medium, or high.
+# thinking_level = "medium"
+
+[deepseek]
+max_output_tokens = 16384
+```
+
+`deepseek-flash` and `deepseek-v4-pro` are examples, not a permanent allowlist.
+DeepSeek requires an explicit model and `DEEPSEEK_API_KEY` only in the server/helper environment.
+Do not serialize the key in TOML, worker JSON, command arguments, or tool arguments.
+Launch without `--no-config` and reconnect after an approved configuration change.
+A running client does not inherit a key exported later in another terminal.
+DeepSeek uses the fixed HTTPS endpoint `https://api.deepseek.com/chat/completions` without Pi.
+The output allowance defaults to 16384 per call and accepts integers from 1 through 393216.
+The selected model must support it.
+
+All providers share the same server-owned thinking policy.
+Omitted settings request medium thinking for direct summary, all notes calls, and final synthesis.
+For standard/focused output, omission preserves Pi/OpenRouter defaults and requests DeepSeek off.
+Explicit `thinking = false` always requests off and leaves a valid configured level inactive.
+Explicit true uses the scalar `thinking_level` (`low`, `medium`, or `high`), otherwise medium.
+A level alone is valid for summarized mode; standard/focused require explicit true unless false makes the level inactive.
+DeepSeek normalizes medium to high.
+Pi/OpenRouter can clamp, map, or reject settings; some models always reason.
+
+Thinking can increase cost, latency, and competition for the output-token allowance.
+Reasoning suppression does not disable billing.
+There is no automatic token-limit increase, retry, repair, fallback, or partial result.
+This policy does not prove better summary fidelity.
+Direct DeepSeek does not use OpenRouter's `data_collection="deny"` request and gives no equivalent retention guarantee.
+See [provider and thinking limits](cli.md#providers).
+
+The five public tool schemas and four primary result fields remain unchanged.
+There are no public thinking, level, or model arguments.
+Plain text and all retrieval tools remain model-free, even with thinking configured.
+The caption cache contains source data, not generated Markdown or private reasoning.
+The existing supervision, total/per-call deadlines, cancellation, and result-size bounds still apply.
+These changes are not included in the pinned 1.0.0 release.
 
 ## Explicit model-processed Markdown output
 
@@ -94,7 +145,7 @@ Model fidelity is not guaranteed.
 
 MCP Markdown currently requires POSIX process supervision.
 If server TOML does not supply `formatting.model`, Pi uses its configured default model.
-OpenRouter always requires an explicit model.
+OpenRouter and DeepSeek always require an explicit model.
 Server `formatting.chunk_chars`, `formatting.summary_synthesis_chars`, and `formatting.editorial_mode` apply.
 These settings do not add caller-controlled tool arguments.
 `formatting.max_chunks` is finite and defaults to 20 when omitted.
@@ -324,7 +375,7 @@ Cleanup is not guaranteed.
 Version 1.0.0 provides four additional retrieval tools.
 All return structured data and compatibility JSON.
 They use the same supervised worker and source cache as `get_transcript`.
-They never call Pi or OpenRouter.
+They never call Pi, OpenRouter, or DeepSeek.
 Initialization and discovery remain network-free.
 
 ```text

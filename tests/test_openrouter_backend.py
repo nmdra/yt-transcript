@@ -219,3 +219,64 @@ def test_formatter_uses_shared_validation_without_pi(monkeypatch):
         exc.value.info.code == "OPENROUTER_OUTPUT_INVALID"
         and exc.value.info.chunk_index == 1
     )
+
+
+@pytest.mark.parametrize(
+    "thinking,level",
+    [(None, None), (False, None), (True, "low"), (True, "medium"), (True, "high")],
+)
+def test_http_reasoning_translation(monkeypatch, thinking, level):
+    captured = []
+
+    def open(request, **kwargs):
+        captured.append(json.loads(request.data))
+        return Response(response(reasoning="PRIVATE_REASONING_SENTINEL"))
+
+    monkeypatch.setattr(
+        backend.urllib.request,
+        "build_opener",
+        lambda handler: SimpleNamespace(open=open),
+    )
+    value = payload() | {"thinking": thinking, "thinking_level": level}
+    result = backend.complete_http(value)
+    assert "PRIVATE_REASONING_SENTINEL" not in result
+    if thinking is None:
+        assert "reasoning" not in captured[0]
+    else:
+        assert captured[0]["reasoning"] == {
+            "enabled": thinking,
+            "effort": level if thinking else "none",
+            "exclude": True,
+        }
+    assert captured[0]["provider"]["require_parameters"] is True
+    assert captured[0]["provider"]["allow_fallbacks"] is False
+
+
+def test_private_request_allows_only_legacy_and_complete_new_shape():
+    legacy = payload()
+    legacy.pop("thinking")
+    legacy.pop("thinking_level")
+    assert backend.validate_request(legacy) == legacy
+    assert backend.validate_request(payload()) == payload()
+    for extra in ({"thinking": True}, {"thinking_level": "low"}, {"unknown": None}):
+        with pytest.raises(ValueError):
+            backend.validate_request(legacy | extra)
+
+
+@pytest.mark.parametrize(
+    "thinking,level",
+    [
+        (True, None),
+        (None, "low"),
+        (False, "low"),
+        (1, "low"),
+        ("false", None),
+        (True, []),
+        (True, "max"),
+    ],
+)
+def test_private_request_rejects_unresolved_or_inconsistent_policy(thinking, level):
+    with pytest.raises(ValueError):
+        backend.validate_request(
+            payload() | {"thinking": thinking, "thinking_level": level}
+        )

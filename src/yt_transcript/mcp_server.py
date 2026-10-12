@@ -480,6 +480,14 @@ def create_server(config: AppConfig, *, runner: Runner | None = None):
                         "OPENROUTER_NOT_CONFIGURED", phase="runtime_check"
                     ).info
                 )
+            if config.provider == "deepseek" and not config.model:
+                from .errors import classify_deepseek_failure
+
+                raise SafeToolError(
+                    classify_deepseek_failure(
+                        "DEEPSEEK_NOT_CONFIGURED", phase="runtime_check"
+                    ).info
+                )
             request.update(
                 output_format="markdown",
                 formatting=asdict(
@@ -487,6 +495,9 @@ def create_server(config: AppConfig, *, runner: Runner | None = None):
                         model=config.model,
                         provider=config.provider,
                         openrouter_max_output_tokens=config.openrouter.max_output_tokens,
+                        deepseek_max_output_tokens=config.deepseek.max_output_tokens,
+                        thinking=config.thinking,
+                        thinking_level=config.thinking_level,
                         chunk_chars=config.chunk_chars,
                         summary_synthesis_chars=config.summary_synthesis_chars,
                         timeout_seconds=min(config.timeout_seconds, 120),

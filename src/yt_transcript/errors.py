@@ -8,10 +8,10 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 CODES = frozenset(
-    "INVALID_URL CONFIG_INVALID RUNTIME_MISSING RUNTIME_INCOMPATIBLE NO_ENGLISH_CAPTIONS NO_ENGLISH_VTT YOUTUBE_ACCESS_LIMITED VIDEO_UNAVAILABLE AUTH_REQUIRED AGE_RESTRICTED GEO_RESTRICTED UNSUPPORTED_LIVESTREAM REMOTE_RATE_LIMITED REMOTE_ACCESS_DENIED NETWORK_FAILED YOUTUBE_EXTRACT_FAILED SUBTITLE_DOWNLOAD_FAILED SUBTITLE_INVALID EMPTY_TRANSCRIPT PI_NOT_FOUND PI_LAUNCH_FAILED PI_INCOMPATIBLE PI_AUTH_FAILED PI_MODEL_UNAVAILABLE PI_RATE_LIMITED PI_QUOTA_EXCEEDED PI_CONTEXT_LIMIT PI_CONTEXT_MUTATED PI_OUTPUT_INCOMPLETE PI_TIMEOUT PI_ABORTED PI_FAILED PI_PROTOCOL_INVALID PI_OUTPUT_INVALID PI_OUTPUT_LIMIT CHUNK_LIMIT_EXCEEDED OUTPUT_EXISTS OUTPUT_FAILED MCP_BUSY MCP_TIMEOUT MCP_RESPONSE_LIMIT SEGMENT_RANGE_INVALID SEARCH_QUERY_INVALID CACHE_CURSOR_INVALID CACHE_CURSOR_EXPIRED CACHE_UNAVAILABLE INTERNAL_ERROR OPENROUTER_NOT_CONFIGURED OPENROUTER_AUTH_FAILED OPENROUTER_LIMITED OPENROUTER_FAILED OPENROUTER_OUTPUT_INVALID OPENROUTER_OUTPUT_INCOMPLETE OPENROUTER_TIMEOUT OPENROUTER_CONTEXT_LIMIT".split()
+    "INVALID_URL CONFIG_INVALID RUNTIME_MISSING RUNTIME_INCOMPATIBLE NO_ENGLISH_CAPTIONS NO_ENGLISH_VTT YOUTUBE_ACCESS_LIMITED VIDEO_UNAVAILABLE AUTH_REQUIRED AGE_RESTRICTED GEO_RESTRICTED UNSUPPORTED_LIVESTREAM REMOTE_RATE_LIMITED REMOTE_ACCESS_DENIED NETWORK_FAILED YOUTUBE_EXTRACT_FAILED SUBTITLE_DOWNLOAD_FAILED SUBTITLE_INVALID EMPTY_TRANSCRIPT PI_NOT_FOUND PI_LAUNCH_FAILED PI_INCOMPATIBLE PI_AUTH_FAILED PI_MODEL_UNAVAILABLE PI_RATE_LIMITED PI_QUOTA_EXCEEDED PI_CONTEXT_LIMIT PI_CONTEXT_MUTATED PI_OUTPUT_INCOMPLETE PI_TIMEOUT PI_ABORTED PI_FAILED PI_PROTOCOL_INVALID PI_OUTPUT_INVALID PI_OUTPUT_LIMIT CHUNK_LIMIT_EXCEEDED OUTPUT_EXISTS OUTPUT_FAILED MCP_BUSY MCP_TIMEOUT MCP_RESPONSE_LIMIT SEGMENT_RANGE_INVALID SEARCH_QUERY_INVALID CACHE_CURSOR_INVALID CACHE_CURSOR_EXPIRED CACHE_UNAVAILABLE INTERNAL_ERROR OPENROUTER_NOT_CONFIGURED OPENROUTER_AUTH_FAILED OPENROUTER_LIMITED OPENROUTER_FAILED OPENROUTER_OUTPUT_INVALID OPENROUTER_OUTPUT_INCOMPLETE OPENROUTER_TIMEOUT OPENROUTER_CONTEXT_LIMIT DEEPSEEK_NOT_CONFIGURED DEEPSEEK_AUTH_FAILED DEEPSEEK_LIMITED DEEPSEEK_FAILED DEEPSEEK_OUTPUT_INVALID DEEPSEEK_OUTPUT_INCOMPLETE DEEPSEEK_TIMEOUT DEEPSEEK_CONTEXT_LIMIT".split()
 )
 PHASES = frozenset(
-    "config runtime_check metadata_extract caption_select subtitle_download vtt_parse pi_start pi_response output mcp_worker openrouter_start openrouter_response".split()
+    "config runtime_check metadata_extract caption_select subtitle_download vtt_parse pi_start pi_response output mcp_worker openrouter_start openrouter_response deepseek_start deepseek_response".split()
 )
 
 
@@ -351,14 +351,53 @@ def classify_openrouter_failure(
     )
 
 
+DEEPSEEK_MESSAGES = {
+    "DEEPSEEK_NOT_CONFIGURED": "DeepSeek requires an explicit model and an API key.",
+    "DEEPSEEK_AUTH_FAILED": "DeepSeek rejected authentication or access.",
+    "DEEPSEEK_LIMITED": "DeepSeek reported a rate, credit, or budget limit.",
+    "DEEPSEEK_FAILED": "DeepSeek completion failed.",
+    "DEEPSEEK_OUTPUT_INVALID": "DeepSeek returned an invalid completion.",
+    "DEEPSEEK_OUTPUT_INCOMPLETE": "DeepSeek output stopped before completion.",
+    "DEEPSEEK_TIMEOUT": "DeepSeek formatting exceeded the call deadline.",
+    "DEEPSEEK_CONTEXT_LIMIT": "DeepSeek input exceeded a context or planning limit.",
+}
+
+
+def classify_deepseek_failure(
+    code: str = "DEEPSEEK_FAILED", *, phase: str = "deepseek_response"
+) -> FormattingError:
+    if code not in DEEPSEEK_MESSAGES:
+        raise ValueError("Invalid DeepSeek error code.")
+    hint = "Check the selected model, DeepSeek access, and limits, or use --raw."
+    if code == "DEEPSEEK_NOT_CONFIGURED":
+        hint = "Set DEEPSEEK_API_KEY and an explicit model, or use --raw."
+    elif code == "DEEPSEEK_CONTEXT_LIMIT":
+        hint = "Review formatting.chunk_chars and the selected model, or use --raw."
+    return FormattingError(
+        ErrorInfo(
+            code,
+            DEEPSEEK_MESSAGES[code],
+            hint,
+            phase,
+            code in ("DEEPSEEK_TIMEOUT", "DEEPSEEK_LIMITED"),
+        )
+    )
+
+
 def translate_formatting_error(exc: FormattingError, provider: str) -> FormattingError:
     mapping = {
         "PI_OUTPUT_INVALID": "OPENROUTER_OUTPUT_INVALID",
         "PI_OUTPUT_LIMIT": "OPENROUTER_OUTPUT_INVALID",
         "PI_CONTEXT_LIMIT": "OPENROUTER_CONTEXT_LIMIT",
     }
-    if provider == "openrouter" and exc.info.code in mapping:
-        safe = classify_openrouter_failure(mapping[exc.info.code])
+    if provider in {"openrouter", "deepseek"} and exc.info.code in mapping:
+        safe = (
+            classify_deepseek_failure(
+                mapping[exc.info.code].replace("OPENROUTER_", "DEEPSEEK_")
+            )
+            if provider == "deepseek"
+            else classify_openrouter_failure(mapping[exc.info.code])
+        )
         diagnostic = validate_summary_diagnostic(exc.info.summary_diagnostic)
         message = safe.info.message
         if diagnostic is not None:
@@ -408,7 +447,10 @@ class WarningCollector:
 
 
 def _is_formatting_failure(code: str) -> bool:
-    return code.startswith(("PI_", "OPENROUTER_")) or code == "CHUNK_LIMIT_EXCEEDED"
+    return (
+        code.startswith(("PI_", "OPENROUTER_", "DEEPSEEK_"))
+        or code == "CHUNK_LIMIT_EXCEEDED"
+    )
 
 
 def _summary_diagnostic_text(info: ErrorInfo) -> str:
@@ -543,6 +585,8 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         "PI_CONTEXT_LIMIT",
         "OPENROUTER_OUTPUT_INVALID",
         "OPENROUTER_CONTEXT_LIMIT",
+        "DEEPSEEK_OUTPUT_INVALID",
+        "DEEPSEEK_CONTEXT_LIMIT",
     }:
         raise ValueError("Invalid summary diagnostic code")
     if diagnostic is not None and (diagnostic["stage"] == "synthesis") != code.endswith(
@@ -551,7 +595,9 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         raise ValueError("Invalid summary diagnostic stage")
     if _is_formatting_failure(code):
         safe = (
-            classify_openrouter_failure(code)
+            classify_deepseek_failure(code)
+            if code.startswith("DEEPSEEK_")
+            else classify_openrouter_failure(code)
             if code.startswith("OPENROUTER_")
             else classify_pi_failure(code=code)
         ).info

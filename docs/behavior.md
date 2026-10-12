@@ -36,7 +36,7 @@ Offline structural tests do not prove that actual model edits keep the source me
 
 ## Conservative spelling correction
 
-Pi and OpenRouter receive the same spelling rules in all Markdown editorial modes, including summary notes and synthesis.
+Pi, OpenRouter, and DeepSeek receive the same spelling rules in all Markdown editorial modes, including summary notes and synthesis.
 If the intended word is clear from the captions, the model may correct an unambiguous ordinary-word spelling error.
 For example, `recieve the message` can become `receive the message`.
 The model must keep the source meaning, certainty, and qualifications.
@@ -161,6 +161,27 @@ The final summary uses its own headings rather than canonical chapter headings.
 Source chapter metadata, descriptions, and SponsorBlock receipts remain unchanged.
 Removal receipts still describe source filtering, not what the summary includes or omits.
 
+### Summary thinking policy
+
+When thinking settings are omitted, summarized Markdown requests thinking at medium in every stage.
+This includes direct summary, each notes call, and final synthesis.
+Explicit `formatting.thinking = false` requests off for every mode, regardless of a valid configured level.
+Explicit true uses `formatting.thinking_level`, or medium when omitted.
+The level is one scalar string: low, medium, or high.
+A level alone is valid for automatic summarized thinking.
+Standard/focused require explicit true for an active level; with explicit false the level is inactive.
+Omitted settings preserve Pi/OpenRouter defaults for standard/focused and request DeepSeek off.
+DeepSeek maps medium to high.
+Pi/OpenRouter may clamp, map, or reject settings, and some models cannot turn reasoning off.
+Preview reports requested policy, not confirmed provider behavior.
+
+Thinking can increase latency and cost and use tokens that would otherwise be available for visible output.
+No output-token allowance increases automatically.
+No extra model calls, retries, repair calls, or partial publication are added.
+Automatic thinking is a selected application policy, not evidence that reasoning improves transcript-summary fidelity.
+Raw, plain-text MCP, and retrieval paths remain model-free.
+See [thinking configuration](cli.md#thinking-policy).
+
 ## Internal summary evidence and continuity
 
 Python assigns a private ID and one source-call owner to each summary source span.
@@ -215,14 +236,22 @@ They never reject a production transcript, launch a model, retry, or publish a s
 
 ## Backend-independent formatting
 
-Both backends use the same source prompts, chapter validation, omission rules, and summary assembly.
+All three backends use the same source prompts, chapter validation, omission rules, and summary assembly.
 Descriptions are never model input.
 Pi keeps the isolated subprocess contract above.
-OpenRouter uses one bounded nonstreaming HTTPS completion through a supervised Python helper.
+OpenRouter and DeepSeek use one bounded nonstreaming HTTPS completion per planned call through a supervised Python helper.
 It rejects tool calls, redirects, invalid or oversized responses, and non-stop completions.
 The wrapper makes no automatic retry or provider switch and publishes no partial result.
-The HTTP response bound is 2 MiB.
-The completion text bound is 1 MiB.
+Direct DeepSeek uses standard-library HTTP at the fixed HTTPS endpoint `https://api.deepseek.com/chat/completions`.
+It requires an explicit model and reads `DEEPSEEK_API_KEY` only from the helper environment.
+Its byte ceilings are 1 MiB helper input, 2 MiB HTTP response including reasoning, 1 MiB visible completion text, and 8 MiB helper output.
+OpenRouter also limits HTTP responses to 2 MiB and visible completion text to 1 MiB.
+Reasoning still counts toward the HTTP response limit even when it is suppressed from documents.
+Oversized responses fail without truncation or raised limits.
+Private reasoning never becomes document text, notes evidence, diagnostics, cache data, or input to later independent calls.
+Hiding it does not disable reasoning or charges.
+DeepSeek sends captions directly to DeepSeek, not through OpenRouter's `data_collection="deny"` route.
+The wrapper gives no equivalent provider retention guarantee.
 A local deadline cannot cancel provider billing or establish factual accuracy.
 
 ## Metadata files

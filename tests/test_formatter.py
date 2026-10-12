@@ -191,3 +191,25 @@ def test_inherited_process_group_timeout_reaps_direct_child(tmp_path, monkeypatc
         formatter.format_with_pi("source", timeout_seconds=1, own_process_group=False)
     assert exc.value.info.code == "PI_TIMEOUT"
     assert processes[0].poll() is not None
+
+
+@pytest.mark.parametrize(
+    "thinking,level,expected",
+    [
+        (False, "high", "off"),
+        (True, None, "medium"),
+        (True, "low", "low"),
+        (True, "high", "high"),
+    ],
+)
+def test_pi_thinking_flag_overrides_model_suffix(
+    tmp_path, monkeypatch, thinking, level, expected
+):
+    calls, _ = fake_pi(tmp_path, monkeypatch)
+    formatter.format_with_pi(
+        "source", model="provider/model:high", thinking=thinking, thinking_level=level
+    )
+    argv = calls[0][0]
+    assert argv[argv.index("--thinking") + 1] == expected
+    assert argv.index("--thinking") < argv.index("--")
+    assert argv[argv.index("--model") + 1] == "provider/model:high"

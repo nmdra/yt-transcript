@@ -550,3 +550,61 @@ def test_retrieval_request_rejects_invalid_parameters(operation, extra, code):
     with pytest.raises(AppError) as exc:
         validate_request(request)
     assert exc.value.info.code == code
+
+
+def test_private_policy_accepts_only_complete_legacy_or_new_shapes():
+    from dataclasses import asdict
+
+    from yt_transcript.mcp_policy import MCPFormattingPolicy, validate_formatting_policy
+
+    current = asdict(MCPFormattingPolicy())
+    new_fields = {"deepseek_max_output_tokens", "thinking", "thinking_level"}
+    legacy = {key: value for key, value in current.items() if key not in new_fields}
+    assert len(legacy) == 8 and len(current) == 11
+    assert validate_formatting_policy(legacy) == MCPFormattingPolicy()
+    assert validate_formatting_policy(current) == MCPFormattingPolicy()
+    for key in new_fields:
+        with pytest.raises(ValueError):
+            validate_formatting_policy({**legacy, key: current[key]})
+        with pytest.raises(ValueError):
+            validate_formatting_policy({k: v for k, v in current.items() if k != key})
+    with pytest.raises(ValueError):
+        validate_formatting_policy({**current, "api_key": "PRIVATE"})
+
+
+def test_dispatch_preserves_optional_thinking_controls(monkeypatch):
+    from dataclasses import asdict
+
+    from yt_transcript import service
+    from yt_transcript.mcp_policy import MCPFormattingPolicy
+    from yt_transcript.mcp_worker import dispatch
+
+    policy = MCPFormattingPolicy(
+        provider="deepseek",
+        model="model",
+        editorial_mode="summarized",
+        deepseek_max_output_tokens=393216,
+        thinking_level="high",
+    )
+    request = {
+        "operation": "get_transcript",
+        "url": "https://youtu.be/abcdefghijk",
+        "mode": "full",
+        "sponsorblock": {
+            "enabled": False,
+            "categories": ["sponsor"],
+            "timeout_seconds": 10,
+        },
+        "output_format": "markdown",
+        "formatting": asdict(policy),
+    }
+    captured = []
+    monkeypatch.setattr(
+        service,
+        "fetch_transcript_document",
+        lambda *args, **kwargs: captured.append(kwargs) or {"document": "body"},
+    )
+    dispatch(validate_request(request))
+    assert captured[0]["formatting"] == policy
+    assert captured[0]["formatting"].thinking is None
+    assert not {"thinking", "thinking_level", "deepseek"} & captured[0].keys()

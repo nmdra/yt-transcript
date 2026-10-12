@@ -154,7 +154,10 @@ def test_missing_server_model_does_not_break_plain_text(monkeypatch):
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX group supervision")
-def test_outer_deadline_kills_http_helper_and_allows_reuse(tmp_path, monkeypatch):
+@pytest.mark.parametrize("provider", ["openrouter", "deepseek"])
+def test_outer_deadline_kills_http_helper_and_allows_reuse(
+    tmp_path, monkeypatch, provider
+):
     marker = tmp_path / "helper-pid"
     helper = tmp_path / "helper.py"
     helper.write_text(
@@ -164,7 +167,7 @@ def test_outer_deadline_kills_http_helper_and_allows_reuse(tmp_path, monkeypatch
     )
     worker = tmp_path / "worker.py"
     worker.write_text(
-        "import sys\nfrom yt_transcript import service,mcp_worker,openrouter_backend as backend\n"
+        f"import sys\nfrom yt_transcript import service,mcp_worker,{provider}_backend as backend\n"
         "from yt_transcript.downloader import DownloadedCaptions\nfrom yt_transcript.metadata import VideoMetadata\n"
         "service.download_english_vtt=lambda url: DownloadedCaptions(b'WEBVTT\\n\\n00:00.000 --> 00:01.000\\ncaption\\n','en',False,VideoMetadata('https://www.youtube.com/watch?v=abcdefghijk','abcdefghijk'))\n"
         "original=backend.subprocess.Popen\n"
@@ -177,7 +180,7 @@ def test_outer_deadline_kills_http_helper_and_allows_reuse(tmp_path, monkeypatch
         return await original(sys.executable, str(worker), **kwargs)
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
-    monkeypatch.setenv("OPENROUTER_API_KEY", "KEY_NOT_FOR_OUTPUT")
+    monkeypatch.setenv(f"{provider.upper()}_API_KEY", "KEY_NOT_FOR_OUTPUT")
     payload = {
         "operation": "get_transcript",
         "url": URL,
@@ -189,7 +192,7 @@ def test_outer_deadline_kills_http_helper_and_allows_reuse(tmp_path, monkeypatch
         },
         "output_format": "markdown",
         "formatting": asdict(
-            MCPFormattingPolicy(provider="openrouter", model="provider/model")
+            MCPFormattingPolicy(provider=provider, model="provider/model")
         ),
     }
 
@@ -207,6 +210,27 @@ def test_outer_deadline_kills_http_helper_and_allows_reuse(tmp_path, monkeypatch
         runner.markdown_timeout_seconds = 5
         result = await runner.run(payload)
         assert result["format"] == "markdown"
+        marker.unlink()
+        helper.write_text(
+            "import os,signal,time,sys\nfrom pathlib import Path\n"
+            + f"Path({str(marker)!r}).write_text(str(os.getpid()))\n"
+            + "signal.signal(signal.SIGTERM,signal.SIG_IGN)\nsys.stdin.read()\ntime.sleep(20)\n"
+        )
+        task = asyncio.create_task(runner.run(payload))
+        async with asyncio.timeout(4):
+            while not marker.exists():
+                await asyncio.sleep(0.01)
+        pid = int(marker.read_text())
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+        assert not runner._busy and runner._process is None
+        helper.write_text(
+            "import sys,json\nsys.stdin.read()\nprint(json.dumps({'text':'## Edited\\n\\nCaption.'}))\n"
+        )
+        assert (await runner.run(payload))["format"] == "markdown"
         await runner.close()
 
     asyncio.run(check())

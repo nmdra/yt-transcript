@@ -7,6 +7,7 @@ import pytest
 from yt_transcript.config import (
     AppConfig,
     CacheConfig,
+    DeepSeekConfig,
     MCPConfig,
     SponsorBlockConfig,
     default_config_path,
@@ -92,12 +93,18 @@ def test_example_documents_all_supported_settings(tmp_path):
     example = Path(__file__).resolve().parents[1] / "config.example.toml"
     assert load_config(example) == AppConfig()
     text = example.read_text(encoding="utf-8")
-    complete = re.sub(r"^# (?=(?:max_chunks|model|enabled) =)", "", text, flags=re.M)
+    complete = re.sub(
+        r"^# (?=(?:max_chunks|model|enabled|thinking|thinking_level) =)",
+        "",
+        text,
+        flags=re.M,
+    )
     tables = tomllib.loads(complete)
     assert set(tables) == {
         "output",
         "formatting",
         "openrouter",
+        "deepseek",
         "sponsorblock",
         "mcp",
         "cache",
@@ -105,7 +112,8 @@ def test_example_documents_all_supported_settings(tmp_path):
     assert set(tables["cache"]) == set(CacheConfig.__dataclass_fields__)
     assert set(tables["output"]) | set(tables["formatting"]) == set(
         AppConfig.__dataclass_fields__
-    ) - {"sponsorblock", "mcp", "openrouter", "cache"}
+    ) - {"sponsorblock", "mcp", "openrouter", "deepseek", "cache"}
+    assert set(tables["deepseek"]) == set(DeepSeekConfig.__dataclass_fields__)
     assert set(tables["sponsorblock"]) == set(SponsorBlockConfig.__dataclass_fields__)
     assert set(tables["mcp"]) == set(MCPConfig.__dataclass_fields__)
     selected = tmp_path / "complete.toml"
@@ -115,6 +123,8 @@ def test_example_documents_all_supported_settings(tmp_path):
         max_chunks=20,
         model="provider/model-id",
         sponsorblock=SponsorBlockConfig(enabled=False),
+        thinking=False,
+        thinking_level="medium",
     )
 
 

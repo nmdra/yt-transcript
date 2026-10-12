@@ -34,7 +34,7 @@ class TerminalProgress:
         self._format_label = "Model calls via pi"
 
     def set_provider(self, provider: str) -> None:
-        if provider not in {"pi", "openrouter"}:
+        if provider not in {"pi", "openrouter", "deepseek"}:
             raise ValueError("Invalid progress provider.")
         with self._lock:
             self._format_label = f"Model calls via {provider}"

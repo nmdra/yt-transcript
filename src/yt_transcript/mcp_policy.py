@@ -13,10 +13,13 @@ class MCPFormattingPolicy:
     provider: str = "pi"
     openrouter_max_output_tokens: int = 16384
     summary_synthesis_chars: int = 50000
+    deepseek_max_output_tokens: int = 16384
+    thinking: bool | None = None
+    thinking_level: str | None = None
 
 
 def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
-    if not isinstance(value, dict) or set(value) != {
+    legacy_fields = {
         "model",
         "chunk_chars",
         "summary_synthesis_chars",
@@ -25,7 +28,17 @@ def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
         "editorial_mode",
         "provider",
         "openrouter_max_output_tokens",
-    }:
+    }
+    new_fields = {"deepseek_max_output_tokens", "thinking", "thinking_level"}
+    if not isinstance(value, dict) or set(value) not in (
+        legacy_fields,
+        legacy_fields | new_fields,
+    ):
+        raise ValueError("Invalid MCP formatting policy.")
+    if "deepseek_max_output_tokens" in value and (
+        type(value["deepseek_max_output_tokens"]) is not int
+        or not 1 <= value["deepseek_max_output_tokens"] <= 393216
+    ):
         raise ValueError("Invalid MCP formatting policy.")
     for key, lower, upper in (
         ("chunk_chars", 1000, 50000),
@@ -39,6 +52,7 @@ def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
     if not isinstance(value["provider"], str) or value["provider"] not in (
         "pi",
         "openrouter",
+        "deepseek",
     ):
         raise ValueError("Invalid MCP formatting policy.")
     model = value["model"]
@@ -46,7 +60,7 @@ def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
         not isinstance(model, str) or not model.strip() or len(model) > 4096
     ):
         raise ValueError("Invalid MCP formatting policy.")
-    if value["provider"] == "openrouter" and model is None:
+    if value["provider"] in ("openrouter", "deepseek") and model is None:
         raise ValueError("Invalid MCP formatting policy.")
     if not isinstance(value["editorial_mode"], str) or value["editorial_mode"] not in (
         "standard",
@@ -54,4 +68,16 @@ def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
         "summarized",
     ):
         raise ValueError("Invalid MCP formatting policy.")
+    from .config import resolve_thinking
+    from .errors import AppError
+
+    try:
+        resolve_thinking(
+            value["provider"],
+            value["editorial_mode"],
+            value.get("thinking"),
+            value.get("thinking_level"),
+        )
+    except AppError, ValueError:
+        raise ValueError("Invalid MCP formatting policy.") from None
     return MCPFormattingPolicy(**value)

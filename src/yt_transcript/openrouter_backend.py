@@ -53,7 +53,10 @@ def validate_request(value: object) -> dict:
         "timeout_seconds",
         "max_output_tokens",
     }
-    if not isinstance(value, dict) or set(value) != fields:
+    if not isinstance(value, dict) or set(value) not in (
+        fields,
+        fields | {"thinking", "thinking_level"},
+    ):
         raise ValueError("Invalid completion request.")
     for name in (
         "system_prompt",
@@ -69,6 +72,15 @@ def validate_request(value: object) -> dict:
     for name, maximum in (("timeout_seconds", 3600), ("max_output_tokens", 131072)):
         if type(value[name]) is not int or not 1 <= value[name] <= maximum:
             raise ValueError("Invalid completion request.")
+    thinking = value.get("thinking")
+    level = value.get("thinking_level")
+    if thinking is not None and type(thinking) is not bool:
+        raise ValueError("Invalid completion request.")
+    if thinking is True:
+        if type(level) is not str or level not in ("low", "medium", "high"):
+            raise ValueError("Invalid completion request.")
+    elif level is not None:
+        raise ValueError("Invalid completion request.")
     return value
 
 
@@ -160,6 +172,12 @@ def complete_http(payload: dict) -> str:
             "data_collection": "deny",
         },
     }
+    if payload.get("thinking") is not None:
+        body["reasoning"] = {
+            "enabled": payload["thinking"],
+            "effort": payload["thinking_level"] if payload["thinking"] else "none",
+            "exclude": True,
+        }
     request = urllib.request.Request(
         ENDPOINT,
         data=json.dumps(body, ensure_ascii=False).encode("utf-8"),

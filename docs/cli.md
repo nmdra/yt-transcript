@@ -95,8 +95,11 @@ The wrapper does not create configuration files.
 |---|---|
 | `output.mode` | `markdown`, `raw`, `raw-vtt` |
 | `output.verbose` | Boolean |
-| `formatting.provider` | `pi` (default) or `openrouter` |
+| `formatting.provider` | `pi` (default), `openrouter`, or `deepseek` |
 | `openrouter.max_output_tokens` | Integer 1 through 131072; default 16384 |
+| `deepseek.max_output_tokens` | Integer 1 through 393216; default 16384 |
+| `formatting.thinking` | Optional strict Boolean; summarized auto-enables when omitted |
+| `formatting.thinking_level` | Optional scalar `low`, `medium`, or `high`; see thinking policy |
 | `formatting.model` | Nonempty selector string, or omit the key |
 | `formatting.chunk_chars` | Integer 1,000 through 50,000; default 12,000; source input limit |
 | `formatting.summary_synthesis_chars` | Integer 1,000 through 500,000; default 50,000; multi-chunk summary synthesis input limit |
@@ -167,6 +170,75 @@ Calls can incur charges, including work completed after a local timeout.
 
 These features are included in dev8. When updating from dev7, rename `[pi]` to `[formatting]` and keep your existing settings.
 
+### Direct DeepSeek
+
+```sh
+# Set DEEPSEEK_API_KEY in the process environment first.
+yt-transcript URL --no-config --provider deepseek --model deepseek-flash -o transcript.md
+```
+
+DeepSeek requires an explicit model and no Pi installation.
+`deepseek-flash` and `deepseek-v4-pro` are examples, not a fixed model catalog.
+The key comes only from `DEEPSEEK_API_KEY` in the helper environment.
+Never put it in TOML, command arguments, or MCP tool arguments.
+Preview requires an explicit model but no key; doctor checks local model/key presence, not authentication.
+Raw modes need neither.
+
+The fixed endpoint is `https://api.deepseek.com/chat/completions`.
+The supervised helper uses standard-library HTTP with one nonstreaming request per planned call and no new dependency.
+It rejects redirects and makes no retry, repair call, or provider fallback.
+`[deepseek]` accepts only `max_output_tokens`, default 16384, integer range 1–393216.
+The model must support the requested allowance.
+Thinking shares this allowance with visible text; enabling it does not raise the limit.
+Invalid, oversized, empty, or incomplete output fails without partial publication.
+See [byte limits](behavior.md#backend-independent-formatting).
+
+Transcript text reaches DeepSeek directly.
+OpenRouter's `data_collection="deny"` routing request does not apply.
+Consult DeepSeek's privacy policy; the wrapper gives no equivalent retention guarantee.
+A local timeout cannot undo charges already incurred.
+
+### Thinking policy
+
+Configure thinking in TOML only. There are no new CLI thinking flags or public MCP arguments.
+Both settings are optional; keep them commented to use the automatic policy:
+
+```toml
+[formatting]
+# thinking = false
+# thinking_level = "medium"
+```
+
+`thinking` must be a Boolean. `thinking_level` must be one scalar string: `low`, `medium`, or `high`, not an array.
+TOML has no null value; omit the key instead.
+
+| `thinking` | Editorial mode | Requested policy |
+|---|---|---|
+| Omitted | Standard/focused | Preserve Pi/OpenRouter defaults; DeepSeek off |
+| Omitted | Summarized | On at configured level, otherwise medium |
+| `true` | Any | On at configured level, otherwise medium |
+| `false` | Any | Off; a valid configured level stays inactive |
+
+A level alone is valid in summarized mode because automatic thinking enables it.
+In standard/focused mode it requires `thinking = true`, unless explicit false keeps it inactive.
+Otherwise formatting reports a safe configuration error rather than silently enabling paid behavior.
+Raw and model-free MCP operations validate configuration but never call a model because of these settings.
+Direct summaries, each notes call, and final synthesis all use the same requested level.
+
+Pi receives `--thinking off` or the selected level; omission in standard/focused adds no flag.
+OpenRouter receives explicit reasoning enabled/effort settings with response reasoning excluded; default preservation adds no reasoning field.
+DeepSeek receives `thinking.type` enabled or disabled and maps low/medium/high to low/high/high when enabled.
+Medium therefore requests high from DeepSeek.
+These are requested states, not verified provider behavior or equal token budgets.
+Pi and OpenRouter can clamp or map levels or reject unsupported parameters.
+Some models cannot disable reasoning.
+OpenRouter still requires parameter support and disables upstream fallback.
+
+Thinking can increase cost, latency, and token competition with visible output.
+Reasoning exclusion hides response content but does not disable thinking or billing.
+The wrapper does not raise token limits automatically, add calls, retry, repair, or return partial output.
+Automatic summary thinking is application policy, not evidence of improved fidelity.
+
 ## Editorial modes
 
 `standard` produces an edited transcript and remains the default.
@@ -200,7 +272,7 @@ Source chunks must fit `formatting.chunk_chars`.
 The complete final notes envelope must fit the independent `formatting.summary_synthesis_chars` limit.
 The notes prompt requests compact JSON and targets 75% of each allocated hard response limit.
 The hard limit still applies to the raw response and the compact serialized claims.
-An infeasible note budget fails with `PI_CONTEXT_LIMIT` or `OPENROUTER_CONTEXT_LIMIT` before model calls.
+An infeasible note budget fails with `PI_CONTEXT_LIMIT`, `OPENROUTER_CONTEXT_LIMIT`, or `DEEPSEEK_CONTEXT_LIMIT` before model calls.
 Oversized or invalid notes cause failure without truncation, a repair call, or a partial summary.
 If all evidence is empty, processing fails before synthesis.
 The formatter rejects final output that contains canonical internal IDs.
@@ -273,6 +345,9 @@ Preview shows these fields in a fixed order:
 15. Model selection
 16. Editorial mode
 
+Preview also reports requested thinking state/level and the DeepSeek medium-to-high mapping when applicable.
+It does not verify that a model honors the request.
+
 Preview requires Markdown mode and no output path.
 If the plan exceeds the cap, preview still returns a successful report.
 Actual formatting rejects a plan that exceeds the cap before any model call.
@@ -286,7 +361,7 @@ The formatter does not split tokens.
 Current chunks that own output do not overlap.
 Optional read-only source windows can repeat neighboring words.
 Pi sends chunks in sequence through independent in-memory sessions.
-OpenRouter uses independent HTTP completions.
+OpenRouter and DeepSeek use independent HTTP completions.
 
 Standard and focused modes join completed bodies without a final synthesis call.
 They do not summarize or remove duplicates across the complete Markdown document.
@@ -327,12 +402,12 @@ Doctor is local and loads the selected wrapper TOML.
 To skip this file, use --no-config.
 Doctor reports Python, package versions, EJS compatibility, Deno, and selected-backend readiness without network requests.
 Doctor accepts --provider, --model, --config, and --no-config.
-For OpenRouter, doctor checks that an API key and model are present.
-Doctor does not check OpenRouter authentication.
+For OpenRouter and DeepSeek, doctor checks that an API key and model are present.
+Doctor does not check provider authentication.
 
 Version commands use isolated directories and five-second deadlines.
 Doctor does not run a model, access YouTube, or run authentication commands.
-Doctor checks that the OpenRouter key is present without displaying the key.
+Doctor checks that the selected direct-provider key is present without displaying the key.
 
 A healthy report shows local readiness only.
 The report does not verify video access, provider authentication, caption completeness, or model accuracy.

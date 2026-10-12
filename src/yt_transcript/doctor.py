@@ -124,10 +124,15 @@ def run_doctor(
         checks.append(_tool("pi", (1, 0, 4), flags))
     else:
         checks.append(DoctorCheck("Pi", "ok", "not required"))
-    if provider == "openrouter":
+    if provider in ("openrouter", "deepseek"):
+        label, key_name = (
+            ("DeepSeek", "DEEPSEEK_API_KEY")
+            if provider == "deepseek"
+            else ("OpenRouter", "OPENROUTER_API_KEY")
+        )
         for name, present in (
-            ("OpenRouter model", bool(model and model.strip())),
-            ("OpenRouter key", bool(os.environ.get("OPENROUTER_API_KEY", "").strip())),
+            (f"{label} model", bool(model and model.strip())),
+            (f"{label} key", bool(os.environ.get(key_name, "").strip())),
         ):
             checks.append(
                 DoctorCheck(

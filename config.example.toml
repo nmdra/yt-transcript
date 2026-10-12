@@ -6,7 +6,7 @@
 # Use --config PATH to select a different file, or --no-config to skip loading.
 # Explicit CLI flags override TOML values. Project files are not auto-loaded.
 # Unknown tables/keys, invalid types, and files larger than 64 KiB are rejected.
-# Keep credentials out of this file; use Pi-managed credentials or OPENROUTER_API_KEY in the environment.
+# Keep credentials out of this file; use Pi-managed credentials, OPENROUTER_API_KEY, or DEEPSEEK_API_KEY in the environment.
 
 [output]
 # Default: "markdown". Allowed: "markdown", "raw", "raw-vtt".
@@ -22,8 +22,9 @@ mode = "markdown"
 verbose = false
 
 [formatting]
-# Default: "pi". Allowed: "pi", "openrouter".
-# OpenRouter requires an explicit model below and OPENROUTER_API_KEY in the process environment.
+# Default: "pi". Allowed: "pi", "openrouter", "deepseek".
+# Direct providers require an explicit model below and their API key in the process environment.
+# OpenRouter: OPENROUTER_API_KEY. DeepSeek: DEEPSEEK_API_KEY.
 # Never put the API key in this file. MCP uses the server-selected backend.
 provider = "pi"
 # Default: "standard". Allowed: "standard", "focused", "summarized".
@@ -36,6 +37,17 @@ provider = "pi"
 # CLI --editorial-mode overrides this. Raw and MCP plain_text ignore this.
 # Explicit MCP markdown uses the server-configured editorial mode.
 editorial_mode = "standard"
+
+# Optional strict Boolean. Omitted: summarized requests thinking; standard/focused
+# preserve Pi/OpenRouter defaults and disable DeepSeek thinking. Explicit false always wins.
+# Explicit true requests thinking at thinking_level, or medium when the level is omitted.
+# thinking = false
+# Optional scalar string: "low", "medium", or "high". Default when enabled: "medium".
+# Level alone is valid for summarized; standard/focused require thinking = true.
+# With thinking = false, a valid configured level is inactive. DeepSeek maps medium to high.
+# Thinking can increase cost and latency and compete with visible output tokens.
+# It does not increase token limits automatically or guarantee summary fidelity.
+# thinking_level = "medium"
 
 # Default: 12000. Allowed: integers from 1000 through 50000.
 # Maximum source payload characters, including chapter/segment or summary-source JSON framing.
@@ -65,7 +77,8 @@ timeout_seconds = 600
 # max_chunks = 20
 
 # Optional for Pi. Default: omitted, preserving Pi's configured default model.
-# Required for OpenRouter. Use an exact OpenRouter model ID when provider = "openrouter".
+# Required for OpenRouter and DeepSeek. Use an exact model ID for the selected provider.
+# DeepSeek examples: "deepseek-flash", "deepseek-v4-pro"; not a permanent allowlist.
 # Allowed: a nonempty model selector; a provider/model-id is recommended.
 # Replace the placeholder with a real selector before uncommenting.
 # Empty strings are invalid. CLI --model overrides this setting.
@@ -83,6 +96,12 @@ timeout_seconds = 600
 # Sent as max_tokens. Reasoning tokens can consume this output allowance.
 # The selected model must support the limit; a larger allowance does not guarantee completion.
 # Incomplete output fails without automatic retry, repair, or partial publication.
+max_output_tokens = 16384
+
+[deepseek]
+# Default: 16384 tokens per model call. Allowed: integers from 1 through 393216.
+# Sent as max_tokens. Thinking can consume the same allowance; no automatic increase.
+# The model must support the limit. Incomplete output fails without retry, repair, or partial output.
 max_output_tokens = 16384
 
 # MCP-only source caption cache. CLI does not read or create it.

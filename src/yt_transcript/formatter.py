@@ -15,7 +15,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from .chapters import ChapterSection
-from .config import OpenRouterConfig
+from .config import DeepSeekConfig, OpenRouterConfig, resolve_thinking
 from .errors import (
     FormattingError,
     classify_pi_failure,
@@ -159,6 +159,8 @@ class ChunkRequest:
     model: str | None
     timeout_seconds: int
     own_process_group: bool = True
+    thinking: bool | None = None
+    thinking_level: str | None = None
 
 
 def validate_chunk_body(result: str) -> str:
@@ -445,7 +447,7 @@ def plan_transcript_formatting(
     provider: str = "pi",
     boundary_context_chars: int = 0,
 ) -> FormattingPlan | ContextFormattingPlan | EvidenceFormattingPlan:
-    if provider not in ("pi", "openrouter"):
+    if provider not in ("pi", "openrouter", "deepseek"):
         raise ValueError("Unsupported formatting provider.")
     try:
         get_editorial_prompt(editorial_mode)
@@ -660,6 +662,8 @@ def _build_chunk_request(
     own_process_group: bool = True,
     summary_stage: str | None = None,
     summary_note_chars: int | None = None,
+    thinking: bool | None = None,
+    thinking_level: str | None = None,
 ) -> ChunkRequest:
     prompt = get_editorial_prompt(editorial_mode, chapter_mode=chapter_mode)
     instruction = f"Edit transcript chunk {index} of {total}. Preserve incomplete transitions and all substantive content. Return only the Markdown body."
@@ -700,6 +704,8 @@ def _build_chunk_request(
         model,
         timeout_seconds,
         own_process_group,
+        thinking,
+        thinking_level,
     )
 
 
@@ -720,7 +726,16 @@ def _run_chunk(
     summary_note_chars: int | None = None,
     provider: str = "pi",
     openrouter: OpenRouterConfig | None = None,
+    deepseek: DeepSeekConfig | None = None,
+    thinking: bool | None = None,
+    thinking_level: str | None = None,
+    _resolved_thinking: tuple[bool | None, str | None] | None = None,
 ) -> str:
+    thinking, thinking_level = (
+        _resolved_thinking
+        if _resolved_thinking is not None
+        else resolve_thinking(provider, editorial_mode, thinking, thinking_level)
+    )
     request = _build_chunk_request(
         chunk,
         index=index,
@@ -734,11 +749,18 @@ def _run_chunk(
         own_process_group=own_process_group,
         summary_stage=summary_stage,
         summary_note_chars=summary_note_chars,
+        thinking=thinking,
+        thinking_level=thinking_level,
     )
     if provider == "openrouter":
         from .openrouter_backend import complete
 
         result = complete(request, openrouter)
+        return result if summary_stage == "notes" else validate_chunk_body(result)
+    if provider == "deepseek":
+        from .deepseek_backend import complete
+
+        result = complete(request, deepseek)
         return result if summary_stage == "notes" else validate_chunk_body(result)
     if provider != "pi" or executable is None:
         raise ValueError("Unsupported formatting provider.")
@@ -767,6 +789,12 @@ def _run_pi_chunk(executable: str, request: ChunkRequest) -> str:
     ]
     if model is not None:
         argv.extend(["--model", model])
+    if request.thinking is not None:
+        if request.thinking:
+            assert request.thinking_level is not None
+            argv.extend(["--thinking", request.thinking_level])
+        else:
+            argv.extend(["--thinking", "off"])
     argv.extend(
         [
             "--",
@@ -897,9 +925,12 @@ def _summarize_transcript(
     on_progress: Callable[[int, int], None] | None,
     provider: str,
     openrouter: OpenRouterConfig | None,
+    controls: dict[str, Any] | None = None,
 ) -> str:
     if not plan.chunks:
         raise classify_pi_failure(code="PI_OUTPUT_INVALID")
+    if controls is None:
+        controls = {"_resolved_thinking": resolve_thinking(provider, "summarized")}
     notes: list[dict[str, Any]] = []
     note_limit = (
         _summary_note_limit(
@@ -952,6 +983,7 @@ def _summarize_transcript(
                 else None,
                 provider=provider,
                 openrouter=openrouter,
+                **controls,
             )
             final = synthesis or not plan.synthesis_required
             if final:
@@ -988,6 +1020,9 @@ def _format_transcript(
     *,
     provider: str = "pi",
     openrouter: OpenRouterConfig | None = None,
+    deepseek: DeepSeekConfig | None = None,
+    thinking: bool | None = None,
+    thinking_level: str | None = None,
     chunk_chars: int = 12000,
     summary_synthesis_chars: int = 50000,
     timeout_seconds: int = 600,
@@ -999,6 +1034,12 @@ def _format_transcript(
     own_process_group: bool = True,
 ) -> str:
     get_editorial_prompt(editorial_mode)
+    policy = resolve_thinking(provider, editorial_mode, thinking, thinking_level)
+    controls: dict[str, Any] = {}
+    if policy != (None, None):
+        controls["_resolved_thinking"] = policy
+    if deepseek is not None:
+        controls["deepseek"] = deepseek
     plan = plan_transcript_formatting(
         transcript,
         sections=sections,
@@ -1030,6 +1071,7 @@ def _format_transcript(
             on_progress=on_progress,
             provider=provider,
             openrouter=openrouter,
+            controls=controls,
         )
     bodies: list[str] = []
     retained_runs: list[ContextRun] = []
@@ -1058,6 +1100,7 @@ def _format_transcript(
                 own_process_group=own_process_group,
                 provider=provider,
                 openrouter=openrouter,
+                **controls,
             )
             if OMISSION_MARKER in result and not (
                 editorial_mode == "focused" and result == OMISSION_MARKER
@@ -1102,6 +1145,11 @@ def ensure_formatter(provider: str, model: str | None) -> str | None:
 
         ensure_openrouter(model)
         return None
+    if provider == "deepseek":
+        from .deepseek_backend import ensure_deepseek
+
+        ensure_deepseek(model)
+        return None
     raise ValueError("Unsupported formatting provider.")
 
 
@@ -1111,6 +1159,9 @@ def format_transcript(
     *,
     provider: str = "pi",
     openrouter: OpenRouterConfig | None = None,
+    deepseek: DeepSeekConfig | None = None,
+    thinking: bool | None = None,
+    thinking_level: str | None = None,
     chunk_chars: int = 12000,
     summary_synthesis_chars: int = 50000,
     timeout_seconds: int = 600,
@@ -1121,6 +1172,13 @@ def format_transcript(
     boundary_context_chars: int = 0,
     own_process_group: bool = True,
 ) -> str:
+    controls: dict[str, Any] = {}
+    if deepseek is not None:
+        controls["deepseek"] = deepseek
+    if thinking is not None:
+        controls["thinking"] = thinking
+    if thinking_level is not None:
+        controls["thinking_level"] = thinking_level
     try:
         return _format_transcript(
             transcript,
@@ -1136,6 +1194,7 @@ def format_transcript(
             on_progress=on_progress,
             boundary_context_chars=boundary_context_chars,
             own_process_group=own_process_group,
+            **controls,
         )
     except FormattingError as exc:
         raise translate_formatting_error(exc, provider) from None
@@ -1145,6 +1204,9 @@ def format_with_pi(
     transcript: str,
     model: str | None = None,
     *,
+    deepseek: DeepSeekConfig | None = None,
+    thinking: bool | None = None,
+    thinking_level: str | None = None,
     chunk_chars: int = 12000,
     summary_synthesis_chars: int = 50000,
     timeout_seconds: int = 600,
@@ -1156,6 +1218,13 @@ def format_with_pi(
     own_process_group: bool = True,
 ) -> str:
     """Compatibility entry point for explicitly Pi-based formatting."""
+    controls: dict[str, Any] = {}
+    if deepseek is not None:
+        controls["deepseek"] = deepseek
+    if thinking is not None:
+        controls["thinking"] = thinking
+    if thinking_level is not None:
+        controls["thinking_level"] = thinking_level
     return format_transcript(
         transcript,
         model,
@@ -1168,4 +1237,5 @@ def format_with_pi(
         on_progress=on_progress,
         boundary_context_chars=boundary_context_chars,
         own_process_group=own_process_group,
+        **controls,
     )

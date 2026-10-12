@@ -135,7 +135,7 @@ def test_cli_failure_cleans_progress(monkeypatch, failure, code):
     assert "elapsed" in stream.getvalue() and "error[" in stream.getvalue()
 
 
-@pytest.mark.parametrize("provider", ["pi", "openrouter"])
+@pytest.mark.parametrize("provider", ["pi", "openrouter", "deepseek"])
 def test_provider_label_in_spinner_and_count_bar(provider):
     stream = io.StringIO()
     progress = TerminalProgress(stream, enabled=True)
@@ -155,6 +155,8 @@ def test_provider_label_in_spinner_and_count_bar(provider):
         ("pi", "openrouter", "openrouter"),
         ("openrouter", "pi", "pi"),
         ("openrouter", None, "openrouter"),
+        ("pi", "deepseek", "deepseek"),
+        ("deepseek", None, "deepseek"),
     ],
 )
 def test_cli_progress_uses_resolved_provider(

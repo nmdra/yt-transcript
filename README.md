@@ -13,7 +13,7 @@ The tool does not require FFmpeg.
 - **Context:** keeps supplied chapters or adds timestamp blocks with original video times
 - **SponsorBlock:** enabled by default for MCP; opt-in for CLI; includes full-caption fallback
 - **No model required:** raw CLI output and MCP plain text make no model calls
-- **Optional model editing:** Pi is the default; OpenRouter provides a direct API backend
+- **Optional model editing:** Pi is the default; direct API backends include OpenRouter and DeepSeek
 
 ## Install
 
@@ -33,13 +33,13 @@ Install the pinned release:
 
 ```sh
 uv tool install --python 3.14.7 \
-  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v1.0.0'
+  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v1.1.0'
 
 yt-transcript --version
 yt-transcript --doctor
 ```
 
-This command pins the application to **1.0.0**.
+This command pins the application to **1.1.0**.
 
 See the [installation guide](docs/installation.md) for verified release assets, checksum checks, and exact dependency versions.
 
@@ -105,6 +105,41 @@ See the [CLI provider guide](docs/cli.md#providers).
 When you update from dev7, rename `[pi]` to `[formatting]`.
 Keep your existing Pi settings.
 
+## DeepSeek and thinking controls
+
+Direct DeepSeek formatting does not require Pi:
+
+```sh
+# Set DEEPSEEK_API_KEY in the environment first; never store it in TOML.
+yt-transcript URL --no-config --provider deepseek --model deepseek-flash --max-chunks 3 -o transcript.md
+```
+
+DeepSeek requires an explicit model and uses the fixed HTTPS endpoint `https://api.deepseek.com/chat/completions`.
+`deepseek-flash` and `deepseek-v4-pro` are model examples, not a permanent allowlist.
+`[deepseek].max_output_tokens` defaults to 16384 per call and allows integers from 1 through 393216.
+The selected model must support the limit.
+Transcript text goes directly to DeepSeek, without OpenRouter's `data_collection="deny"` routing request.
+Do not assume equivalent retention or privacy guarantees.
+
+Optional TOML settings `formatting.thinking` and `formatting.thinking_level` control all three backends.
+With both omitted, summarized Markdown requests thinking at medium for every stage.
+Standard and focused preserve Pi/OpenRouter defaults and request DeepSeek thinking off.
+`thinking = false` always requests off, including summaries, and ignores a configured level.
+`thinking = true` uses the configured scalar level (`low`, `medium`, or `high`), or medium when omitted.
+A level alone is valid for summarized mode; outside summarized mode it requires explicit true unless thinking is explicitly false.
+DeepSeek maps medium to high.
+Pi and OpenRouter can clamp, map, or reject requested settings; some models always reason.
+
+Thinking can increase cost and latency and compete with visible output for the token allowance.
+The tool does not automatically raise token limits, retry, repair, or publish partial output.
+Hiding reasoning does not disable thinking or billing.
+This policy does not establish improved summary fidelity.
+Raw output, plain-text MCP, and retrieval tools remain model-free.
+The source-caption cache does not store provider-generated output or reasoning.
+There are no new CLI thinking flags or public MCP arguments.
+See [thinking policy](docs/cli.md#thinking-policy) and [backend limits](docs/behavior.md#backend-independent-formatting).
+These changes are not included in the pinned 1.0.0 installation above.
+
 ## MCP
 
 For a compatible MCP client, follow the [MCP setup guide](docs/mcp.md).
@@ -132,7 +167,7 @@ See [retrieval tools and cache](docs/mcp.md#retrieval-tools).
 Copy this prompt into an agent that has local shell and file access:
 
 ```text
-Install `nmdra/yt-transcript` `v1.0.0` for my user account with the MCP extra and exactly Python `3.14.7`.
+Install `nmdra/yt-transcript` `v1.1.0` for my user account with the MCP extra and exactly Python `3.14.7`.
 
 First read the official installation guide, MCP guide, and release page:
 https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md

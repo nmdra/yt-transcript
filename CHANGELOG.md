@@ -7,19 +7,25 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-12
+
 ### Added
 
-- Bounded `formatting.summary_synthesis_chars` setting for multi-chunk summary input, independent of source chunk size
-- Server-controlled `cache.path` configuration for the SQLite database, preserving the existing cache location by default
+- Add direct DeepSeek Markdown formatting with an explicit model, environment-only API key, bounded supervised HTTP, and no automatic retry or fallback
+- Add shared `formatting.thinking` and scalar `formatting.thinking_level` controls for Pi, OpenRouter, and DeepSeek without new CLI flags or public MCP arguments
+- Add bounded `formatting.summary_synthesis_chars` for multi-chunk summary input, independent of source chunk size
+- Add server-controlled `cache.path` for the SQLite database while preserving the existing default location
 
 ### Changed
 
+- Automatically request medium thinking for each summarized Markdown stage unless explicitly disabled; map DeepSeek medium to high and preserve standard/focused Pi/OpenRouter defaults when omitted
+- Report requested thinking policy in offline preview without promising provider capability or improved summary fidelity
 - Allocate summary notes against the separate synthesis budget and request compact JSON with a conservative response target, without retries or truncation
-- Show the selected Pi or OpenRouter backend in CLI model-call progress labels
+- Show the selected Pi, OpenRouter, or DeepSeek backend in CLI model-call progress labels
 
 ### Fixed
 
-- Identify summary validation stages and reasons with safe character counts instead of describing invalid JSON notes as a Markdown failure
+- Identify summary validation stages and reasons with safe character counts instead of reporting invalid JSON notes as a Markdown failure
 
 ## [1.0.0] - 2026-10-12
 
@@ -134,7 +140,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/nmdra/yt-transcript/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.9...v1.0.0
 [0.2.0-dev.9]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.8...v0.2.0-dev.9
 [0.2.0-dev.8]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.7...v0.2.0-dev.8
