@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -39,9 +39,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--editorial-mode", choices=("standard", "focused", "summarized")
     )
+    parser.add_argument("--language")
+    parser.add_argument("--json", action="store_true")
     sponsor = parser.add_mutually_exclusive_group()
     sponsor.add_argument("--sponsorblock", action="store_true", default=None)
     sponsor.add_argument("--no-sponsorblock", dest="sponsorblock", action="store_false")
+    cached = parser.add_mutually_exclusive_group()
+    cached.add_argument("--cache", dest="cache", action="store_true", default=None)
+    cached.add_argument("--no-cache", dest="cache", action="store_false")
     configs = parser.add_mutually_exclusive_group()
     configs.add_argument("--config", type=Path)
     configs.add_argument("--no-config", action="store_true")
@@ -78,20 +83,47 @@ def _broken_pipe_exit() -> int:
     return 1
 
 
+def _json_error(exc: AppError, *, verbose: bool) -> str:
+    from .json_output import error_document, serialize
+
+    return serialize(error_document(exc, verbose=verbose))
+
+
+def _write_error(exc: AppError, *, json_requested: bool, verbose: bool) -> None:
+    if json_requested:
+        sys.stderr.write(_json_error(exc, verbose=verbose))
+        return
+    sys.stderr.write(render_cli_error(exc))
+    if verbose:
+        sys.stderr.write(render_diagnostics(exc))
+
+
+def _caption_line(language: str, automatic: bool, translated: bool | None) -> str:
+    source = "automatic" if automatic else "manual"
+    origin = (
+        "origin-unknown"
+        if translated is None
+        else ("translated" if translated else "original")
+    )
+    return f"caption: {language}; source={source}; {origin}"
+
+
 def _transcribe(
     args: argparse.Namespace, config: AppConfig, progress: TerminalProgress
 ) -> None:
     verbose = config.verbose
+    language = config.captions.language
     if not args.url:
         raise _invalid("A YouTube video URL is required.")
-    from .downloader import download_english_vtt, validate_youtube_url
+    from .downloader import download_caption_vtt, validate_youtube_url
     from .formatter import (
         ensure_formatter,
         format_transcript,
         plan_transcript_formatting,
     )
     from .output import validate_output, write_output
-    from .service import fetch_clean_transcript
+    from .service import get_cached_snapshot
+    from .transcript_cache import TranscriptCache
 
     canonical = validate_youtube_url(args.url)
     if args.no_clobber and args.output is None:
@@ -134,18 +166,30 @@ def _transcribe(
         )
     if config.mode == "raw-vtt" and args.sponsorblock:
         raise _invalid("--sponsorblock cannot be used with --raw-vtt.")
+    if config.mode == "raw-vtt" and args.json:
+        raise _invalid("--json cannot be used with --raw-vtt.")
     progress.stage("fetch")
     if config.mode == "raw-vtt":
-        raw_download = download_english_vtt(canonical, verbose=verbose)
+        raw_download = download_caption_vtt(
+            canonical, language=language, verbose=verbose
+        )
         data = raw_download.vtt
-        if verbose:
+        if verbose and not args.json:
             progress.write_line(
-                "caption: selected English VTT; source="
-                + ("automatic" if raw_download.automatic else "manual")
+                _caption_line(
+                    raw_download.language,
+                    raw_download.automatic,
+                    raw_download.translated,
+                )
             )
     else:
-        downloaded = fetch_clean_transcript(
-            canonical, sponsorblock=config.sponsorblock.resolved()
+        cache_policy = config.sponsorblock.resolved()
+        downloaded = get_cached_snapshot(
+            canonical,
+            "filtered" if cache_policy.enabled else "full",
+            sponsorblock=config.sponsorblock,
+            cache=TranscriptCache(**asdict(config.cache)),
+            language=language,
         )
         effective = config.mode == "markdown"
         body = downloaded.effective_body if effective else downloaded.body
@@ -154,13 +198,18 @@ def _transcribe(
             if effective and downloaded.projection
             else downloaded.metadata.sponsorblock
         )
-        if lookup.warning:
+        if lookup.warning and not args.json:
             progress.write_line(lookup.warning)
-        if verbose:
+        if verbose and not args.json:
             progress.write_line(
-                "caption: selected English VTT; source="
-                + ("automatic" if downloaded.automatic else "manual")
+                _caption_line(
+                    downloaded.language,
+                    downloaded.automatic,
+                    downloaded.translated,
+                )
             )
+            if downloaded.cache_hit:
+                progress.write_line("cache: reused local source snapshot")
         if args.preview:
             plan = plan_transcript_formatting(
                 body,
@@ -208,7 +257,51 @@ def _transcribe(
                     f"boundary context characters per side: {args.boundary_context_chars}"
                 )
             progress.close()
-            _emit(("\n".join(lines) + "\n").encode("utf-8"))
+            if args.json:
+                from .json_output import preview_document, serialize
+
+                _emit(
+                    serialize(
+                        preview_document(
+                            canonical_url=canonical,
+                            language=downloaded.language,
+                            automatic=downloaded.automatic,
+                            translated=downloaded.translated,
+                            cache_enabled=config.cache.enabled,
+                            cache_hit=downloaded.cache_hit,
+                            cleaned_characters=len(downloaded.body),
+                            retained_characters=len(body),
+                            sponsorblock_enabled=lookup.enabled,
+                            sponsorblock_status=lookup.status,
+                            removed_cues=(
+                                downloaded.projection.receipt.removed_cue_count
+                                if downloaded.projection
+                                else 0
+                            ),
+                            warning=lookup.warning,
+                            plan_invocations=plan.call_count,
+                            character_counts=plan.character_counts,
+                            synthesis_invocations=1 if plan.synthesis_required else 0,
+                            summary_note_limit=getattr(
+                                plan, "summary_note_chars", None
+                            ),
+                            within_cap=plan.within_cap,
+                            configured_chunk_chars=config.chunk_chars,
+                            configured_summary_synthesis_chars=(
+                                config.summary_synthesis_chars
+                            ),
+                            max_chunks=config.max_chunks,
+                            provider=config.provider,
+                            model=config.model,
+                            editorial_mode=config.editorial_mode,
+                            thinking=thinking,
+                            thinking_level=thinking_level,
+                            boundary_context_chars=args.boundary_context_chars,
+                        )
+                    ).encode("utf-8")
+                )
+            else:
+                _emit(("\n".join(lines) + "\n").encode("utf-8"))
             return
         if config.mode == "markdown":
             progress.stage("format")
@@ -234,12 +327,41 @@ def _transcribe(
                 boundary_context_chars=args.boundary_context_chars or 0,
                 **thinking_kwargs,
             )
-        document = (
-            downloaded.document(body, effective=effective)
-            if args.output
-            else body.rstrip() + "\n"
-        )
-        data = document.encode("utf-8")
+        if args.json:
+            from .json_output import serialize, transcript_document
+
+            mapping = downloaded.mapping(effective=effective)
+            if not args.output:
+                mapping = mapping | {"description": None}
+            cues = (
+                [
+                    {
+                        "start_seconds": cue.start_ms / 1000,
+                        "end_seconds": cue.end_ms / 1000,
+                        "text": cue.text,
+                    }
+                    for cue in downloaded.fragments
+                ]
+                if config.mode == "raw"
+                else None
+            )
+            data = serialize(
+                transcript_document(
+                    mode=config.mode,
+                    metadata=mapping,
+                    body=body,
+                    cache_enabled=config.cache.enabled,
+                    cache_hit=downloaded.cache_hit,
+                    cues=cues,
+                )
+            ).encode("utf-8")
+        else:
+            document = (
+                downloaded.document(body, effective=effective)
+                if args.output
+                else body.rstrip() + "\n"
+            )
+            data = document.encode("utf-8")
     if args.output:
         progress.stage("output")
         write_output(args.output, data, no_clobber=args.no_clobber)
@@ -249,13 +371,15 @@ def _transcribe(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    json_requested = "--json" in arguments
     parser = _parser()
     try:
-        args = parser.parse_args(argv)
+        args = parser.parse_args(arguments)
     except SystemExit as exc:
         return int(exc.code or 0)
     except AppError as exc:
-        sys.stderr.write(render_cli_error(exc))
+        _write_error(exc, json_requested=json_requested, verbose=False)
         return 2
     except KeyboardInterrupt:
         return 130
@@ -263,7 +387,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _broken_pipe_exit()
     verbose = bool(args.verbose)
     progress = TerminalProgress(
-        sys.stderr, enabled=False if args.mcp or args.doctor else None
+        sys.stderr, enabled=False if args.mcp or args.doctor or args.json else None
     )
     try:
         restricted = (
@@ -278,6 +402,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             or args.max_chunks is not None
             or args.sponsorblock is not None
             or args.editorial_mode is not None
+            or args.language is not None
+            or args.cache is not None
         )
         if args.doctor:
             if (
@@ -291,6 +417,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 or args.editorial_mode is not None
                 or args.mcp
                 or args.boundary_context_chars is not None
+                or args.language is not None
+                or args.cache is not None
             ):
                 raise _invalid(
                     "--doctor permits provider, model, config selection, and --verbose."
@@ -307,8 +435,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 provider=doctor_config.provider,
                 model=doctor_config.model,
             )
-            _emit(render_doctor(report).encode("utf-8"))
+            if args.json:
+                from .json_output import doctor_document, serialize
+
+                _emit(serialize(doctor_document(report)).encode("utf-8"))
+            else:
+                _emit(render_doctor(report).encode("utf-8"))
             return 0 if report.healthy else 1
+        if args.mcp and args.json:
+            raise _invalid("--json cannot be used with --mcp.")
         if args.mcp and restricted:
             raise _invalid("--mcp permits only config selection and --verbose.")
         file_config = load_config(args.config, disabled=args.no_config)
@@ -329,6 +464,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 max_chunks=args.max_chunks,
                 sponsorblock=args.sponsorblock,
                 editorial_mode=args.editorial_mode,
+                language=args.language,
+                cache=args.cache,
             )
         )
         verbose = config.verbose
@@ -360,24 +497,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     except AppError as exc:
         progress.close()
-        sys.stderr.write(render_cli_error(exc))
-        if verbose:
-            sys.stderr.write(render_diagnostics(exc))
+        _write_error(exc, json_requested=args.json, verbose=verbose)
         return 2 if exc.info.code in ("INVALID_URL", "CONFIG_INVALID") else 1
     except KeyboardInterrupt:
         progress.close()
-        sys.stderr.write("error[INTERRUPTED]: Operation interrupted.\n")
+        _write_error(
+            AppError(ErrorInfo("INTERRUPTED", "Operation interrupted.")),
+            json_requested=args.json,
+            verbose=False,
+        )
         return 130
     except BrokenPipeError:
         progress.close()
         return _broken_pipe_exit()
     except OSError:
         progress.close()
-        sys.stderr.write("error[OUTPUT_FAILED]: Output could not be written.\n")
+        _write_error(
+            AppError(ErrorInfo("OUTPUT_FAILED", "Output could not be written.")),
+            json_requested=args.json,
+            verbose=False,
+        )
         return 1
     except Exception:
         progress.close()
-        sys.stderr.write("error[INTERNAL_ERROR]: Operation failed unexpectedly.\n")
+        _write_error(
+            AppError(ErrorInfo("INTERNAL_ERROR", "Operation failed unexpectedly.")),
+            json_requested=args.json,
+            verbose=False,
+        )
         return 1
     finally:
         progress.close()

@@ -28,8 +28,8 @@ def source(monkeypatch):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\nRetries can duplicate writes.\n",
             "en",
             False,
@@ -101,7 +101,7 @@ def test_preview_does_not_require_key(source, monkeypatch, capsys):
 @pytest.mark.parametrize("flags", [[], ["--preview"]])
 def test_missing_model_is_safe_before_extraction(source, monkeypatch, capsys, flags):
     monkeypatch.setattr(
-        service, "download_english_vtt", lambda *a: pytest.fail("must fail early")
+        service, "download_caption_vtt", lambda *a: pytest.fail("must fail early")
     )
     assert main([URL, "--no-config", "--provider", "openrouter", *flags]) == 1
     out = capsys.readouterr()

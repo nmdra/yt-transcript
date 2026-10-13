@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 CODES = frozenset(
-    "INVALID_URL CONFIG_INVALID RUNTIME_MISSING RUNTIME_INCOMPATIBLE NO_ENGLISH_CAPTIONS NO_ENGLISH_VTT YOUTUBE_ACCESS_LIMITED VIDEO_UNAVAILABLE AUTH_REQUIRED AGE_RESTRICTED GEO_RESTRICTED UNSUPPORTED_LIVESTREAM REMOTE_RATE_LIMITED REMOTE_ACCESS_DENIED NETWORK_FAILED YOUTUBE_EXTRACT_FAILED SUBTITLE_DOWNLOAD_FAILED SUBTITLE_INVALID EMPTY_TRANSCRIPT PI_NOT_FOUND PI_LAUNCH_FAILED PI_INCOMPATIBLE PI_AUTH_FAILED PI_MODEL_UNAVAILABLE PI_RATE_LIMITED PI_QUOTA_EXCEEDED PI_CONTEXT_LIMIT PI_CONTEXT_MUTATED PI_OUTPUT_INCOMPLETE PI_TIMEOUT PI_ABORTED PI_FAILED PI_PROTOCOL_INVALID PI_OUTPUT_INVALID PI_OUTPUT_LIMIT CHUNK_LIMIT_EXCEEDED OUTPUT_EXISTS OUTPUT_FAILED MCP_BUSY MCP_TIMEOUT MCP_RESPONSE_LIMIT SEGMENT_RANGE_INVALID SEARCH_QUERY_INVALID CACHE_CURSOR_INVALID CACHE_CURSOR_EXPIRED CACHE_UNAVAILABLE INTERNAL_ERROR OPENROUTER_NOT_CONFIGURED OPENROUTER_AUTH_FAILED OPENROUTER_LIMITED OPENROUTER_FAILED OPENROUTER_OUTPUT_INVALID OPENROUTER_OUTPUT_INCOMPLETE OPENROUTER_TIMEOUT OPENROUTER_CONTEXT_LIMIT DEEPSEEK_NOT_CONFIGURED DEEPSEEK_AUTH_FAILED DEEPSEEK_LIMITED DEEPSEEK_FAILED DEEPSEEK_OUTPUT_INVALID DEEPSEEK_OUTPUT_INCOMPLETE DEEPSEEK_TIMEOUT DEEPSEEK_CONTEXT_LIMIT".split()
+    "INVALID_URL CONFIG_INVALID RUNTIME_MISSING RUNTIME_INCOMPATIBLE NO_CAPTIONS NO_VTT INTERRUPTED NO_ENGLISH_CAPTIONS NO_ENGLISH_VTT YOUTUBE_ACCESS_LIMITED VIDEO_UNAVAILABLE AUTH_REQUIRED AGE_RESTRICTED GEO_RESTRICTED UNSUPPORTED_LIVESTREAM REMOTE_RATE_LIMITED REMOTE_ACCESS_DENIED NETWORK_FAILED YOUTUBE_EXTRACT_FAILED SUBTITLE_DOWNLOAD_FAILED SUBTITLE_INVALID EMPTY_TRANSCRIPT PI_NOT_FOUND PI_LAUNCH_FAILED PI_INCOMPATIBLE PI_AUTH_FAILED PI_MODEL_UNAVAILABLE PI_RATE_LIMITED PI_QUOTA_EXCEEDED PI_CONTEXT_LIMIT PI_CONTEXT_MUTATED PI_OUTPUT_INCOMPLETE PI_TIMEOUT PI_ABORTED PI_FAILED PI_PROTOCOL_INVALID PI_OUTPUT_INVALID PI_OUTPUT_LIMIT CHUNK_LIMIT_EXCEEDED OUTPUT_EXISTS OUTPUT_FAILED MCP_BUSY MCP_TIMEOUT MCP_RESPONSE_LIMIT SEGMENT_RANGE_INVALID SEARCH_QUERY_INVALID CACHE_CURSOR_INVALID CACHE_CURSOR_EXPIRED CACHE_UNAVAILABLE INTERNAL_ERROR OPENROUTER_NOT_CONFIGURED OPENROUTER_AUTH_FAILED OPENROUTER_LIMITED OPENROUTER_FAILED OPENROUTER_OUTPUT_INVALID OPENROUTER_OUTPUT_INCOMPLETE OPENROUTER_TIMEOUT OPENROUTER_CONTEXT_LIMIT DEEPSEEK_NOT_CONFIGURED DEEPSEEK_AUTH_FAILED DEEPSEEK_LIMITED DEEPSEEK_FAILED DEEPSEEK_OUTPUT_INVALID DEEPSEEK_OUTPUT_INCOMPLETE DEEPSEEK_TIMEOUT DEEPSEEK_CONTEXT_LIMIT".split()
 )
 PHASES = frozenset(
     "config runtime_check metadata_extract caption_select subtitle_download vtt_parse pi_start pi_response output mcp_worker openrouter_start openrouter_response deepseek_start deepseek_response".split()
@@ -612,6 +612,7 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         "Caption availability could not be fully verified.",
         "Expected one video result.",
         "Extracted video ID does not match the requested video.",
+        # Retained so a worker and server from adjacent releases stay compatible.
         "no English VTT subtitles found",
         "no English subtitles found",
         "empty transcript",
@@ -639,6 +640,10 @@ def decode_worker_error(payload: object) -> ErrorInfo:
         message not in messages
         and not re.fullmatch(
             r"Invalid (?:caption block|timing in block) [0-9]+\.", message
+        )
+        and not re.fullmatch(
+            r"no (?:VTT )?captions found for requested language: [A-Za-z0-9-]{1,64}",
+            message,
         )
     ):
         message = "Worker operation failed."
@@ -718,7 +723,8 @@ def decode_worker_error(payload: object) -> ErrorInfo:
     )
 
 
-def render_diagnostics(exc: AppError, **fields: Any) -> str:
+def safe_diagnostic_fields(exc: AppError, **fields: Any) -> dict[str, str]:
+    """Return only fields with constrained vocabularies; discard arbitrary caller text."""
     safe = {
         "code": exc.info.code if exc.info.code in CODES else "INTERNAL_ERROR",
         "phase": exc.info.phase if exc.info.phase in PHASES else "mcp_worker",
@@ -727,7 +733,6 @@ def render_diagnostics(exc: AppError, **fields: Any) -> str:
         value = getattr(exc.info, key)
         if value is not None:
             safe[key] = str(value)
-    # Each field has a constrained vocabulary. Arbitrary caller text is discarded.
     for key in ("http_status", "retry_count", "line"):
         value = fields.get(key)
         if type(value) is int and 0 <= value <= 100000:
@@ -757,4 +762,9 @@ def render_diagnostics(exc: AppError, **fields: Any) -> str:
         reason = _output_reason(exc.info)
         if reason is not None:
             safe["validation_reason"] = reason
+    return safe
+
+
+def render_diagnostics(exc: AppError, **fields: Any) -> str:
+    safe = safe_diagnostic_fields(exc, **fields)
     return "diagnostic: " + " ".join(f"{k}={v}" for k, v in safe.items()) + "\n"

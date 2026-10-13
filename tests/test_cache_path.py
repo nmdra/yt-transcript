@@ -243,3 +243,48 @@ def test_unicode_path_and_policy_keep_utf8_worker_request_bound(monkeypatch):
         assert exc.value.info.code == "CONFIG_INVALID" and launches == [True]
 
     asyncio.run(check())
+
+
+def test_server_language_is_private_and_propagated(tmp_path):
+    from yt_transcript.config import CaptionsConfig
+
+    class Runner:
+        def __init__(self):
+            self.calls: list[dict[str, Any]] = []
+
+        async def close(self):
+            pass
+
+        async def run(self, payload, *, on_progress=None):
+            self.calls.append(payload)
+            cleaned = CleanedTranscript(
+                "hello",
+                VideoMetadata(
+                    "https://www.youtube.com/watch?v=abcdefghijk", "abcdefghijk"
+                ),
+                "fr",
+                False,
+                translated=True,
+            )
+            return {
+                "format": "plain_text",
+                "document": "hello",
+                "character_count": 5,
+                "metadata": cleaned.mapping(),
+            }
+
+    async def check():
+        runner = Runner()
+        async with Client(
+            create_server(AppConfig(captions=CaptionsConfig("zh-Hans")), runner=runner),
+            raise_exceptions=True,
+        ) as client:
+            tools = (await client.list_tools()).tools
+            assert all(
+                "language" not in tool.input_schema["properties"] for tool in tools
+            )
+            result = await client.call_tool("get_transcript", {"url": URL})
+            assert not result.is_error
+            assert runner.calls[0]["language"] == "zh-Hans"
+
+    asyncio.run(check())

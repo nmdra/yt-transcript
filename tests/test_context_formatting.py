@@ -82,8 +82,8 @@ def test_context_failure_keeps_existing_file(tmp_path, monkeypatch, capsys):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\nsource\n", "en", False, metadata
         ),
     )

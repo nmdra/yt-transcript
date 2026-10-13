@@ -32,7 +32,7 @@ from .chapters import (
 )
 from .cleaner import Cue, clean_vtt_timed
 from .config import DeepSeekConfig, OpenRouterConfig
-from .downloader import download_english_vtt, validate_youtube_url
+from .downloader import download_caption_vtt, validate_youtube_url
 from .errors import ErrorInfo, TranscriptError
 from .json_tools import strict_json_loads
 from .mcp_policy import MCPFormattingPolicy, validate_formatting_policy
@@ -72,6 +72,7 @@ class MetadataResult(TypedDict):
     duration_seconds: int | float | None
     caption_language: str
     caption_source: Literal["manual", "automatic"]
+    caption_translated: bool | None
     chapter_status: Literal["available", "unavailable", "invalid"]
     chapters: list[ChapterResult]
     sponsorblock: SponsorBlockResult
@@ -319,6 +320,8 @@ class CleanedTranscript:
     sections: tuple[ChapterSection, ...] = ()
     projection: CaptionProjection | None = None
     raw_receipt: SponsorBlockRemovalReceipt = SponsorBlockRemovalReceipt()
+    translated: bool | None = None
+    cache_hit: bool | None = None
 
     @property
     def effective_body(self) -> str:
@@ -343,6 +346,7 @@ class CleanedTranscript:
                 self.metadata,
                 language=self.language,
                 automatic=self.automatic,
+                translated=self.translated,
                 sponsorblock_result=self.projection.lookup
                 if effective and self.projection
                 else self.metadata.sponsorblock,
@@ -358,6 +362,7 @@ class CleanedTranscript:
             (self.effective_body if effective else self.body) if body is None else body,
             language=self.language,
             automatic=self.automatic,
+            translated=self.translated,
             sponsorblock_result=self.projection.lookup
             if effective and self.projection
             else self.metadata.sponsorblock,
@@ -368,9 +373,12 @@ class CleanedTranscript:
 
 
 def fetch_clean_transcript(
-    url: str, *, sponsorblock: SponsorBlockConfig | None = None
+    url: str,
+    *,
+    sponsorblock: SponsorBlockConfig | None = None,
+    language: str = "en",
 ) -> CleanedTranscript:
-    downloaded = download_english_vtt(url)
+    downloaded = download_caption_vtt(url, language=language)
     try:
         fragments = clean_vtt_timed(
             downloaded.vtt.decode("utf-8-sig"), automatic=downloaded.automatic
@@ -398,6 +406,7 @@ def fetch_clean_transcript(
         build_chapter_sections(fragments, downloaded.metadata.chapters),
         projection,
         compute_receipt(fragments, lookup),
+        translated=downloaded.translated,
     )
 
 
@@ -411,6 +420,7 @@ def fetch_transcript_document(
     supervised: bool = False,
     cache: TranscriptCache | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    language: str = "en",
 ) -> TranscriptResult:
     if mode not in ("filtered", "full"):
         raise ValueError("Invalid transcript mode.")
@@ -432,7 +442,9 @@ def fetch_transcript_document(
             asdict(formatting or MCPFormattingPolicy())
         )
         ensure_formatter(formatting.provider, formatting.model)
-    cleaned = get_cached_snapshot(url, mode, sponsorblock=sponsorblock, cache=cache)
+    cleaned = get_cached_snapshot(
+        url, mode, sponsorblock=sponsorblock, cache=cache, language=language
+    )
     projection = cleaned.projection
     assert projection is not None
     if output_format == "markdown":
@@ -514,12 +526,18 @@ def _cacheable(cleaned: CleanedTranscript, policy: SponsorBlockConfig) -> bool:
 
 
 def _matches_snapshot(
-    cleaned: CleanedTranscript, canonical: str, policy: SponsorBlockConfig
+    cleaned: CleanedTranscript,
+    canonical: str,
+    policy: SponsorBlockConfig,
+    language: str,
 ) -> bool:
     lookup = cleaned.metadata.sponsorblock
+    target = language.lower()
+    cached = cleaned.language.lower()
     return (
         cleaned.metadata.url == canonical
         and cleaned.metadata.video_id == canonical.rsplit("=", 1)[-1]
+        and (cached == target or cached.startswith(target + "-"))
         and lookup.enabled == policy.enabled
         and sorted(lookup.categories) == sorted(policy.categories)
         and _cacheable(cleaned, policy)
@@ -532,22 +550,25 @@ def get_cached_snapshot(
     *,
     sponsorblock: SponsorBlockConfig | None = None,
     cache: TranscriptCache | None = None,
+    language: str = "en",
 ) -> CleanedTranscript:
-    """Reuse captions only when a cache is explicitly supplied by MCP dispatch."""
+    """Reuse captions only when a cache is explicitly supplied by dispatch."""
     canonical = validate_youtube_url(url)
     policy = _resolved_policy(mode, sponsorblock)
     key = None
     if cache is not None:
         from .transcript_cache import make_cache_key
 
-        key = make_cache_key(canonical, mode, policy)
+        key = make_cache_key(canonical, mode, policy, language)
         try:
             cached = cache.get(key)
         except Exception:
             cached = None
-        if cached is not None and _matches_snapshot(cached, canonical, policy):
-            return cached
-    cleaned = fetch_clean_transcript(canonical, sponsorblock=policy)
+        if cached is not None and _matches_snapshot(
+            cached, canonical, policy, language
+        ):
+            return replace(cached, cache_hit=True)
+    cleaned = fetch_clean_transcript(canonical, sponsorblock=policy, language=language)
     if cache is not None and key is not None and _cacheable(cleaned, policy):
         try:
             cache.put(key, cleaned)
@@ -588,8 +609,11 @@ def get_video_info(
     *,
     sponsorblock: SponsorBlockConfig | None = None,
     cache: TranscriptCache | None = None,
+    language: str = "en",
 ) -> VideoInfoResult:
-    cleaned = get_cached_snapshot(url, sponsorblock=sponsorblock, cache=cache)
+    cleaned = get_cached_snapshot(
+        url, sponsorblock=sponsorblock, cache=cache, language=language
+    )
     return _checked_result(
         "get_video_info", {"metadata": cleaned.mapping(effective=True)}
     )
@@ -623,9 +647,12 @@ def get_transcript_segment(
     *,
     sponsorblock: SponsorBlockConfig | None = None,
     cache: TranscriptCache | None = None,
+    language: str = "en",
 ) -> SegmentResult:
     start, end = validate_segment_range(start_seconds, end_seconds)
-    cleaned = get_cached_snapshot(url, mode, sponsorblock=sponsorblock, cache=cache)
+    cleaned = get_cached_snapshot(
+        url, mode, sponsorblock=sponsorblock, cache=cache, language=language
+    )
     fragments, _ = _effective_cues(cleaned)
     selected = [
         cue
@@ -670,9 +697,12 @@ def search_transcript(
     *,
     sponsorblock: SponsorBlockConfig | None = None,
     cache: TranscriptCache | None = None,
+    language: str = "en",
 ) -> SearchResult:
     normalized = validate_search_query(query, max_results)
-    cleaned = get_cached_snapshot(url, mode, sponsorblock=sponsorblock, cache=cache)
+    cleaned = get_cached_snapshot(
+        url, mode, sponsorblock=sponsorblock, cache=cache, language=language
+    )
     fragments, indices = _effective_cues(cleaned)
     runs: list[list[tuple[Cue, int]]] = []
     for cue, index in zip(fragments, indices, strict=True):
@@ -787,13 +817,14 @@ def get_transcript_page(
     *,
     sponsorblock: SponsorBlockConfig | None = None,
     cache: TranscriptCache | None = None,
+    language: str = "en",
 ) -> PageResult:
     payload = validate_page_request(cursor, max_chars)
     canonical = validate_youtube_url(url)
     policy = _resolved_policy(mode, sponsorblock)
     from .transcript_cache import make_cache_key, snapshot_id
 
-    key = make_cache_key(canonical, mode, policy)
+    key = make_cache_key(canonical, mode, policy, language)
     if payload is not None and payload["cache_key"] != key:
         raise _retrieval_error("CACHE_CURSOR_INVALID")
     if cache is None:
@@ -805,13 +836,17 @@ def get_transcript_page(
             cleaned = cache.get_exact(key, payload["snapshot_id"])
         except Exception:
             cleaned = None
-        if cleaned is None or not _matches_snapshot(cleaned, canonical, policy):
+        if cleaned is None or not _matches_snapshot(
+            cleaned, canonical, policy, language
+        ):
             raise _retrieval_error("CACHE_CURSOR_EXPIRED")
         identity, index = payload["snapshot_id"], payload["next_index"]
     else:
         if not cache.enabled:
             raise _retrieval_error("CACHE_UNAVAILABLE")
-        cleaned = get_cached_snapshot(canonical, mode, sponsorblock=policy, cache=cache)
+        cleaned = get_cached_snapshot(
+            canonical, mode, sponsorblock=policy, cache=cache, language=language
+        )
         if not _cacheable(cleaned, policy):
             raise _retrieval_error("CACHE_UNAVAILABLE")
         try:
@@ -819,7 +854,9 @@ def get_transcript_page(
             retained = cache.get_exact(key, identity)
         except Exception:
             retained = None
-        if retained is None or not _matches_snapshot(retained, canonical, policy):
+        if retained is None or not _matches_snapshot(
+            retained, canonical, policy, language
+        ):
             raise _retrieval_error("CACHE_UNAVAILABLE")
         cleaned, index = retained, 0
     fragments, _ = _effective_cues(cleaned)

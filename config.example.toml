@@ -104,7 +104,16 @@ max_output_tokens = 16384
 # The model must support the limit. Incomplete output fails without retry, repair, or partial output.
 max_output_tokens = 16384
 
-# MCP-only source caption cache. CLI does not read or create it.
+# Default: "en". Allowed: one BCP-47-shaped tag of 2-63 characters, with letters
+# and digits separated by hyphens, for example "en", "en-US", "fr", or "zh-Hans".
+# The tool prefers a native track in that language. When only a YouTube-provided
+# translated track exists, the tool uses it and reports the translation in verbose
+# output, in file metadata, and in JSON. The tool never translates locally.
+# CLI --language overrides this setting. MCP uses this server-selected value.
+[captions]
+language = "en"
+
+# Source caption cache shared by CLI and MCP.
 # Local snapshots are private source data; model-generated Markdown is not cached.
 # Disable caching to fetch each time. Paging requires available cache storage.
 [cache]

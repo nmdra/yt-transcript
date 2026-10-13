@@ -204,6 +204,7 @@ def test_description_preserves_positional_fields_and_mapping_prefix():
         "duration_seconds",
         "caption_language",
         "caption_source",
+        "caption_translated",
         "chapter_status",
         "chapters",
         "sponsorblock",

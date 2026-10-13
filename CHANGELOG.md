@@ -7,10 +7,20 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add `--language` and `[captions].language` for caption language selection, with native tracks always preferred, reported YouTube translation fallback, and a primary-subtag fallback that never substitutes another variant
+- Add `caption_translated` to file metadata and to the MCP metadata result so a translated track is never silent
+- Add `--json` for `--doctor`, `--preview`, `--raw`, Markdown mode, and errors, with one versioned document per stream
+- Share the source-caption cache between the CLI and MCP, including `--cache` and `--no-cache` overrides
+
 ### Changed
 
 - Raise the maximum `formatting.chunk_chars` from 50,000 to 200,000 for CLI and MCP; keep the 12,000-character default, token allowances, byte limits, and deadlines unchanged
 - Publish package classifiers and project URLs, and state Python 3.14.7 or newer in the README
+- Use the cache for CLI transcripts by default; `[cache].enabled` defaults to true for both interfaces
+- Replace the English-only caption error codes with `NO_CAPTIONS` and `NO_VTT`; keep `NO_ENGLISH_CAPTIONS` and `NO_ENGLISH_VTT` recognized but unused
+- Bump the source-caption cache payload version so earlier snapshots are refetched
 
 ### Fixed
 

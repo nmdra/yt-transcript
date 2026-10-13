@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any
 
-from .config import validate_cache_policy
+from .config import validate_cache_policy, validate_language_tag
 from .errors import AppError, ErrorInfo
 from .json_tools import strict_json_loads
 
@@ -37,9 +37,12 @@ def validate_request(request: object) -> dict:
         raise ValueError
     if "cache" in request:
         fields.add("cache")
+    if "language" in request:
+        fields.add("language")
     if set(request) != fields:
         raise ValueError
     validate_cache_policy(request.get("cache", {}))
+    validate_language_tag(request.get("language", "en"))
     from .downloader import validate_youtube_url
 
     if not isinstance(request["url"], str):
@@ -82,7 +85,11 @@ def dispatch(request: dict) -> Mapping[str, Any]:
 
     sponsorblock = validate_policy(request["sponsorblock"])
     cache = TranscriptCache(**asdict(validate_cache_policy(request.get("cache", {}))))
-    options: dict[str, Any] = {"sponsorblock": sponsorblock, "cache": cache}
+    options: dict[str, Any] = {
+        "sponsorblock": sponsorblock,
+        "cache": cache,
+        "language": request.get("language", "en"),
+    }
     operation = request["operation"]
     if operation == "get_transcript":
         markdown = request.get("output_format") == "markdown"

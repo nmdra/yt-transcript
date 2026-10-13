@@ -578,3 +578,38 @@ def test_summary_diagnostic_keeps_priority_over_output_reason(provider, context)
     diagnostics = render_diagnostics(AppError(combined))
     assert "summary=" in diagnostics
     assert "validation_reason=" not in diagnostics
+
+
+def test_worker_preserves_requested_caption_language_message():
+    from yt_transcript.errors import decode_worker_error
+
+    for message in (
+        "no captions found for requested language: fr",
+        "no VTT captions found for requested language: zh-Hans",
+    ):
+        info = decode_worker_error(
+            {
+                "code": "NO_CAPTIONS",
+                "message": message,
+                "hint": "No matching captions were returned; availability is not guaranteed.",
+                "phase": "caption_select",
+                "retryable": False,
+                "chunk_index": None,
+                "chunk_total": None,
+                "summary_diagnostic": None,
+            }
+        )
+        assert info.message == message
+    info = decode_worker_error(
+        {
+            "code": "NO_CAPTIONS",
+            "message": "private upstream text",
+            "hint": None,
+            "phase": "caption_select",
+            "retryable": False,
+            "chunk_index": None,
+            "chunk_total": None,
+            "summary_diagnostic": None,
+        }
+    )
+    assert info.message == "Worker operation failed."

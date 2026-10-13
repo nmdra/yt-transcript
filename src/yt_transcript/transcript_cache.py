@@ -16,8 +16,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 from .chapters import Chapter, build_chapter_sections, milliseconds, normalize_chapters
 from .cleaner import Cue
+from .config import validate_language_tag
 from .downloader import validate_youtube_url
-from .errors import TranscriptError
+from .errors import AppError, TranscriptError
 from .json_tools import strict_json_loads
 from .metadata import VideoMetadata
 from .sponsorblock import (
@@ -35,7 +36,7 @@ from .sponsorblock import (
 if TYPE_CHECKING:
     from .service import CleanedTranscript, TranscriptMode
 
-VERSION = 1
+VERSION = 2
 PAYLOAD_LIMIT = 5 * 1024 * 1024
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
 _FAULTS = (
@@ -61,12 +62,16 @@ def _json(value: object) -> bytes:
 
 
 def make_cache_key(
-    canonical_url: str, mode: TranscriptMode, policy: SponsorBlockConfig
+    canonical_url: str,
+    mode: TranscriptMode,
+    policy: SponsorBlockConfig,
+    language: str = "en",
 ) -> str:
-    """Hash the canonical video identity and resolved processing policy."""
+    """Hash the canonical video identity, language, and resolved processing policy."""
     url = validate_youtube_url(canonical_url)
     if mode not in ("filtered", "full"):
         raise ValueError("Invalid mode.")
+    target = validate_language_tag(language).lower()
     resolved = policy.resolved(default=True)
     if mode == "full":
         resolved = SponsorBlockConfig(
@@ -82,7 +87,7 @@ def make_cache_key(
                 "enabled": resolved.enabled,
                 "categories": sorted(resolved.categories),
                 "timeout_seconds": resolved.timeout_seconds,
-                "caption_selection": "english-v1",
+                "caption_selection": f"language-v2:{target}",
             }
         )
     ).hexdigest()
@@ -95,6 +100,7 @@ def _payload(cleaned: CleanedTranscript) -> bytes:
             "metadata": asdict(cleaned.metadata),
             "language": cleaned.language,
             "automatic": cleaned.automatic,
+            "translated": cleaned.translated,
             "fragments": [
                 {"start_ms": c.start_ms, "end_ms": c.end_ms, "text": c.text}
                 for c in cleaned.fragments
@@ -141,13 +147,18 @@ def _restore(payload: bytes) -> CleanedTranscript:
         decoded = strict_json_loads(payload.decode("utf-8"))
     except UnicodeError, RecursionError, ValueError:
         raise ValueError from None
-    data = _fields(decoded, "v metadata language automatic fragments")
+    data = _fields(decoded, "v metadata language automatic translated fragments")
     if type(data["v"]) is not int or data["v"] != VERSION:
         raise ValueError
     language = _string(data["language"])
-    if language != "en" and not language.startswith("en-"):
-        raise ValueError
+    try:
+        language = validate_language_tag(language)
+    except AppError:
+        # An unusable language is a cache miss, never a caller-visible failure.
+        raise ValueError from None
     if type(data["automatic"]) is not bool:
+        raise ValueError
+    if data["translated"] is not None and type(data["translated"]) is not bool:
         raise ValueError
     m = _fields(
         data["metadata"],
@@ -267,6 +278,7 @@ def _restore(payload: bytes) -> CleanedTranscript:
         build_chapter_sections(cues, metadata.chapters),
         project_sponsorblock(cues, lookup),
         compute_receipt(cues, lookup),
+        translated=data["translated"],
     )
     for effective in (False, True):
         validate_service_result(

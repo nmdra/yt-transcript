@@ -35,7 +35,7 @@ class Runner:
 def source(monkeypatch):
     calls = []
 
-    def download(url):
+    def download(url, **kwargs):
         calls.append(url)
         return DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\nRetries can duplicate writes.\n",
@@ -48,7 +48,7 @@ def source(monkeypatch):
             ),
         )
 
-    monkeypatch.setattr(service, "download_english_vtt", download)
+    monkeypatch.setattr(service, "download_caption_vtt", download)
     monkeypatch.setattr(formatter, "ensure_pi", lambda: pytest.fail("no Pi"))
     return calls
 

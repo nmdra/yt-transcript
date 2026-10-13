@@ -15,7 +15,7 @@ Verbose mode uses only diagnostic fields from the allowlist.
 |---|---|
 | `INVALID_URL`, `CONFIG_INVALID` | Correct the input or use `--no-config`. |
 | `RUNTIME_MISSING`, `RUNTIME_INCOMPATIBLE` | Install compatible Deno/EJS components. Run doctor. |
-| `NO_ENGLISH_CAPTIONS`, `NO_ENGLISH_VTT` | Extraction returned no matching English track, or returned English tracks without a VTT format. This does not prove that the video has no English captions. Check permitted access and supported runtime setup. |
+| `NO_CAPTIONS`, `NO_VTT` | Extraction returned no track for the requested language, or returned matching tracks without a VTT format. This does not prove that the video has no captions in that language. Check the requested language, permitted access, and supported runtime setup. `NO_ENGLISH_CAPTIONS` and `NO_ENGLISH_VTT` are deprecated aliases that 1.1.0 no longer emits. |
 | `YOUTUBE_ACCESS_LIMITED` | Check permitted browser access. Access restrictions can cause extraction to omit captions. |
 | `VIDEO_UNAVAILABLE`, `AUTH_REQUIRED`, `AGE_RESTRICTED`, `GEO_RESTRICTED` | Check permitted browser/account access. The tool provides no bypass. |
 | `REMOTE_RATE_LIMITED`, `NETWORK_FAILED` | Wait or check the network/certificates. Keep TLS verification enabled. |
@@ -145,10 +145,10 @@ A manual retry can cause new charges.
 
 ## Plain-text recovery
 
-A new MCP plain-text request can reuse a valid source snapshot from the shared cache when the video and resolved mode/SponsorBlock policy match.
+A new CLI or MCP request can reuse a valid source snapshot from the shared cache when the video, requested language, mode, and SponsorBlock policy match.
 The request fetches captions again if the cache is disabled or unavailable, or if no valid matching snapshot remains, including after expiry or eviction.
 A failed effective SponsorBlock lookup is not cached for reuse.
-CLI `--raw` fetches captions again.
+CLI `--no-cache` and `[cache].enabled = false` disable reuse.
 Neither plain-text recovery path calls a model.
 A fresh fetch can still fail because of network or caption errors.
 Timeouts do not undo model charges already incurred.

@@ -2,7 +2,7 @@
 
 <img width="2172" height="724" alt="yt-transcript Workflow Overview" src="https://github.com/user-attachments/assets/c556b444-b47f-4afa-88c4-0aca64639cae" />
 
-Get English YouTube transcripts through the CLI or through an AI agent that uses MCP.
+Get YouTube transcripts in a chosen caption language through the CLI or through an AI agent that uses MCP.
 Save raw captions, create edited Markdown, or create a whole-video summary.
 The tool uses only captions. It does not download audio or video. It does not require FFmpeg.
 
@@ -13,7 +13,9 @@ The tool uses only captions. It does not download audio or video. It does not re
 - **Chapter and timestamp context:** supplied chapters or timestamp blocks with original video times
 - **SponsorBlock filtering:** enabled by default for MCP, opt-in for CLI, with full-caption fallback
 - **Agent retrieval:** video metadata, time-range excerpts, transcript search, and stable pagination
-- **Local source cache:** MCP tools share private caption snapshots, with 24-hour expiry by default
+- **Language selection:** `--language` or `[captions].language`, native tracks preferred, with reported YouTube translation fallback
+- **Machine-readable output:** `--json` for doctor, preview, transcripts, and errors
+- **Local source cache:** CLI and MCP share private caption snapshots, with 24-hour expiry by default
 - **Provider choice:** Pi by default, or direct OpenRouter and DeepSeek APIs
 - **Cost and output controls:** preview planned calls, set a call cap, and publish files only after processing succeeds
 

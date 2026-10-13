@@ -44,8 +44,8 @@ def test_mcp_provider_is_server_owned(monkeypatch, mode, editorial):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\nRetries can duplicate writes.\n",
             "en",
             False,
@@ -131,8 +131,8 @@ def test_missing_server_model_does_not_break_plain_text(monkeypatch):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\ncaption\n", "en", False, metadata
         ),
     )
@@ -169,7 +169,7 @@ def test_outer_deadline_kills_http_helper_and_allows_reuse(
     worker.write_text(
         f"import sys\nfrom yt_transcript import service,mcp_worker,{provider}_backend as backend\n"
         "from yt_transcript.downloader import DownloadedCaptions\nfrom yt_transcript.metadata import VideoMetadata\n"
-        "service.download_english_vtt=lambda url: DownloadedCaptions(b'WEBVTT\\n\\n00:00.000 --> 00:01.000\\ncaption\\n','en',False,VideoMetadata('https://www.youtube.com/watch?v=abcdefghijk','abcdefghijk'))\n"
+        "service.download_caption_vtt=lambda url, **kwargs: DownloadedCaptions(b'WEBVTT\\n\\n00:00.000 --> 00:01.000\\ncaption\\n','en',False,VideoMetadata('https://www.youtube.com/watch?v=abcdefghijk','abcdefghijk'))\n"
         "original=backend.subprocess.Popen\n"
         + f"backend.subprocess.Popen=lambda argv,**kw: original([sys.executable,{str(helper)!r}],**kw)\n"
         "raise SystemExit(mcp_worker.main())\n"

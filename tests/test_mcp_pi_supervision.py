@@ -69,7 +69,7 @@ def fixture_worker(
         "import sys\nfrom yt_transcript import formatter, service, mcp_worker\n"
         "from yt_transcript.downloader import DownloadedCaptions\n"
         "from yt_transcript.metadata import VideoMetadata\n"
-        f"service.download_english_vtt=lambda url: DownloadedCaptions({captions!r},'en',False,VideoMetadata('https://www.youtube.com/watch?v=abcdefghijk','abcdefghijk',duration_seconds=10))\n"
+        f"service.download_caption_vtt=lambda url, **kwargs: DownloadedCaptions({captions!r},'en',False,VideoMetadata('https://www.youtube.com/watch?v=abcdefghijk','abcdefghijk',duration_seconds=10))\n"
         "formatter.ensure_pi=lambda: 'synthetic-pi'\n"
         "original=formatter.subprocess.Popen\n"
         + f"formatter.subprocess.Popen=lambda argv,**kw: original([sys.executable,{str(pi)!r}],**kw)\n"

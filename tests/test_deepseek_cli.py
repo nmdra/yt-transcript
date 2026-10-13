@@ -29,8 +29,8 @@ def source(monkeypatch):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\nRetries can duplicate writes.\n",
             "en",
             False,
@@ -150,7 +150,7 @@ def test_summary_preview_reports_policy_without_key(
 @pytest.mark.parametrize("flags", [[], ["--preview"]])
 def test_missing_model_fails_before_extraction(source, monkeypatch, capsys, flags):
     monkeypatch.setattr(
-        service, "download_english_vtt", lambda *a: pytest.fail("must fail early")
+        service, "download_caption_vtt", lambda *a: pytest.fail("must fail early")
     )
     assert cli.main([URL, "--no-config", "--provider", "deepseek", *flags]) == 1
     out = capsys.readouterr()
@@ -160,7 +160,7 @@ def test_missing_model_fails_before_extraction(source, monkeypatch, capsys, flag
 def test_missing_key_fails_before_extraction(source, monkeypatch, capsys):
     monkeypatch.delenv("DEEPSEEK_API_KEY")
     monkeypatch.setattr(
-        service, "download_english_vtt", lambda *a: pytest.fail("must fail early")
+        service, "download_caption_vtt", lambda *a: pytest.fail("must fail early")
     )
     assert (
         cli.main(

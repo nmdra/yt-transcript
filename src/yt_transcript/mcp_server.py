@@ -452,6 +452,7 @@ def create_server(config: AppConfig, *, runner: Runner | None = None):
             "url": url,
             "mode": mode,
             "cache": asdict(config.cache),
+            "language": config.captions.language,
             "sponsorblock": {
                 "enabled": False
                 if mode == "full"

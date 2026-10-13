@@ -221,7 +221,7 @@ def download(monkeypatch):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
+        "download_caption_vtt",
         lambda *a, **k: DownloadedCaptions(vtt, "en", False, metadata),
     )
     return source

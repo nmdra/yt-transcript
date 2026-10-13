@@ -95,6 +95,7 @@ def metadata_mapping(
     *,
     language: str,
     automatic: bool,
+    translated: bool | None = None,
     sponsorblock_result: SponsorBlockLookup | None = None,
     removal_receipt: SponsorBlockRemovalReceipt | None = None,
 ) -> dict[str, Any]:
@@ -114,6 +115,7 @@ def metadata_mapping(
         },
         "caption_language": language,
         "caption_source": "automatic" if automatic else "manual",
+        "caption_translated": translated,
         "chapter_status": metadata.chapter_status,
         "chapters": [
             {
@@ -136,6 +138,7 @@ def format_transcript_file(
     *,
     language: str,
     automatic: bool,
+    translated: bool | None = None,
     sponsorblock_result: SponsorBlockLookup | None = None,
     removal_receipt: SponsorBlockRemovalReceipt | None = None,
 ) -> str:
@@ -155,6 +158,7 @@ def format_transcript_file(
             metadata,
             language=language,
             automatic=automatic,
+            translated=translated,
             sponsorblock_result=sponsorblock_result,
             removal_receipt=removal_receipt,
         ),

@@ -259,7 +259,7 @@ for i in range(40):
     cues.append(f"00:{i:02d}.000 --> 00:{i:02d}.900\\nCue {i:02d} authentication JWT cache "+"words "*12)
 vtt=("WEBVTT\\n\\n"+"\\n\\n".join(cues)+"\\n").encode()
 metadata=VideoMetadata("https://www.youtube.com/watch?v=abcdefghijk","abcdefghijk",duration_seconds=40)
-def download(url):
+def download(url, **kwargs):
     mark("download")
     return DownloadedCaptions(vtt,"en",False,metadata)
 def lookup(video_id,*,config,duration_seconds):
@@ -272,7 +272,7 @@ def format_body(body,*,on_progress=None,**kwargs):
             on_progress(done,2)
             time.sleep(0.01)
     return "## Edited\\n\\nSource captions."
-service.download_english_vtt=download
+service.download_caption_vtt=download
 service.lookup_sponsorblock=lookup
 formatter.ensure_formatter=lambda *a: None
 formatter.format_transcript=format_body

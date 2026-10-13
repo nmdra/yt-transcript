@@ -7,6 +7,7 @@ import pytest
 from yt_transcript.config import (
     AppConfig,
     CacheConfig,
+    CaptionsConfig,
     DeepSeekConfig,
     MCPConfig,
     SponsorBlockConfig,
@@ -108,11 +109,13 @@ def test_example_documents_all_supported_settings(tmp_path):
         "sponsorblock",
         "mcp",
         "cache",
+        "captions",
     }
     assert set(tables["cache"]) == set(CacheConfig.__dataclass_fields__)
+    assert set(tables["captions"]) == set(CaptionsConfig.__dataclass_fields__)
     assert set(tables["output"]) | set(tables["formatting"]) == set(
         AppConfig.__dataclass_fields__
-    ) - {"sponsorblock", "mcp", "openrouter", "deepseek", "cache"}
+    ) - {"sponsorblock", "mcp", "openrouter", "deepseek", "cache", "captions"}
     assert set(tables["deepseek"]) == set(DeepSeekConfig.__dataclass_fields__)
     assert set(tables["sponsorblock"]) == set(SponsorBlockConfig.__dataclass_fields__)
     assert set(tables["mcp"]) == set(MCPConfig.__dataclass_fields__)
@@ -151,3 +154,35 @@ def test_files(tmp_path):
             load_config(path)
     path.write_bytes(b"")
     assert load_config(path) == AppConfig()
+
+
+def test_captions_language_defaults_and_overrides(tmp_path):
+    assert AppConfig().captions == CaptionsConfig("en")
+    path = tmp_path / "config.toml"
+    path.write_text('[captions]\nlanguage = "zh-Hans"\n', encoding="utf-8")
+    assert load_config(path).captions.language == "zh-Hans"
+    assert resolve_config(load_config(path), language="fr").captions.language == "fr"
+    assert resolve_config(AppConfig(), language=None).captions.language == "en"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        '[captions]\nlanguage = "fr EN"\n',
+        '[captions]\nlanguage = ""\n',
+        "[captions]\nlanguage = 12\n",
+        '[captions]\nunknown = "en"\n',
+        '[unknown]\nlanguage = "en"\n',
+    ],
+)
+def test_captions_language_rejects_invalid_values(tmp_path, body):
+    path = tmp_path / "config.toml"
+    path.write_text(body, encoding="utf-8")
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+@pytest.mark.parametrize("value", ["f", "12", "fr EN", "en--US", "en-" + "a" * 64])
+def test_resolve_config_rejects_invalid_language(value):
+    with pytest.raises(ConfigError):
+        resolve_config(AppConfig(), language=value)

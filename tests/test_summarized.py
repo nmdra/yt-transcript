@@ -270,8 +270,8 @@ def download_fixture(monkeypatch):
     vtt = b"WEBVTT\n\n00:00.000 --> 00:01.000\n" + SOURCE.encode() + b"\n"
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(vtt, "en", False, metadata),
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(vtt, "en", False, metadata),
     )
     return metadata
 

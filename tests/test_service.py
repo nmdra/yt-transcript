@@ -18,20 +18,20 @@ def test_shared_document_and_plan(monkeypatch, description):
         description=description,
     )
 
-    def download(url):
+    def download(url, **kwargs):
         calls.append(url)
         return DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\nhello world\n", "en", False, metadata
         )
 
-    monkeypatch.setattr(service, "download_english_vtt", download)
+    monkeypatch.setattr(service, "download_caption_vtt", download)
     result = service.fetch_transcript_document(metadata.url)
     assert len(calls) == 1
     assert result["character_count"] == 27
     assert result["document"] == "[00:00 - 00:01] hello world"
     assert result["character_count"] == len(result["document"])
     assert result["metadata"]["caption_source"] == "manual"
-    assert len(result["metadata"]) == 14
+    assert len(result["metadata"]) == 15
     assert result["metadata"]["description"] == description
     service.validate_service_result("get_transcript", result)
     cleaned = service.CleanedTranscript("hello world", metadata, "en", False)
@@ -80,3 +80,58 @@ def test_description_is_required_even_when_nullable():
             },
         )
     assert exc.value.info.code == "INTERNAL_ERROR"
+
+
+def test_language_reaches_downloader_and_mapping(monkeypatch):
+    seen = []
+    metadata = VideoMetadata(
+        "https://www.youtube.com/watch?v=abcdefghijk", "abcdefghijk"
+    )
+
+    def download(url, **kwargs):
+        seen.append(kwargs.get("language"))
+        return DownloadedCaptions(
+            b"WEBVTT\n\n00:00.000 --> 00:01.000\nbonjour\n",
+            "fr",
+            False,
+            metadata,
+            True,
+        )
+
+    monkeypatch.setattr(service, "download_caption_vtt", download)
+    cleaned = service.fetch_clean_transcript(metadata.url, language="fr")
+    assert seen == ["fr"]
+    mapping = cleaned.mapping()
+    assert mapping["caption_language"] == "fr"
+    assert mapping["caption_translated"] is True
+    assert "cache_hit" not in mapping
+
+
+def test_cache_hit_is_marked_without_entering_metadata(monkeypatch, tmp_path):
+    from yt_transcript.sponsorblock import SponsorBlockConfig
+    from yt_transcript.transcript_cache import TranscriptCache
+
+    calls = []
+    metadata = VideoMetadata(
+        "https://www.youtube.com/watch?v=abcdefghijk", "abcdefghijk"
+    )
+
+    def download(url, **kwargs):
+        calls.append(url)
+        return DownloadedCaptions(
+            b"WEBVTT\n\n00:00.000 --> 00:01.000\nhello world\n", "en", False, metadata
+        )
+
+    monkeypatch.setattr(service, "download_caption_vtt", download)
+    cache = TranscriptCache(tmp_path / "cache" / "transcripts.db")
+    policy = SponsorBlockConfig(enabled=False)
+    first = service.get_cached_snapshot(
+        metadata.url, "full", sponsorblock=policy, cache=cache
+    )
+    second = service.get_cached_snapshot(
+        metadata.url, "full", sponsorblock=policy, cache=cache
+    )
+    assert len(calls) == 1
+    assert not first.cache_hit
+    assert second.cache_hit is True
+    assert "cache_hit" not in second.mapping()

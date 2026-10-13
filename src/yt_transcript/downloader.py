@@ -1,4 +1,4 @@
-"""Validated YouTube URLs and ranked English VTT tracks."""
+"""Validated YouTube URLs and ranked caption VTT tracks."""
 
 import re
 import shutil
@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlsplit
 from yt_dlp import YoutubeDL
 
 from .chapters import snapshot_chapters
+from .config import validate_language_tag
 from .errors import (
     AppError,
     ErrorInfo,
@@ -80,40 +81,66 @@ def validate_youtube_url(url: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
-def select_english_track(info: Mapping[str, Any]) -> CaptionTrack:
+def _caption_candidates(
+    info: Mapping[str, Any], target: str, *, strict: bool = False
+) -> tuple[list[tuple[int, str, str, CaptionTrack]], bool]:
+    """Rank tracks for a target language.
+
+    A normal scan accepts the target key and its region, script, or `-orig` extensions.
+    A strict scan accepts only the target key and its `-orig` marker, so a fallback never
+    substitutes a different variant, such as `zh-Hans` for a `zh-Hant` request.
+    """
     candidates = []
-    english = False
+    matched = False
     for automatic, source in ((False, "subtitles"), (True, "automatic_captions")):
         tracks = info.get(source) or {}
-        for language, formats in tracks.items():
-            key = language.lower()
-            if key != "en" and not key.startswith("en-"):
+        for language_key, formats in tracks.items():
+            key = language_key.lower()
+            if strict:
+                acceptable = key == target or key == target + "-orig"
+            else:
+                acceptable = key == target or key.startswith(target + "-")
+            if not acceptable:
                 continue
-            english = True
+            matched = True
             vtt = tuple(
                 f for f in formats if isinstance(f, dict) and f.get("ext") == "vtt"
             )
             if not vtt:
                 continue
             if not automatic:
-                rank = 0 if key == "en" else 1
-            elif key == "en-orig":
+                rank = 0 if key == target else 1
+            elif key == target + "-orig":
                 rank = 2
             elif key.endswith("-orig"):
                 rank = 3
-            elif key == "en":
+            elif key == target:
                 rank = 4
             else:
                 rank = 5
             candidates.append(
-                (rank, key, language, CaptionTrack(language, automatic, vtt))
+                (rank, key, language_key, CaptionTrack(language_key, automatic, vtt))
             )
+    return candidates, matched
+
+
+def select_caption_track(info: Mapping[str, Any], language: str = "en") -> CaptionTrack:
+    requested = validate_language_tag(language).lower()
+    candidates, matched = _caption_candidates(info, requested)
+    if not candidates and "-" in requested:
+        # A region or script request falls back to its primary subtag, and only to that
+        # exact tag. Asking for "en-US" reaches "en" or "en-orig" instead of failing, and
+        # asking for "zh-Hant" never returns "zh-Hans".
+        candidates, fallback_matched = _caption_candidates(
+            info, requested.split("-", 1)[0], strict=True
+        )
+        matched = matched or fallback_matched
     if not candidates:
-        code = "NO_ENGLISH_VTT" if english else "NO_ENGLISH_CAPTIONS"
+        code = "NO_VTT" if matched else "NO_CAPTIONS"
         message = (
-            "no English VTT subtitles found"
-            if english
-            else "no English subtitles found"
+            f"no VTT captions found for requested language: {language}"
+            if matched
+            else f"no captions found for requested language: {language}"
         )
         raise TranscriptError(
             ErrorInfo(
@@ -126,12 +153,34 @@ def select_english_track(info: Mapping[str, Any]) -> CaptionTrack:
     return min(candidates, key=lambda candidate: candidate[:3])[3]
 
 
+def uses_translated_track(formats: object) -> bool | None:
+    """Report caption provenance from the selected format URLs, never key shape."""
+    if not isinstance(formats, (list, tuple)):
+        return None
+    usable = False
+    for item in formats:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("url")
+        if not isinstance(url, str) or not url:
+            continue
+        try:
+            query = parse_qs(urlsplit(url).query, keep_blank_values=True)
+        except ValueError:
+            continue
+        usable = True
+        if "tlang" in query:
+            return True
+    return False if usable else None
+
+
 @dataclass(frozen=True)
 class DownloadedCaptions:
     vtt: bytes
     language: str
     automatic: bool
     metadata: VideoMetadata
+    translated: bool | None = None
 
 
 def retry_delay(n: int) -> int:
@@ -189,7 +238,9 @@ def ensure_deno() -> None:
         ) from None
 
 
-def download_english_vtt(url: str, *, verbose: bool = False) -> DownloadedCaptions:
+def download_caption_vtt(
+    url: str, *, language: str = "en", verbose: bool = False
+) -> DownloadedCaptions:
     canonical = validate_youtube_url(url)
     ensure_deno()
     logger = WarningCollector()
@@ -246,7 +297,7 @@ def download_english_vtt(url: str, *, verbose: bool = False) -> DownloadedCaptio
                     )
                 phase = "caption_select"
                 try:
-                    track = select_english_track(info)
+                    track = select_caption_track(info, language)
                 except TranscriptError:
                     if logger.access_limited:
                         raise TranscriptError(
@@ -297,7 +348,11 @@ def download_english_vtt(url: str, *, verbose: bool = False) -> DownloadedCaptio
                     processed, canonical_url=canonical, chapter_input=chapter_input
                 )
                 return DownloadedCaptions(
-                    raw, track.language, track.automatic, metadata
+                    raw,
+                    track.language,
+                    track.automatic,
+                    metadata,
+                    uses_translated_track(track.formats),
                 )
         except AppError:
             raise

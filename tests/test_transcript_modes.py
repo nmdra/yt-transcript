@@ -36,7 +36,7 @@ def source(monkeypatch):
     )
     calls = []
 
-    def download(url):
+    def download(url, **kwargs):
         calls.append("download")
         return DownloadedCaptions(VTT, "en", False, metadata)
 
@@ -51,7 +51,7 @@ def source(monkeypatch):
             (SponsorBlockSegment(1000, 3000, "sponsor", 1, True),),
         )
 
-    monkeypatch.setattr(service, "download_english_vtt", download)
+    monkeypatch.setattr(service, "download_caption_vtt", download)
     monkeypatch.setattr(service, "lookup_sponsorblock", lookup)
     return metadata, calls, download
 
@@ -109,8 +109,8 @@ def test_description_is_independent_of_mode_and_editing(
     metadata = replace(metadata, description=description)
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(VTT, "en", False, metadata),
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(VTT, "en", False, metadata),
     )
     edits = []
 
@@ -198,8 +198,8 @@ def test_chapter_labels_source_order_and_raw_compatibility(source, monkeypatch):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(VTT, "en", False, metadata),
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(VTT, "en", False, metadata),
     )
     result = service.fetch_transcript_document(URL, "full")
     assert "Chapter 1 [00:00 - 00:05]: Introduction" in result["document"]

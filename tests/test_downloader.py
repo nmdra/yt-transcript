@@ -1,6 +1,6 @@
 import pytest
 
-from yt_transcript.downloader import select_english_track, validate_youtube_url
+from yt_transcript.downloader import select_caption_track, validate_youtube_url
 from yt_transcript.errors import TranscriptError
 
 ID = "abcdefghijk"
@@ -51,7 +51,7 @@ def test_caption_priority_order(first_available):
     info = {"subtitles": {}, "automatic_captions": {}}
     for source, language in reversed(ordered[first_available:]):
         info[source][language] = [{"ext": "vtt"}]
-    track = select_english_track(info)
+    track = select_caption_track(info)
     source, language = ordered[first_available]
     assert track.language == language
     assert track.automatic == (source == "automatic_captions")
@@ -60,18 +60,22 @@ def test_caption_priority_order(first_available):
 def test_caption_priority_preserves_case_and_lexical_ties():
     formats = [{"ext": "vtt"}]
     assert (
-        select_english_track(
+        select_caption_track(
             {"subtitles": {"en-US": formats, "en-GB": formats}}
         ).language
         == "en-GB"
     )
     assert (
-        select_english_track({"subtitles": {"en": formats, "EN": formats}}).language
+        select_caption_track({"subtitles": {"en": formats, "EN": formats}}).language
         == "EN"
     )
 
 
-def test_real_upstream_selection():
+@pytest.mark.parametrize(
+    "key,pattern",
+    [("en", "^en$"), ("fr-en", "^fr-en$"), ("zh-Hans", "^zh-Hans$")],
+)
+def test_real_upstream_selection(key, pattern):
     from typing import Any, cast
 
     from yt_dlp import YoutubeDL
@@ -85,16 +89,16 @@ def test_real_upstream_selection():
             {
                 "quiet": True,
                 "writesubtitles": True,
-                "subtitleslangs": ["^en$"],
+                "subtitleslangs": [pattern],
                 "subtitlesformat": "vtt",
                 "cachedir": False,
             },
         )
     ) as ydl:
         selected = ydl.process_subtitles(
-            ID, {"en": [{"ext": "vtt", "url": "synthetic"}]}, {}
+            ID, {key: [{"ext": "vtt", "url": "synthetic"}]}, {}
         )
-    assert selected is not None and selected["en"]["ext"] == "vtt"
+    assert selected is not None and selected[key]["ext"] == "vtt"
 
 
 def test_download_orchestration(monkeypatch):
@@ -155,7 +159,7 @@ def test_download_orchestration(monkeypatch):
 
     monkeypatch.setattr(module, "ensure_deno", lambda: None)
     monkeypatch.setattr(module, "YoutubeDL", FakeDL)
-    result = module.download_english_vtt(f"https://youtu.be/{ID}")
+    result = module.download_caption_vtt(f"https://youtu.be/{ID}")
     assert result.vtt.endswith(b"hello\r\n")
     assert result.metadata.chapters[0].title == "Original"
     assert (
@@ -247,15 +251,15 @@ def fake_download(monkeypatch, tmp_path):
     ],
 )
 def test_livestream_guard(fake_download, status, accepted):
-    from yt_transcript.downloader import download_english_vtt
+    from yt_transcript.downloader import download_caption_vtt
 
     fake_download.info["live_status"] = status
     if accepted:
-        download_english_vtt(f"https://youtu.be/{ID}")
+        download_caption_vtt(f"https://youtu.be/{ID}")
         assert fake_download.processed == 1
     else:
         with pytest.raises(TranscriptError) as exc:
-            download_english_vtt(f"https://youtu.be/{ID}")
+            download_caption_vtt(f"https://youtu.be/{ID}")
         assert exc.value.info.code == "UNSUPPORTED_LIVESTREAM"
         assert fake_download.processed == 0
     assert not fake_download.root.exists()
@@ -263,11 +267,11 @@ def test_livestream_guard(fake_download, status, accepted):
 
 @pytest.mark.parametrize("mode", ["missing", "empty", "outside", "multiple", "nonvtt"])
 def test_file_validation(fake_download, mode):
-    from yt_transcript.downloader import download_english_vtt
+    from yt_transcript.downloader import download_caption_vtt
 
     fake_download.path_mode = mode
     with pytest.raises(TranscriptError) as exc:
-        download_english_vtt(f"https://youtu.be/{ID}")
+        download_caption_vtt(f"https://youtu.be/{ID}")
     assert exc.value.info.code == "SUBTITLE_DOWNLOAD_FAILED"
     assert not fake_download.root.exists()
 
@@ -275,7 +279,7 @@ def test_file_validation(fake_download, mode):
 @pytest.mark.parametrize(
     "warning,code",
     [
-        ("ordinary secret warning", "NO_ENGLISH_CAPTIONS"),
+        ("ordinary secret warning", "NO_CAPTIONS"),
         (
             "Some web client subtitles require a PO Token which was not provided. private secret",
             "YOUTUBE_ACCESS_LIMITED",
@@ -283,12 +287,12 @@ def test_file_validation(fake_download, mode):
     ],
 )
 def test_warning_missing_captions(fake_download, warning, code):
-    from yt_transcript.downloader import download_english_vtt
+    from yt_transcript.downloader import download_caption_vtt
 
     fake_download.info["subtitles"] = {}
     fake_download.warning = warning
     with pytest.raises(TranscriptError) as exc:
-        download_english_vtt(f"https://youtu.be/{ID}")
+        download_caption_vtt(f"https://youtu.be/{ID}")
     assert exc.value.info.code == code
     assert fake_download.processed == 0
 
@@ -297,19 +301,19 @@ def test_warning_missing_captions(fake_download, warning, code):
     "chapters", ["bad", [None], [{"title": "x", "start_time": True}]]
 )
 def test_optional_malformed_chapters_do_not_reach_processor(fake_download, chapters):
-    from yt_transcript.downloader import download_english_vtt
+    from yt_transcript.downloader import download_caption_vtt
 
     fake_download.info["chapters"] = chapters
-    result = download_english_vtt(f"https://youtu.be/{ID}")
+    result = download_caption_vtt(f"https://youtu.be/{ID}")
     assert result.metadata.chapter_status == "invalid"
     assert not result.metadata.chapters and fake_download.processed == 1
 
 
 def test_manual_options_and_valid_warning(fake_download):
-    from yt_transcript.downloader import download_english_vtt
+    from yt_transcript.downloader import download_caption_vtt
 
     fake_download.warning = "unknown secret warning"
-    download_english_vtt(f"https://youtu.be/{ID}")
+    download_caption_vtt(f"https://youtu.be/{ID}")
     assert fake_download.params["writesubtitles"]
     assert not fake_download.params["writeautomaticsub"]
     assert fake_download.params["subtitleslangs"] == ["^en$"]
@@ -320,11 +324,11 @@ def test_manual_options_and_valid_warning(fake_download):
 def test_subtitle_failure_no_retry(fake_download):
     from yt_dlp.utils import DownloadError
 
-    from yt_transcript.downloader import download_english_vtt
+    from yt_transcript.downloader import download_caption_vtt
 
     fake_download.failure = DownloadError("private secret")
     with pytest.raises(TranscriptError) as exc:
-        download_english_vtt(f"https://youtu.be/{ID}")
+        download_caption_vtt(f"https://youtu.be/{ID}")
     assert exc.value.info.code == "SUBTITLE_DOWNLOAD_FAILED"
     assert fake_download.processed == 1
     assert not fake_download.root.exists()
@@ -336,26 +340,156 @@ def test_ranking():
         "subtitles": {"en-z": vtt, "en-a": vtt, "en": vtt},
         "automatic_captions": {"en-orig": vtt, "en": vtt},
     }
-    assert select_english_track(info).language == "en"
+    assert select_caption_track(info).language == "en"
     del info["subtitles"]["en"]
-    assert select_english_track(info).language == "en-a"
+    assert select_caption_track(info).language == "en-a"
     info["subtitles"] = {}
-    assert select_english_track(info).language == "en-orig"
+    assert select_caption_track(info).language == "en-orig"
     del info["automatic_captions"]["en-orig"]
     info["automatic_captions"]["en-GB-orig"] = vtt
-    assert select_english_track(info).language == "en-GB-orig"
+    assert select_caption_track(info).language == "en-GB-orig"
     del info["automatic_captions"]["en-GB-orig"]
-    assert select_english_track(info).language == "en"
+    assert select_caption_track(info).language == "en"
 
 
 @pytest.mark.parametrize(
     "info,code",
     [
-        ({"subtitles": {"english": [{"ext": "vtt"}]}}, "NO_ENGLISH_CAPTIONS"),
-        ({"subtitles": {"en": [{"ext": "srt"}]}}, "NO_ENGLISH_VTT"),
+        ({"subtitles": {"english": [{"ext": "vtt"}]}}, "NO_CAPTIONS"),
+        ({"subtitles": {"en": [{"ext": "srt"}]}}, "NO_VTT"),
     ],
 )
 def test_missing(info, code):
     with pytest.raises(TranscriptError) as exc:
-        select_english_track(info)
+        select_caption_track(info)
     assert exc.value.info.code == code
+
+
+def test_language_ranking_mirrors_english_order():
+    formats = [{"ext": "vtt"}]
+    ordered = [
+        ("subtitles", "fr"),
+        ("subtitles", "fr-CA"),
+        ("automatic_captions", "fr-orig"),
+        ("automatic_captions", "fr-CA-orig"),
+        ("automatic_captions", "fr"),
+        ("automatic_captions", "fr-en"),
+    ]
+    for first_available in range(len(ordered)):
+        info = {"subtitles": {}, "automatic_captions": {}}
+        for source, key in reversed(ordered[first_available:]):
+            info[source][key] = formats
+        track = select_caption_track(info, "fr")
+        source, key = ordered[first_available]
+        assert track.language == key
+        assert track.automatic == (source == "automatic_captions")
+
+
+def test_language_selection_is_case_insensitive_and_ignores_others():
+    formats = [{"ext": "vtt"}]
+    info = {
+        "subtitles": {"de": formats, "EN": formats},
+        "automatic_captions": {"fr": formats},
+    }
+    assert select_caption_track(info, "en").language == "EN"
+    assert select_caption_track(info, "FR").language == "fr"
+
+
+@pytest.mark.parametrize("tag", ["zh-Hans", "pt-BR", "yue"])
+def test_region_and_script_language_tags(tag):
+    info = {"subtitles": {tag: [{"ext": "vtt"}]}, "automatic_captions": {}}
+    assert select_caption_track(info, tag).language == tag
+    assert select_caption_track(info, tag.lower()).language == tag
+
+
+@pytest.mark.parametrize(
+    "info,code",
+    [
+        ({"subtitles": {"de": [{"ext": "vtt"}]}}, "NO_CAPTIONS"),
+        ({"subtitles": {"fr": [{"ext": "srt"}]}}, "NO_VTT"),
+    ],
+)
+def test_missing_requested_language(info, code):
+    with pytest.raises(TranscriptError) as exc:
+        select_caption_track(info, "fr")
+    assert exc.value.info.code == code
+    assert "fr" in exc.value.info.message
+
+
+def test_translation_provenance_reads_tlang_only():
+    from yt_transcript.downloader import uses_translated_track
+
+    assert (
+        uses_translated_track([{"ext": "vtt", "url": "https://x.test/a?lang=en"}])
+        is False
+    )
+    assert (
+        uses_translated_track([{"ext": "vtt", "url": "https://x.test/a?tlang=fr"}])
+        is True
+    )
+    assert uses_translated_track([{"ext": "vtt"}]) is None
+    assert uses_translated_track([{"ext": "vtt", "url": 1}]) is None
+    assert uses_translated_track("not-a-list") is None
+    assert uses_translated_track([{"ext": "vtt", "url": "http://[::1"}]) is None
+
+
+@pytest.mark.parametrize("language", ["f", "12", "fr EN", "en--US", "en-" + "a" * 64])
+def test_invalid_language_is_rejected(language):
+    from yt_transcript.errors import AppError
+
+    with pytest.raises(AppError):
+        select_caption_track({"subtitles": {"en": [{"ext": "vtt"}]}}, language)
+
+
+def test_region_request_falls_back_to_primary_subtag():
+    formats = [{"ext": "vtt"}]
+    info = {
+        "subtitles": {},
+        "automatic_captions": {
+            "en": formats,
+            "en-orig": formats,
+            "pt": formats,
+            "pt-PT": formats,
+        },
+    }
+    assert select_caption_track(info, "en-US").language == "en-orig"
+    assert select_caption_track(info, "en-GB").language == "en-orig"
+    assert select_caption_track(info, "pt-BR").language == "pt"
+
+
+def test_exact_tag_wins_over_primary_subtag_fallback():
+    formats = [{"ext": "vtt"}]
+    info = {"subtitles": {"pt-PT": formats}, "automatic_captions": {"pt": formats}}
+    assert select_caption_track(info, "pt-PT").language == "pt-PT"
+    assert select_caption_track(info, "pt-BR").language == "pt"
+
+
+def test_script_tag_never_substitutes_a_sibling_script():
+    formats = [{"ext": "vtt"}]
+    info = {"subtitles": {"zh-Hans": formats}, "automatic_captions": {"zh": formats}}
+    assert select_caption_track(info, "zh-Hans").language == "zh-Hans"
+    assert select_caption_track(info, "zh-Hant").language == "zh"
+
+
+def test_fallback_never_substitutes_a_region_variant():
+    formats = [{"ext": "vtt"}]
+    info = {"subtitles": {}, "automatic_captions": {"pt-PT": formats}}
+    with pytest.raises(TranscriptError) as exc:
+        select_caption_track(info, "pt-BR")
+    assert exc.value.info.code == "NO_CAPTIONS"
+    assert "pt-BR" in exc.value.info.message
+
+
+def test_fallback_failure_reports_the_requested_language():
+    info = {"subtitles": {"de": [{"ext": "vtt"}]}, "automatic_captions": {}}
+    with pytest.raises(TranscriptError) as exc:
+        select_caption_track(info, "en-US")
+    assert exc.value.info.code == "NO_CAPTIONS"
+    assert "en-US" in exc.value.info.message
+
+
+def test_fallback_distinguishes_no_vtt_from_no_captions():
+    info = {"subtitles": {"en": [{"ext": "srt"}]}, "automatic_captions": {}}
+    with pytest.raises(TranscriptError) as exc:
+        select_caption_track(info, "en-GB")
+    assert exc.value.info.code == "NO_VTT"

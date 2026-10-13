@@ -106,13 +106,14 @@ The wrapper does not create configuration files.
 | `formatting.timeout_seconds` | Integer 1 through 3,600, per model call |
 | `formatting.max_chunks` | Integer 1 through 1,000, or omit for unlimited; includes summary synthesis |
 | `formatting.editorial_mode` | `standard` (default), `focused`, or `summarized` |
-| `cache.path` | Empty or omitted keeps the existing cache location; otherwise an absolute SQLite filename with optional `~` expansion; MCP only |
+| `captions.language` | BCP-47-shaped tag, 2-63 characters, letters and digits separated by hyphens; default `en` |
+| `cache.path` | Empty or omitted keeps the existing cache location; otherwise an absolute SQLite filename with optional `~` expansion |
 | `mcp.markdown_timeout_seconds` | Integer 300 through 3,600; total MCP Markdown deadline, default 300; ignored by CLI |
 | `sponsorblock.enabled` | Optional boolean; unset means CLI off, MCP filtered on |
 | `sponsorblock.categories` | Nonempty unique list: `sponsor`, `selfpromo`, `interaction`, `intro`, `outro`, `preview` |
 | `sponsorblock.timeout_seconds` | Integer 1 through 30, per socket operation |
 
-`--raw`, `--raw-vtt`, `--model`, `--max-chunks`, and `-v` override their corresponding defaults.
+`--raw`, `--raw-vtt`, `--model`, `--max-chunks`, `--language`, and `-v` override their corresponding defaults.
 There is no `--markdown` or `--quiet` flag.
 Set `chunk_chars` and `summary_synthesis_chars` in `[formatting]` in TOML.
 There is no `--chunk-chars` or `--summary-synthesis-chars` flag.
@@ -120,10 +121,19 @@ Larger source chunks need enough model context, output capacity, and time for th
 The 200,000-character maximum does not increase token allowances, byte limits, or deadlines.
 `--no-config` still uses the 12,000-character built-in default.
 
+`--language` selects one caption language for one run.
+`captions.language` sets the default for both CLI and MCP.
+A native track is always preferred.
+When only a YouTube-provided translated track exists, the wrapper uses it and reports the translation in verbose output, in file metadata, and in JSON.
+A region or script tag that has no track falls back to its primary subtag alone, so `--language en-US` accepts `en` and never accepts `en-GB`.
+The wrapper never translates locally.
+See the [caption selection contract](behavior.md#caption-selection-and-cleanup).
+
 After the wrapper checks the schema, raw modes ignore saved formatting preferences.
 An explicit model, chunk cap, or editorial-mode flag conflicts with raw output.
 `--editorial-mode` overrides TOML.
 The mutually exclusive `--sponsorblock` / `--no-sponsorblock` flags also override TOML.
+The mutually exclusive `--cache` / `--no-cache` flags override `cache.enabled` for one run.
 The existing CLI structure and defaults remain unchanged.
 
 Without an explicit model in TOML or CLI, every Pi call omits `--model`.
@@ -259,8 +269,9 @@ Preview requires Markdown mode and no output path.
 If the plan exceeds the cap, preview still returns a successful report.
 Actual formatting rejects a plan that exceeds the cap before any model call.
 
-Preview is not a cache or a reservation.
-A later run downloads captions again.
+Preview is not a reservation.
+A later run reuses the shared source-caption snapshot when the video, language, and resolved SponsorBlock policy match.
+A later run downloads captions again when no valid snapshot remains.
 Invocation counts are not token counts, dollar estimates, or exact provider-request counts.
 
 The formatter splits text on sentence boundaries or whitespace.
@@ -297,6 +308,36 @@ The total MCP Markdown deadline is separate from CLI per-chunk timeouts.
 
 `--no-session` prevents local Pi session persistence.
 This flag does not prevent provider-side logging or retention.
+
+## JSON output
+
+```sh
+yt-transcript --doctor --json
+yt-transcript URL --no-config --preview --json
+yt-transcript URL --no-config --raw --json
+```
+
+`--json` prints exactly one JSON document per stream.
+Every document includes `schema_version` (currently `1`) and `command`.
+Stdout carries the result document.
+Stderr carries one error document, or nothing.
+Progress and other stderr text are disabled, so both streams stay parseable.
+A SponsorBlock warning appears inside the document, not on stderr.
+Exit codes do not change.
+`--json` is invalid with `--raw-vtt` and with `--mcp`.
+
+| Command | Document |
+|---|---|
+| `--doctor` | `healthy`, `checks` with `name`, `status`, and `detail`, and a readiness `note` |
+| `--preview` | Canonical URL, caption language and provenance, cache state, SponsorBlock state, character counts, the plan, provider, model, editorial mode, and requested thinking |
+| `--raw` | The metadata fields below, `body`, `character_count`, and `cues` with original times |
+| Markdown mode | The same metadata fields and `body`; no `cues` |
+| Any failure | `error` with `code`, `phase`, `retryable`, chunk position, `message`, `hint`, and `diagnostic` only with `--verbose` |
+
+Caption text and descriptions never appear in doctor or preview output.
+Transcript output includes the description only with `-o`, matching the file metadata rule.
+With `-o`, the file contains the JSON document instead of the YAML header and body.
+The preview document omits the plan's source chunks.
 
 ## Doctor and file safety
 

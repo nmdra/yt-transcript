@@ -40,8 +40,8 @@ def source(monkeypatch):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\nhello world\n", "en", False, metadata
         ),
     )
@@ -98,8 +98,8 @@ def test_markdown_has_canonical_chapter_headings(source, monkeypatch):
     )
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\nhello world\n", "en", False, metadata
         ),
     )
@@ -114,8 +114,8 @@ def test_markdown_has_canonical_chapter_headings(source, monkeypatch):
 def test_cap_rejects_before_model(source, monkeypatch):
     monkeypatch.setattr(
         service,
-        "download_english_vtt",
-        lambda url: DownloadedCaptions(
+        "download_caption_vtt",
+        lambda url, **kwargs: DownloadedCaptions(
             b"WEBVTT\n\n00:00.000 --> 00:01.000\n" + b"word " * 1000 + b"\n",
             "en",
             False,

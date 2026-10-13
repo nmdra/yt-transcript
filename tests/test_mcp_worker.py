@@ -78,6 +78,7 @@ def test_dispatch_uses_explicit_formatting_options(monkeypatch, markdown):
                 "sponsorblock": SponsorBlockConfig(
                     enabled=False, categories=("sponsor",), timeout_seconds=10
                 ),
+                "language": "en",
                 "output_format": "markdown" if markdown else "plain_text",
                 "formatting": policy if markdown else None,
                 "supervised": markdown,
@@ -608,3 +609,41 @@ def test_dispatch_preserves_optional_thinking_controls(monkeypatch):
     assert captured[0]["formatting"] == policy
     assert captured[0]["formatting"].thinking is None
     assert not {"thinking", "thinking_level", "deepseek"} & captured[0].keys()
+
+
+def _language_request(**extra):
+    payload = {
+        "operation": "get_video_info",
+        "url": "https://youtu.be/abcdefghijk",
+        "mode": "filtered",
+        "sponsorblock": {
+            "enabled": False,
+            "categories": ["sponsor"],
+            "timeout_seconds": 10,
+        },
+    }
+    payload.update(extra)
+    return payload
+
+
+def test_request_language_is_optional_and_validated():
+    assert validate_request(_language_request())["mode"] == "filtered"
+    assert validate_request(_language_request(language="fr"))["language"] == "fr"
+    with pytest.raises((ValueError, AppError)):
+        validate_request(_language_request(language="fr EN"))
+
+
+def test_dispatch_defaults_language_to_english(monkeypatch):
+    from yt_transcript import service
+    from yt_transcript.mcp_worker import dispatch
+
+    captured = []
+
+    def info(url, **kwargs):
+        captured.append(kwargs["language"])
+        return {"metadata": {"video_id": "abcdefghijk"}}
+
+    monkeypatch.setattr(service, "get_video_info", info)
+    dispatch(validate_request(_language_request()))
+    dispatch(validate_request(_language_request(language="de")))
+    assert captured == ["en", "de"]

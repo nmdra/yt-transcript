@@ -278,6 +278,7 @@ upload_date: "2008-05-29"
 duration_seconds: 597
 caption_language: "en-orig"
 caption_source: "automatic"
+caption_translated: false
 chapter_status: "unavailable"
 chapters: []
 sponsorblock:
@@ -323,7 +324,9 @@ Missing or invalid optional values become `null`.
 Caption language keeps the selected key exactly.
 
 Caption source is `manual` or `automatic`.
-These fields do not prove that the text is untranslated original English.
+`caption_translated` is `true` when the selected track is a YouTube translation, `false` when its URL has no `tlang` parameter, and `null` when no usable URL exists.
+A `true` value means YouTube machine-translated the text.
+A `false` value does not prove editorial accuracy.
 
 `description` contains the text that yt-dlp supplies in the same processed extraction.
 The wrapper makes no additional request for this field.
@@ -358,17 +361,28 @@ Raw VTT receives no header or byte changes.
 
 ## Caption selection and cleanup
 
-The wrapper selects one track with VTT formats, in this order:
+The wrapper selects one track with VTT formats for the requested language `L`, in this order:
 
-1. Manual `en`
-2. Other manual `en-` keys, in lexical order
-3. Automatic `en-orig`, then other English `-orig` keys
-4. Automatic `en`
-5. Other automatic `en-` keys, in lexical order
+1. Manual `L`
+2. Other manual `L-` keys, in lexical order
+3. Automatic `L-orig`, then other `L-` keys that end in `-orig`
+4. Automatic `L`
+5. Other automatic `L-` keys, in lexical order
 
 Track matching ignores case but keeps the original key.
-YouTube-provided translated English is a fallback.
-The wrapper does not translate locally or infer translation provenance.
+`L` comes from `--language` or from `[captions].language`, which defaults to `en`.
+When a request carries a region or script subtag and finds no track, the wrapper retries the primary subtag alone.
+The fallback accepts only the exact primary key and its `-orig` marker.
+It never substitutes a different variant, so `zh-Hant` never returns `zh-Hans`, and `pt-BR` never returns `pt-PT`.
+`en-US` therefore reaches `en` or `en-orig`, and `pt-BR` reaches `pt` or `pt-orig`.
+The selected key is always reported in file metadata and in verbose output.
+Every native track ranks above every translated track.
+YouTube-provided translated tracks are the fallback when no native track exists.
+The wrapper reports whether the selected track is a YouTube translation.
+It reads the `tlang` query parameter on the selected track's format URL.
+`caption_translated` is `true` for a translation, `false` for a track with a URL that has no `tlang`, and `null` when no usable URL exists.
+The wrapper does not translate locally.
+Translated tracks receive no quality guarantee and can be less accurate than native tracks.
 
 The wrapper downloads only captions, into a temporary directory.
 The wrapper performs one metadata extraction.
@@ -415,5 +429,8 @@ Cache rehydration preserves original cues, chapters, descriptions, filtering rec
 The cache does not store a failed effective SponsorBlock lookup as a successful filtered snapshot.
 The wrapper formats Markdown again on each explicit request.
 The cache stores only source data.
-CLI processing remains unchanged.
+The CLI and MCP use the same cache, the same default database, and the same `[cache]` policy.
+They therefore reuse each other's snapshots.
+A run reuses a snapshot only when the video, the requested language, the mode, and the resolved SponsorBlock policy match.
+`--no-cache` disables reuse for one CLI run; `--cache` forces it on when the configured policy disables it.
 See [MCP retrieval tools](mcp.md#retrieval-tools) and [cache privacy and limits](mcp.md#local-source-cache).

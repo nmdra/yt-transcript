@@ -1,6 +1,7 @@
 """Strict user-level TOML defaults."""
 
 import os
+import re
 import tomllib
 import unicodedata
 from dataclasses import dataclass, replace
@@ -35,6 +36,11 @@ class CacheConfig:
 
 
 @dataclass(frozen=True)
+class CaptionsConfig:
+    language: str = "en"
+
+
+@dataclass(frozen=True)
 class AppConfig:
     mode: str = "markdown"
     verbose: bool = False
@@ -52,6 +58,10 @@ class AppConfig:
     deepseek: DeepSeekConfig = DeepSeekConfig()
     thinking: bool | None = None
     thinking_level: str | None = None
+    captions: CaptionsConfig = CaptionsConfig()
+
+
+_LANGUAGE_TAG = re.compile(r"[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*")
 
 
 def default_config_path() -> Path:
@@ -104,6 +114,23 @@ def resolve_thinking(
     if thinking_level is not None:
         raise invalid("formatting.thinking_level without enabled thinking")
     return (False, None) if provider == "deepseek" else (None, None)
+
+
+def validate_language_tag(value: object) -> str:
+    """Accept one BCP-47-shaped caption language tag and nothing else."""
+    if (
+        not isinstance(value, str)
+        or len(value) > 64
+        or not _LANGUAGE_TAG.fullmatch(value)
+    ):
+        raise invalid("captions.language")
+    return value
+
+
+def validate_captions_config(value: object) -> CaptionsConfig:
+    if not isinstance(value, dict) or set(value) - {"language"}:
+        raise invalid("captions")
+    return CaptionsConfig(validate_language_tag(value.get("language", "en")))
 
 
 def validate_cache_policy(value: object) -> CacheConfig:
@@ -181,9 +208,13 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
         "sponsorblock",
         "mcp",
         "cache",
+        "captions",
     }:
         raise invalid("configuration table")
-    values: dict[str, Any] = {"cache": validate_cache_policy(data.get("cache", {}))}
+    values: dict[str, Any] = {
+        "cache": validate_cache_policy(data.get("cache", {})),
+        "captions": validate_captions_config(data.get("captions", {})),
+    }
     for table, allowed in (
         ("output", {"mode", "verbose"}),
         (
@@ -298,6 +329,8 @@ def resolve_config(
     max_chunks: int | None = None,
     sponsorblock: bool | None = None,
     editorial_mode: str | None = None,
+    language: str | None = None,
+    cache: bool | None = None,
 ) -> AppConfig:
     values = {
         k: v
@@ -327,11 +360,15 @@ def resolve_config(
         type(max_chunks) is not int or not 1 <= max_chunks <= 1000
     ):
         raise invalid("max_chunks")
+    if language is not None:
+        values["captions"] = CaptionsConfig(validate_language_tag(language))
     result = replace(file_config, **values)
     if sponsorblock is not None:
         result = replace(
             result, sponsorblock=replace(result.sponsorblock, enabled=sponsorblock)
         )
+    if cache is not None:
+        result = replace(result, cache=replace(result.cache, enabled=cache))
     # Validate against the selected editorial mode before raw output resets it.
     resolve_thinking(
         result.provider, result.editorial_mode, result.thinking, result.thinking_level

@@ -39,7 +39,7 @@ def synthetic(monkeypatch):
         Cue(14000, 15000, "Straße repeats repeats"),
     )
 
-    def fetch(url, *, sponsorblock=None):
+    def fetch(url, *, sponsorblock=None, language="en"):
         calls.append((url, sponsorblock))
         enabled = sponsorblock is not None and sponsorblock.enabled is True
         lookup = SponsorBlockLookup(
@@ -580,7 +580,7 @@ def test_sdk_multi_operation_snapshot_acceptance(monkeypatch, tmp_path):
         + "\n"
     )
 
-    def download(url):
+    def download(url, **kwargs):
         extraction.append(url)
         return DownloadedCaptions(
             vtt.encode(), "en", False, VideoMetadata(URL, "abcdefghijk")
@@ -594,7 +594,7 @@ def test_sdk_multi_operation_snapshot_acceptance(monkeypatch, tmp_path):
         model_calls.append((body, kwargs["editorial_mode"]))
         return "Mocked Markdown output."
 
-    monkeypatch.setattr(service, "download_english_vtt", download)
+    monkeypatch.setattr(service, "download_caption_vtt", download)
     monkeypatch.setattr(service, "lookup_sponsorblock", lookup)
     monkeypatch.setattr(formatter, "ensure_formatter", lambda *args: None)
     monkeypatch.setattr(formatter, "format_transcript", edit)

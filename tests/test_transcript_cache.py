@@ -28,6 +28,7 @@ from yt_transcript.sponsorblock import (
 )
 from yt_transcript.transcript_cache import (
     PAYLOAD_LIMIT,
+    VERSION,
     TranscriptCache,
     make_cache_key,
     snapshot_id,
@@ -230,10 +231,11 @@ def test_failed_effective_lookup_rejected_on_read(cache):
     "mutate",
     [
         lambda d: d.update(extra=1),
-        lambda d: d.update(v=2),
+        lambda d: d.update(v=VERSION + 1),
         lambda d: d.update(v=True),
         lambda d: d.update(automatic=1),
-        lambda d: d.update(language="fr"),
+        lambda d: d.update(language="12"),
+        lambda d: d.update(translated="yes"),
         lambda d: d.update(fragments=[]),
         lambda d: d["fragments"][0].update(extra=1),
         lambda d: d["fragments"][0].update(start_ms=True),
@@ -598,3 +600,34 @@ def test_stale_cursor_does_not_delete_healthy_replacement(cache):
     assert old != new
     assert cache.get_exact(KEY, old) is None
     assert cache.get_exact(KEY, new) is not None
+
+
+def test_cache_key_is_language_scoped_and_english_stable():
+    policy = SponsorBlockConfig(True)
+    assert make_cache_key(URL, "filtered", policy, "en") == KEY
+    assert make_cache_key(URL, "filtered", policy, "EN") == KEY
+    french = make_cache_key(URL, "filtered", policy, "fr")
+    assert french != KEY
+    assert make_cache_key(URL, "filtered", policy, "fr") == french
+
+
+def test_previous_payload_version_is_a_miss(cache):
+    assert cache.put(KEY, cleaned())
+    rewrite(cache, lambda d: d.update(v=1))
+    assert cache.get(KEY) is None
+
+
+def test_translation_provenance_survives_roundtrip(cache):
+    original = replace(cleaned(), translated=True)
+    identity = cache.put(KEY, original)
+    restored = TranscriptCache(cache.path, clock=cache.clock).get_exact(KEY, identity)
+    assert restored is not None
+    assert restored.translated is True
+    assert restored.cache_hit is None
+    assert restored.mapping()["caption_translated"] is True
+
+
+def test_cache_language_must_be_a_language_tag(cache):
+    assert cache.put(KEY, cleaned())
+    rewrite(cache, lambda d: d.update(language="12"))
+    assert cache.get(KEY) is None
