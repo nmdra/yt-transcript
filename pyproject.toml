@@ -9,6 +9,15 @@ description = "English YouTube captions with deterministic cleanup and optional 
 readme = "README.md"
 requires-python = ">=3.14.7"
 license = "MIT"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Text Processing :: Markup",
+]
 dependencies = ["yt-dlp[default]>=2026.8.19", "PyYAML>=6.0.3"]
 
 [project.optional-dependencies]
@@ -19,6 +28,10 @@ dev = ["pytest>=9.1.1", "ruff>=0.16.10"]
 
 [project.scripts]
 yt-transcript = "yt_transcript.cli:main"
+
+[project.urls]
+Repository = "https://github.com/nmdra/yt-transcript"
+Changelog = "https://github.com/nmdra/yt-transcript/blob/main/CHANGELOG.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

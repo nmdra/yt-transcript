@@ -19,7 +19,7 @@ The tool uses only captions. It does not download audio or video. It does not re
 
 ## Install
 
-Requirements: [uv](https://docs.astral.sh/uv/getting-started/installation/), Python **3.14.7**, and [Deno](https://docs.deno.com/runtime/getting_started/installation/) **2.3.0+**.
+Requirements: [uv](https://docs.astral.sh/uv/getting-started/installation/), Python **3.14.7 or newer**, and [Deno](https://docs.deno.com/runtime/getting_started/installation/) **2.3.0+**.
 [yt-dlp](https://github.com/yt-dlp/yt-dlp) retrieves captions and video metadata and is installed automatically as a dependency.
 The minimum supported version is **2026.8.19**, also pinned in the v1.1.0 release lockfile.
 Markdown also requires a configured model backend. Raw output and MCP plain text do not require one.

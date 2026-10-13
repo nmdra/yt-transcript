@@ -10,6 +10,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 
 - Raise the maximum `formatting.chunk_chars` from 50,000 to 200,000 for CLI and MCP; keep the 12,000-character default, token allowances, byte limits, and deadlines unchanged
+- Publish package classifiers and project URLs, and state Python 3.14.7 or newer in the README
 
 ### Fixed
 
