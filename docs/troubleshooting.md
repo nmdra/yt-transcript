@@ -15,7 +15,7 @@ Verbose mode uses only diagnostic fields from the allowlist.
 |---|---|
 | `INVALID_URL`, `CONFIG_INVALID` | Correct the input or use `--no-config`. |
 | `RUNTIME_MISSING`, `RUNTIME_INCOMPATIBLE` | Install compatible Deno/EJS components. Run doctor. |
-| `NO_CAPTIONS`, `NO_VTT` | Extraction found no track for the requested language, or it found tracks for that language without a VTT format. This does not prove that the video has no captions in that language. Check the requested language, permitted access, and supported runtime setup. The codes `NO_ENGLISH_CAPTIONS` and `NO_ENGLISH_VTT` are deprecated aliases. Version 1.1.0 no longer emits them. |
+| `NO_CAPTIONS`, `NO_VTT` | Extraction found no track for the requested language, or it found tracks for that language without a VTT format. This does not prove that the video has no captions in that language. Check the requested language, permitted access, and supported runtime setup. The codes `NO_ENGLISH_CAPTIONS` and `NO_ENGLISH_VTT` are deprecated aliases. Version 1.2.0 no longer emits them. |
 | `YOUTUBE_ACCESS_LIMITED` | Check permitted browser access. Access restrictions can cause extraction to omit captions. |
 | `VIDEO_UNAVAILABLE`, `AUTH_REQUIRED`, `AGE_RESTRICTED`, `GEO_RESTRICTED` | Check permitted browser/account access. The tool provides no bypass. |
 | `REMOTE_RATE_LIMITED`, `NETWORK_FAILED` | Wait or check the network/certificates. Keep TLS verification enabled. |

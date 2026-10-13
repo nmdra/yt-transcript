@@ -458,7 +458,7 @@ All helpers keep the serialized result limit, safe errors, 300-second deadline, 
 
 ## Local source cache
 
-In version 1.1.0, the CLI and MCP share one SQLite cache with one `[cache]` policy and one default database path.
+In version 1.2.0, the CLI and MCP share one SQLite cache with one `[cache]` policy and one default database path.
 The cache stores source cues, original timestamps, complete metadata, caption provenance, and SponsorBlock lookup data.
 The cache does not store model-generated Markdown or credentials.
 A snapshot is reusable only if the video, the requested language, the mode, and the resolved SponsorBlock policy match.

@@ -6,12 +6,12 @@ Copy this prompt into an agent that has local shell and file access.
 The prompt tells the agent to install the pinned release, preserve existing settings, and use only offline verification checks.
 
 ```text
-Install `nmdra/yt-transcript` `v1.1.0` for my user account with the MCP extra and exactly Python `3.14.7`.
+Install `nmdra/yt-transcript` `v1.2.0` for my user account with the MCP extra and exactly Python `3.14.7`.
 
 First, read the official installation guide, MCP guide, and release page:
 https://github.com/nmdra/yt-transcript/blob/main/docs/installation.md
 https://github.com/nmdra/yt-transcript/blob/main/docs/mcp.md
-https://github.com/nmdra/yt-transcript/releases/tag/v1.1.0
+https://github.com/nmdra/yt-transcript/releases/tag/v1.2.0
 
 Use the GitHub release wheel, not the unrelated PyPI package `yt-transcript`.
 Verify the wheel and source archive against the release `SHA256SUMS`.
@@ -35,16 +35,16 @@ If I select OpenRouter or DeepSeek, require an explicit model ID and the matchin
 Read the provider guide at https://github.com/nmdra/yt-transcript/blob/main/docs/providers.md before you change provider or thinking settings.
 Do not put the key in TOML, command arguments, MCP tool arguments, or chat.
 Explain that a running client does not inherit a key that I export later in another terminal.
-The version 1.1.0 OpenRouter default is 16384 output tokens per model call. Reasoning tokens can use this allowance, and the selected model must support it.
+The version 1.2.0 OpenRouter default is 16384 output tokens per model call. Reasoning tokens can use this allowance, and the selected model must support it.
 A larger allowance does not guarantee completion.
 Preserve any explicit output-token override.
 
-Explain that version 1.1.0 permits only conservative ordinary-word spelling correction in model-generated Markdown.
+Explain that version 1.2.0 permits only conservative ordinary-word spelling correction in model-generated Markdown.
 Uncertain words, names, technical terms, and protected literals remain unchanged.
 This is a prompt policy, not a guaranteed spelling checker.
 Raw output and MCP plain text remain model-free.
 
-Explain that version 1.1.0 exposes five MCP tools. `get_transcript` remains the primary tool, and its public arguments remain unchanged.
+Explain that version 1.2.0 exposes five MCP tools. `get_transcript` remains the primary tool, and its public arguments remain unchanged.
 Source captions and metadata are stored privately in a shared local SQLite cache for 24 hours by default, with a 50 MiB retained-payload budget.
 Preserve any saved `[cache]` settings.
 The four retrieval helpers are model-free. Markdown still formats on each explicit request.
