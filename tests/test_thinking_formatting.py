@@ -106,7 +106,20 @@ def test_unspecified_policy_preserves_defaults_and_context(
         if contextual
         else "## Edited\n\nRetries can duplicate writes."
     )
-    calls = fake_backend(monkeypatch, provider, lambda request: body)
+
+    def output(request):
+        if not contextual:
+            return body
+        return json.dumps(
+            {
+                "runs": [
+                    {"run_id": run["run_id"], "body": "Retries can duplicate writes."}
+                    for run in json.loads(request.source)["runs"]
+                ]
+            }
+        )
+
+    calls = fake_backend(monkeypatch, provider, output)
     sections = (
         build_chapter_sections(
             (Cue(0, 1000, "Retries can duplicate writes."),),
@@ -211,7 +224,18 @@ def test_contextual_and_boundary_calls_receive_explicit_policy(
         (Cue(0, 1000, "Retries can duplicate writes."),), (Chapter("Retries", 0, 1000),)
     )
     body = sections[0].heading + "\n\nRetries can duplicate writes."
-    calls = fake_backend(monkeypatch, provider, lambda request: body)
+
+    def output(request):
+        return json.dumps(
+            {
+                "runs": [
+                    {"run_id": run["run_id"], "body": "Retries can duplicate writes."}
+                    for run in json.loads(request.source)["current"]["runs"]
+                ]
+            }
+        )
+
+    calls = fake_backend(monkeypatch, provider, output)
     assert (
         formatter.format_transcript(
             "Retries can duplicate writes.",

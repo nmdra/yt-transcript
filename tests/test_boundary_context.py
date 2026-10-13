@@ -63,12 +63,12 @@ def test_windows_omit_oversize_neighbor_tokens_without_truncation():
     )
 
 
-@pytest.mark.parametrize("provider", ["pi", "openrouter"])
+@pytest.mark.parametrize("provider", ["pi", "openrouter", "deepseek"])
 @pytest.mark.parametrize("mode", ["standard", "focused"])
 def test_context_transport_emits_only_current_and_preserves_chapters(
     provider, mode, monkeypatch
 ):
-    from yt_transcript import openrouter_backend
+    from yt_transcript import deepseek_backend, openrouter_backend
 
     source = " ".join(f"retained_word_{i}" for i in range(160))
     sections = build_chapter_sections(
@@ -92,9 +92,16 @@ def test_context_transport_emits_only_current_and_preserves_chapters(
         assert "REMOVED_CAPTION" not in request.source
         assert "exact numeric values" in request.system_prompt
         current = envelope["current"]
-        return "\n\n".join(
-            run["heading"] + "\n\n" + " ".join(f["text"] for f in run["fragments"])
-            for run in current["runs"]
+        return json.dumps(
+            {
+                "runs": [
+                    {
+                        "run_id": run["run_id"],
+                        "body": " ".join(f["text"] for f in run["fragments"]),
+                    }
+                    for run in current["runs"]
+                ]
+            }
         )
 
     monkeypatch.setattr(
@@ -102,6 +109,9 @@ def test_context_transport_emits_only_current_and_preserves_chapters(
     )
     monkeypatch.setattr(
         openrouter_backend, "complete", lambda request, settings=None: echo(request)
+    )
+    monkeypatch.setattr(
+        deepseek_backend, "complete", lambda request, config=None: echo(request)
     )
     plan = formatter.plan_transcript_formatting(
         source,

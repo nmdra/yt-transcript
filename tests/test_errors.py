@@ -5,6 +5,7 @@ from yt_dlp.utils import DownloadError, ExtractorError, GeoRestrictedError
 from yt_transcript.errors import (
     AppError,
     ErrorInfo,
+    FormattingError,
     WarningCollector,
     classify_pi_failure,
     classify_ytdlp_error,
@@ -378,3 +379,202 @@ def test_deepseek_summary_decoder_rejects_wrong_code_or_stage():
     value["phase"] = "PRIVATE_REASONING"
     with pytest.raises(ValueError):
         decode_worker_error(value)
+
+
+def test_output_failure_reports_validation_reason():
+    from yt_transcript.errors import output_failure
+
+    exc = output_failure("body_yaml_header")
+    assert exc.info.code == "PI_OUTPUT_INVALID"
+    assert exc.info.message == (
+        "Pi returned an invalid Markdown body. Validation reason: body_yaml_header."
+    )
+    assert exc.info.hint is not None and "--raw" in exc.info.hint
+    assert "validation_reason=body_yaml_header" in render_diagnostics(exc)
+
+
+OUTPUT_REASONS = (
+    "completion_empty_text",
+    "body_empty_text",
+    "body_yaml_header",
+    "body_outer_fence",
+    "chapter_invalid_fence",
+    "chapter_level_one_heading",
+    "chapter_setext_heading",
+    "chapter_unclosed_fence",
+    "chapter_missing_headings",
+    "chapter_heading_mismatch",
+    "chapter_preamble",
+    "chapter_empty_body",
+    "chapter_invalid_json",
+    "chapter_invalid_schema",
+    "chapter_invalid_run_ids",
+    "transcript_unexpected_omission",
+    "transcript_empty_output",
+    "summary_empty_output",
+    "summary_unexpected_omission",
+    "summary_invalid_structure",
+    "summary_empty_evidence",
+    "summary_private_id",
+)
+
+
+@pytest.mark.parametrize("reason", OUTPUT_REASONS)
+@pytest.mark.parametrize("provider", ["pi", "openrouter", "deepseek"])
+def test_output_reasons_survive_translation_worker_and_rendering(reason, provider):
+    from dataclasses import asdict, replace
+
+    from yt_transcript.errors import (
+        decode_worker_error,
+        output_failure,
+        render_mcp_error,
+        translate_formatting_error,
+    )
+
+    exc = output_failure(reason)
+    original_hint = exc.info.hint
+    exc.info = replace(exc.info, chunk_index=2, chunk_total=3)
+    translated = translate_formatting_error(exc, provider)
+    assert translated.info.code == f"{provider.upper()}_OUTPUT_INVALID"
+    assert translated.info.phase == f"{provider}_response"
+    assert translated.info.hint == original_hint
+    assert translated.info.summary_diagnostic is None
+    assert (translated.info.chunk_index, translated.info.chunk_total) == (2, 3)
+    assert translated.info.message.endswith(f" Validation reason: {reason}.")
+    decoded = decode_worker_error(asdict(translated.info))
+    assert decoded == translated.info
+    cli, mcp = render_cli_error(AppError(decoded)), render_mcp_error(decoded)
+    assert f"Validation reason: {reason}." in cli + mcp
+    assert "(chunk 2/3)" in cli and "(chunk 2/3)" in mcp
+    assert "--raw" in cli and "--raw" not in mcp
+    assert 'output_format="plain_text"' in mcp
+    assert f"validation_reason={reason}" in render_diagnostics(AppError(decoded))
+    # No caller-supplied reason can replace the reason in the trusted message.
+    assert "PRIVATE_REASONING" not in render_diagnostics(
+        AppError(decoded), validation_reason="PRIVATE_REASONING"
+    )
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "PRIVATE_REASONING",
+        "body_yaml_header\nBearer secret",
+        " body_yaml_header",
+        "body_yaml_header.",
+        "chapter_unknown",
+        "",
+        None,
+        [],
+    ],
+)
+def test_output_failure_rejects_unknown_reason_without_echo(reason):
+    from yt_transcript.errors import output_failure
+
+    with pytest.raises(ValueError, match="^Invalid output validation reason$"):
+        output_failure(reason)
+
+
+@pytest.mark.parametrize("provider", ["pi", "openrouter", "deepseek"])
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "prefix",
+        "suffix",
+        "substring",
+        "unknown_reason",
+        "newline",
+        "missing_period",
+        "wrong_provider",
+        "nonstring",
+    ],
+)
+def test_output_worker_accepts_only_exact_trusted_messages(provider, mutation):
+    from dataclasses import asdict, replace
+
+    from yt_transcript.errors import (
+        decode_worker_error,
+        output_failure,
+        translate_formatting_error,
+    )
+
+    exc = translate_formatting_error(output_failure("chapter_preamble"), provider)
+    message = exc.info.message
+    mutated = {
+        "prefix": "Bearer secret " + message,
+        "suffix": message + " PRIVATE_REASONING",
+        "substring": "Validation reason: chapter_preamble.",
+        "unknown_reason": message.replace("chapter_preamble", "PRIVATE_REASONING"),
+        "newline": message + "\n",
+        "missing_period": message[:-1],
+        "wrong_provider": message.replace(
+            {"pi": "Pi", "openrouter": "OpenRouter", "deepseek": "DeepSeek"}[provider],
+            "OtherProvider",
+        ),
+        "nonstring": [message],
+    }[mutation]
+    decoded = decode_worker_error(
+        asdict(replace(exc.info, message=mutated, hint="Bearer secret"))
+    )
+    assert decoded.message != message
+    assert "Validation reason:" not in decoded.message
+    assert "validation_reason=" not in render_diagnostics(AppError(decoded))
+    assert "Bearer" not in render_cli_error(AppError(decoded))
+    if provider == "pi":
+        sanitized = replace(exc.info, message=mutated)
+        for target in ("openrouter", "deepseek"):
+            translated = translate_formatting_error(FormattingError(sanitized), target)
+            assert "Validation reason:" not in translated.info.message
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "PI_FAILED",
+        "PI_OUTPUT_LIMIT",
+        "PI_CONTEXT_LIMIT",
+        "OPENROUTER_FAILED",
+        "DEEPSEEK_FAILED",
+        "NETWORK_FAILED",
+    ],
+)
+def test_output_reason_is_not_recognized_on_unrelated_codes(code):
+    from dataclasses import asdict, replace
+
+    from yt_transcript.errors import decode_worker_error, output_failure
+
+    info = replace(output_failure("body_empty_text").info, code=code)
+    assert "validation_reason=" not in render_diagnostics(AppError(info))
+    decoded = decode_worker_error(asdict(info))
+    assert "Validation reason:" not in decoded.message
+
+
+@pytest.mark.parametrize("provider", ["pi", "openrouter", "deepseek"])
+@pytest.mark.parametrize("context", [False, True])
+def test_summary_diagnostic_keeps_priority_over_output_reason(provider, context):
+    from dataclasses import asdict, replace
+
+    from yt_transcript.errors import (
+        decode_worker_error,
+        output_failure,
+        summary_failure,
+        translate_formatting_error,
+    )
+
+    summary = summary_failure(
+        "synthesis" if context else "notes",
+        "capacity" if context else "invalid_json",
+        context=context,
+    )
+    expected = translate_formatting_error(summary, provider)
+    combined = replace(
+        summary.info, message=output_failure("summary_private_id").info.message
+    )
+    decoded = decode_worker_error(asdict(combined))
+    assert decoded == summary.info
+    translated = translate_formatting_error(FormattingError(combined), provider)
+    if provider != "pi":
+        assert translated.info == expected.info
+    diagnostics = render_diagnostics(AppError(combined))
+    assert "summary=" in diagnostics
+    assert "validation_reason=" not in diagnostics

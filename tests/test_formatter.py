@@ -88,13 +88,20 @@ def test_timeout_reaps(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "output", ["", "```markdown\nbody\n```", "---\ntitle: fake\n---\nbody"]
+    "output,reason",
+    [
+        ("", "completion_empty_text"),
+        ("```markdown\nbody\n```", "body_outer_fence"),
+        ("---\ntitle: fake\n---\nbody", "body_yaml_header"),
+    ],
 )
-def test_body_rejection(tmp_path, monkeypatch, output):
+def test_body_rejection(tmp_path, monkeypatch, output, reason):
     fake_pi(tmp_path, monkeypatch, output=output)
     with pytest.raises(FormattingError) as exc:
         formatter.format_with_pi("source")
     assert exc.value.info.code == "PI_OUTPUT_INVALID"
+    assert f"Validation reason: {reason}." in exc.value.info.message
+    assert exc.value.info.chunk_index == 1 and exc.value.info.chunk_total == 1
 
 
 def test_internal_fences_and_rule(tmp_path, monkeypatch):

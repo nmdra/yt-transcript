@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, NoReturn
 
-from .errors import classify_pi_failure
+from .errors import classify_pi_failure, output_failure
 
 
 @dataclass(frozen=True)
@@ -151,10 +151,14 @@ class PiEventParser:
                     self._fail()
                 texts.append(block["text"])
         text = "".join(texts).strip()
-        if len(text.encode("utf-8")) > self.TEXT_LIMIT:
+        try:
+            text_bytes = len(text.encode("utf-8"))
+        except UnicodeError:
+            self._fail()
+        if text_bytes > self.TEXT_LIMIT:
             self._fail("PI_OUTPUT_LIMIT")
         if not text:
-            self._fail("PI_OUTPUT_INVALID")
+            raise output_failure("completion_empty_text")
         return PiChunkResult(
             text, reason, message.get("provider"), message.get("model"), self._retries
         )

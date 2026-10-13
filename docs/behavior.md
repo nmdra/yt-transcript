@@ -55,8 +55,16 @@ Raw captions, raw VTT, MCP plain text, metadata, and canonical chapter headings 
 
 In standard and focused modes, valid supplied chapters become canonical `## [time] title` Markdown headings.
 Cue-start alignment keeps caption order, crossings, gaps, and backward revisits.
-Python validates headings outside correctly closed code fences.
+For chapter-aware standard and focused calls, the model returns strict JSON with one `run_id` and Markdown `body` for each supplied run.
+Python requires all run IDs exactly once in the supplied order. It rejects duplicate keys, extra fields, foreign IDs, and reordered or missing runs.
+Python inserts the canonical headings from its source plan. The model does not copy heading text or Markdown escaping.
+Each body can use `###` and lower headings. Code fences must close within that body, not in another run.
+Standard mode requires a nonblank body for every run. Focused mode permits an empty body for a wholly removable run.
+Python validates each run's Markdown structure, then validates the assembled chunk.
 Then Python removes duplicate continuation headings.
+The complete JSON response and rendered chunk retain the existing 1 MiB UTF-8 limits.
+This private response format does not change CLI output, MCP schemas, metadata, or source filtering.
+Nonchapter formatting and whole-video summaries keep their existing response formats.
 Invalid output causes failure without a repair call or silent fallback.
 
 ```sh

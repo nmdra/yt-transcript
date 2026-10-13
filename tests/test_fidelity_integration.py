@@ -42,13 +42,13 @@ def test_chapter_revisits_omissions_and_ambiguous_content_match(
         assert "When uncertain, keep the original spelling" in request.system_prompt
         data = json.loads(request.source)
         calls.append(data)
-        blocks = []
+        rows = []
         for run in data["runs"]:
             text = " ".join(f["text"] for f in run["fragments"])
             if mode == "focused" and text == "Like and subscribe!":
-                continue
-            blocks.append(run["heading"] + "\n\n" + text)
-        return "\n\n".join(blocks) if blocks else formatter.OMISSION_MARKER
+                text = ""
+            rows.append({"run_id": run["run_id"], "body": text})
+        return json.dumps({"runs": rows})
 
     monkeypatch.setattr(
         formatter, "_run_pi_chunk", lambda executable, request: echo(request)

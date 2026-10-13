@@ -7,6 +7,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent chapter heading-copy failures by validating structured run bodies and inserting canonical headings in Python, without retries, repair, or partial publication
+- Report fixed output validation reasons through CLI and MCP errors without exposing model text, and reject malformed Pi completion Unicode safely
+
 ## [1.1.0] - 2026-10-12
 
 ### Added

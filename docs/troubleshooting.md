@@ -30,7 +30,7 @@ Verbose mode uses only diagnostic fields from the allowlist.
 | `PI_CONTEXT_MUTATED` | Pi attempted compaction or context changes. Complete formatting cannot be verified. Review Pi/model compatibility or request plain text. Do not accept summarized source as a complete transcript. |
 | `PI_TIMEOUT`, `PI_ABORTED`, `PI_FAILED` | Check provider/model setup or use deterministic output. |
 | `PI_PROTOCOL_INVALID`, `PI_OUTPUT_LIMIT` | Check compatible Pi setup. The tool discards buffered output. |
-| `PI_OUTPUT_INVALID` | Review the safe summary validation stage and reason when present. Notes can fail JSON, schema, source-reference, or character-budget validation rather than Markdown validation. |
+| `PI_OUTPUT_INVALID` | Review the fixed output validation reason or safe summary validation details when present. Notes can fail JSON, schema, source-reference, or character-budget validation rather than Markdown validation. |
 | `OPENROUTER_NOT_CONFIGURED` | Set an explicit model and OPENROUTER_API_KEY in the environment. Pi is not required. |
 | `OPENROUTER_AUTH_FAILED` | Review permitted authentication/access. A 403 can also be a guardrail rejection. |
 | `OPENROUTER_LIMITED` | Review rate, credit, and budget limits. No automatic retry occurs. |
@@ -53,6 +53,33 @@ CLI suggests `--raw`.
 MCP suggests `output_format="plain_text"`.
 The tool returns no partial document or automatic fallback.
 MCP errors show the failing chunk when it is known.
+
+## Output validation reasons
+
+Invalid model output can include a fixed `Validation reason` in CLI and MCP errors.
+The reason identifies the failed check. It does not include captions, chapter titles, model output, private reasoning, credentials, or raw provider errors.
+The existing error code and failing chunk position remain unchanged.
+
+| Reason | Meaning |
+|---|---|
+| `completion_empty_text` | Pi reported a normal stop but returned no nonblank visible text. Thinking alone is not a transcript. |
+| `body_empty_text`, `body_yaml_header`, `body_outer_fence` | The response was empty, started with YAML front matter, or used a whole-response code fence. |
+| `chapter_heading_mismatch` | The assembled Markdown contained unexpected or mismatched chapter headings. Python inserts canonical headings; model bodies must not add `##` headings. |
+| `chapter_missing_headings`, `chapter_preamble`, `chapter_empty_body` | Structure checks found no chapter headings, text before the first heading, or an empty chapter body in standard mode. |
+| `chapter_invalid_json`, `chapter_invalid_schema`, `chapter_invalid_run_ids` | The model did not return strict chapter-body JSON, used invalid fields/types, or failed to return all supplied run IDs exactly once in order. |
+| `chapter_level_one_heading`, `chapter_setext_heading` | The response used a forbidden heading style. |
+| `chapter_invalid_fence`, `chapter_unclosed_fence` | A chapter response contained an invalid or unclosed code fence. |
+| `transcript_unexpected_omission`, `transcript_empty_output` | The response used an invalid omission marker or left no retained transcript body. |
+| `summary_empty_output`, `summary_unexpected_omission`, `summary_invalid_structure`, `summary_empty_evidence`, `summary_private_id` | The summary was empty, used an omission marker, failed heading/body checks, had no notes evidence, or contained a private source ID. |
+
+Chapter-aware standard and focused calls return private JSON bodies. Python supplies the final chapter headings, including their punctuation and escaping.
+Invalid JSON or Markdown still fails without repair. Nonchapter and summary response formats remain unchanged.
+
+These reasons identify structural failures. They do not prove a cause such as authentication failure, an output-token limit, or incorrect model content.
+A successful retry does not establish why an earlier response failed.
+A manual retry can incur new charges.
+The tool does not retry automatically, repair the response, relax validation, or publish partial output.
+Use CLI `--raw` or MCP `output_format="plain_text"` to avoid model processing.
 
 ## Thinking and DeepSeek checks
 

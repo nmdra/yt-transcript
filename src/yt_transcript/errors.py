@@ -384,6 +384,81 @@ def classify_deepseek_failure(
     )
 
 
+_OUTPUT_REASONS = frozenset(
+    {
+        "completion_empty_text",
+        "body_empty_text",
+        "body_yaml_header",
+        "body_outer_fence",
+        "chapter_invalid_fence",
+        "chapter_level_one_heading",
+        "chapter_setext_heading",
+        "chapter_unclosed_fence",
+        "chapter_missing_headings",
+        "chapter_heading_mismatch",
+        "chapter_preamble",
+        "chapter_empty_body",
+        "chapter_invalid_json",
+        "chapter_invalid_schema",
+        "chapter_invalid_run_ids",
+        "transcript_unexpected_omission",
+        "transcript_empty_output",
+        "summary_empty_output",
+        "summary_unexpected_omission",
+        "summary_invalid_structure",
+        "summary_empty_evidence",
+        "summary_private_id",
+    }
+)
+_OUTPUT_MESSAGES = {
+    "PI_OUTPUT_INVALID": "Pi returned an invalid Markdown body.",
+    "OPENROUTER_OUTPUT_INVALID": OPENROUTER_MESSAGES["OPENROUTER_OUTPUT_INVALID"],
+    "DEEPSEEK_OUTPUT_INVALID": DEEPSEEK_MESSAGES["DEEPSEEK_OUTPUT_INVALID"],
+}
+_OUTPUT_HINTS = {
+    "completion": "Select a model that returns nonempty completion text, or use --raw.",
+    "body": "The model must return a nonempty Markdown body without a YAML header or an outer code fence, or use --raw.",
+    "chapter": "The model must return chapter-body JSON with all supplied run IDs in order and valid Markdown bodies; only focused omissions may have empty bodies, or use --raw.",
+    "transcript": "The model must return the complete transcript without omissions, or use --raw.",
+    "summary": "The model must return a nonempty summary with the required structure and evidence, without omissions or private source IDs, or use --raw.",
+}
+
+
+def _output_message(code: str, reason: str) -> str:
+    return f"{_OUTPUT_MESSAGES[code]} Validation reason: {reason}."
+
+
+def _output_hint(reason: str) -> str:
+    return _OUTPUT_HINTS[reason.split("_", 1)[0]]
+
+
+def _output_reason(info: ErrorInfo) -> str | None:
+    """Recognize only a complete trusted message for its output-invalid code."""
+    if info.code not in _OUTPUT_MESSAGES or not isinstance(info.message, str):
+        return None
+    return next(
+        (
+            reason
+            for reason in _OUTPUT_REASONS
+            if info.message == _output_message(info.code, reason)
+        ),
+        None,
+    )
+
+
+def output_failure(reason: str) -> FormattingError:
+    """Report a fixed validation reason without including model output."""
+    if not isinstance(reason, str) or reason not in _OUTPUT_REASONS:
+        raise ValueError("Invalid output validation reason")
+    exc = classify_pi_failure(code="PI_OUTPUT_INVALID")
+    exc.info = replace(
+        exc.info,
+        message=_output_message(exc.info.code, reason),
+        hint=_output_hint(reason),
+    )
+    return exc
+
+
 def translate_formatting_error(exc: FormattingError, provider: str) -> FormattingError:
     mapping = {
         "PI_OUTPUT_INVALID": "OPENROUTER_OUTPUT_INVALID",
@@ -400,6 +475,9 @@ def translate_formatting_error(exc: FormattingError, provider: str) -> Formattin
         )
         diagnostic = validate_summary_diagnostic(exc.info.summary_diagnostic)
         message = safe.info.message
+        reason = _output_reason(exc.info)
+        if reason is not None:
+            message = _output_message(safe.info.code, reason)
         if diagnostic is not None:
             message = (
                 "Summary synthesis capacity is insufficient."
@@ -411,6 +489,8 @@ def translate_formatting_error(exc: FormattingError, provider: str) -> Formattin
             message=message,
             hint=_summary_hint(diagnostic)
             if diagnostic is not None
+            else _output_hint(reason)
+            if reason is not None
             else safe.info.hint,
             chunk_index=exc.info.chunk_index,
             chunk_total=exc.info.chunk_total,
@@ -602,6 +682,9 @@ def decode_worker_error(payload: object) -> ErrorInfo:
             else classify_pi_failure(code=code)
         ).info
         message, hint = safe.message, safe.hint
+        reason = _output_reason(replace(safe, message=payload["message"]))
+        if reason is not None:
+            message, hint = _output_message(code, reason), _output_hint(reason)
         if code == "CHUNK_LIMIT_EXCEEDED" and isinstance(payload["message"], str):
             counts = re.fullmatch(
                 r"formatting requires ([1-9][0-9]{0,5}) (?:chunks|model calls), exceeding max-chunks "
@@ -670,4 +753,8 @@ def render_diagnostics(exc: AppError, **fields: Any) -> str:
     detail = _summary_diagnostic_text(exc.info)
     if detail:
         safe["summary"] = detail
+    elif exc.info.summary_diagnostic is None:
+        reason = _output_reason(exc.info)
+        if reason is not None:
+            safe["validation_reason"] = reason
     return "diagnostic: " + " ".join(f"{k}={v}" for k, v in safe.items()) + "\n"
