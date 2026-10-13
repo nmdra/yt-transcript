@@ -7,11 +7,11 @@
 Pi receives cleaned text through stdin.
 With chapter or SponsorBlock boundary context, stdin contains JSON with applicable titles, times, annotations, and retained text.
 Each retained source word belongs to one current chunk in the plan.
-Optional read-only boundary context can repeat neighboring words as context, not as text that owns output.
+Optional read-only boundary context can repeat neighboring words as context. These words do not own output.
 The complete serialized source input counts toward the source chunk limit.
 Multi-chunk summary synthesis uses a separate limit described below.
 Context overhead can increase the number of calls.
-Pi receives neither YAML nor the upstream metadata dictionary.
+Pi does not receive YAML or the upstream metadata dictionary.
 
 The wrapper replaces the coding prompt with editorial instructions.
 The wrapper supplies a fixed append prompt.
@@ -29,7 +29,7 @@ The wrapper reads bounded JSONL events internally.
 Success requires process exit 0, `agent_settled`, and a final authoritative assistant message with `stopReason='stop'`.
 
 Length stops, aborts, compaction, tool calls, missing completion, invalid JSON, and oversized output cause failure before publication.
-Events, thinking, and raw stderr never appear in documents or diagnostics.
+Documents and diagnostics never contain events, thinking, or raw stderr.
 
 A normal stop does not prove factual accuracy or semantic completeness.
 Offline structural tests do not prove that actual model edits keep the source meaning.
@@ -47,7 +47,7 @@ Uncertain spellings must remain unchanged.
 The model must not replace a correctly spelled word with a different word, resolve homophones, infer missing words, or repair technical claims.
 This policy does not correct every speech-recognition error.
 
-These are prompt instructions, not a deterministic spelling checker or a guarantee of model fidelity.
+These rules are prompt instructions. They are not a deterministic spelling checker or a guarantee of model fidelity.
 The policy adds no model calls, research, retries, or repair pass.
 Raw captions, raw VTT, MCP plain text, metadata, and canonical chapter headings remain unchanged.
 
@@ -65,19 +65,19 @@ yt-transcript URL --no-config --editorial-mode focused --max-chunks 3 -o focused
 yt-transcript URL --no-config --sponsorblock --preview
 ```
 
-Standard remains the CLI default.
+Standard mode remains the CLI default.
 Focused editing is selective editing, not summarization.
 Focused editing removes separable greetings, ads, interaction requests, housekeeping, and unrelated tangents.
-Focused editing keeps substantive examples, technical product explanations, code, URLs, numbers, qualifications, relevant affiliation/disclosures, and ambiguous content.
+Focused editing keeps substantive examples, technical product explanations, code, URLs, numbers, qualifications, relevant affiliations/disclosures, and ambiguous content.
 
 Every retained source chunk still goes to the selected model backend.
 Fully omitted chunks do not reduce planned calls.
 If all output is omitted, publication fails.
-Use standard or raw in this case.
+Use standard or raw mode in this case.
 Source chapter metadata remains complete even when focused editing omits a body section.
 Fake-process tests do not prove actual model fidelity.
 
-CLI uses SponsorBlock only when enabled.
+The CLI uses SponsorBlock only when enabled.
 MCP filtered mode attempts SponsorBlock by default.
 The fixed official HTTPS lookup sends only a four-character SHA-256 prefix of the video ID.
 Then the wrapper matches the actual ID locally.
@@ -98,7 +98,7 @@ This tolerance checks duration alignment, not the time taken by the lookup.
 If removal would empty the transcript, the wrapper keeps the transcript and gives a warning.
 Community labels cannot guarantee correct promotion detection.
 
-If the lookup or its data fails, the tool keeps captions and produces `warning[SPONSORBLOCK_UNAVAILABLE]`.
+If the lookup or its data fails, the tool keeps the captions and produces `warning[SPONSORBLOCK_UNAVAILABLE]`.
 MCP puts the warning in metadata.
 CLI also writes the warning to stderr.
 Intentional disablement and no returned segments do not require a failure warning.
@@ -125,7 +125,7 @@ Review [upstream terms](https://github.com/ajayyy/SponsorBlock/wiki/Database-and
 ## Summarized editing
 
 `--editorial-mode summarized` or `formatting.editorial_mode = "summarized"` selects a whole-video summary for Markdown output.
-Standard remains the default.
+Standard mode remains the default.
 Raw and MCP plain-text output stay deterministic.
 The prompt targets 400–700 words, with shorter output for short sources.
 It requests an overview, key points, and supported conclusions or caveats.
@@ -140,7 +140,7 @@ The existing per-call and MCP total deadlines still apply.
 Source chunks use `formatting.chunk_chars`.
 Multi-chunk summaries use `formatting.summary_synthesis_chars` for the complete final notes envelope.
 The synthesis limit defaults to 50,000 characters and allows integers from 1,000 through 500,000.
-Python divides that limit among note calls after reserving JSON framing.
+Python reserves space for JSON framing, then divides the remaining limit among note calls.
 The notes prompt requests compact JSON and targets 75% of each hard response limit to leave space for estimation errors.
 This prompt target is not a deterministic guarantee.
 Python rejects impossible budgets before model calls and rejects oversized notes without truncation.
@@ -151,12 +151,12 @@ Character budgets do not override the existing UTF-8 transport and completion-si
 Larger budgets can increase latency and cost or exceed the selected model's context window.
 Notes use independent backend calls.
 Completed note calls can incur charges even if synthesis later fails.
-Only the final synthesis call receives them as validated private evidence objects.
-They are never published as transcript output.
+Only the final synthesis call receives the notes as validated private evidence objects.
+The notes are never published as transcript output.
 
 Python validates final headings and nonempty bodies.
 Python does not prove summary accuracy or enforce the target word count.
-Failures publish no partial notes, summary, or automatic fallback.
+If processing fails, it publishes no partial notes, summary, or automatic fallback.
 The final summary uses its own headings rather than canonical chapter headings.
 Source chapter metadata, descriptions, and SponsorBlock receipts remain unchanged.
 Removal receipts still describe source filtering, not what the summary includes or omits.
@@ -166,17 +166,17 @@ Removal receipts still describe source filtering, not what the summary includes 
 When thinking settings are omitted, summarized Markdown requests thinking at medium in every stage.
 This includes direct summary, each notes call, and final synthesis.
 Explicit `formatting.thinking = false` requests off for every mode, regardless of a valid configured level.
-Explicit true uses `formatting.thinking_level`, or medium when omitted.
+Explicit true uses `formatting.thinking_level`, or medium if you omit the level.
 The level is one scalar string: low, medium, or high.
 A level alone is valid for automatic summarized thinking.
-Standard/focused require explicit true for an active level; with explicit false the level is inactive.
+Standard/focused require explicit true for an active level. With explicit false, the level is inactive.
 Omitted settings preserve Pi/OpenRouter defaults for standard/focused and request DeepSeek off.
 DeepSeek maps medium to high.
 Pi/OpenRouter may clamp, map, or reject settings, and some models cannot turn reasoning off.
 Preview reports requested policy, not confirmed provider behavior.
 
 Thinking can increase latency and cost and use tokens that would otherwise be available for visible output.
-No output-token allowance increases automatically.
+The output-token allowance does not increase automatically.
 No extra model calls, retries, repair calls, or partial publication are added.
 Automatic thinking is a selected application policy, not evidence that reasoning improves transcript-summary fidelity.
 Raw, plain-text MCP, and retrieval paths remain model-free.
@@ -187,7 +187,7 @@ See [thinking configuration](cli.md#thinking-policy).
 Python assigns a private ID and one source-call owner to each summary source span.
 Timed source origins retain source indices, run order, original cue times, and split-word ranges.
 Untimed source origins use normalized-text offsets and null timestamps.
-The ID namespace is absent from retained caption text.
+Retained caption text does not contain the ID namespace.
 Removed captions and descriptions are never added to the registry.
 A split cue keeps its original interval.
 The wrapper does not infer finer timing.
@@ -196,9 +196,9 @@ Multi-chunk note calls return strict JSON with exactly `claims`.
 Each claim has `statement`, unique same-call `source_ids`, and a `qualifications` array.
 Limits are 64 claims per call, 16 IDs per claim, and 16 qualifications per claim.
 Empty claims are allowed.
-If all evidence is empty, processing fails before synthesis.
+If all evidence is empty, processing fails before the synthesis call.
 Duplicate keys, forged/cross-call references, invalid schemas, fences, commentary, and oversized notes fail without repair.
-Validated objects, IDs, and qualifications are serialized directly into the final notes envelope, not quoted Markdown strings.
+The wrapper serializes validated objects, IDs, and qualifications directly into the final notes envelope, not as quoted Markdown strings.
 
 Planning counts source IDs, claim/schema framing, JSON escapes, and chunk indices.
 Each note call must have at least 256 serialized characters available after minimum claim framing.
@@ -207,7 +207,7 @@ ID framing can change source partitions and call counts.
 One planned source chunk still uses one direct summary call.
 N chunks use N note calls plus one synthesis.
 No hierarchical synthesis, judging, repair, or retry calls are added.
-Final summaries reject canonical private IDs rather than remove them silently.
+Final summary validation rejects canonical private IDs rather than removing them silently.
 Only the validated final Markdown is published.
 Metadata and public MCP fields remain unchanged.
 
@@ -218,12 +218,12 @@ Offline annotations and human review remain necessary.
 Real-model fidelity has not been verified.
 
 CLI and Python standard or focused formatting can use bounded read-only neighboring captions when enabled.
-The default zero keeps their old source payload shapes without private ID fields.
+The default value of zero keeps their old source payload shapes without private ID fields.
 Nonzero context wraps existing current data with `previous_context` and `following_context`.
 Only current words own output.
 Only current runs determine canonical headings.
-Windows use whole tokens, never chapter titles, descriptions, removed captions, or earlier model output.
-Worst-case JSON escaping is reserved before deterministic repartitioning.
+Context windows use whole tokens, never chapter titles, descriptions, removed captions, or earlier model output.
+The wrapper reserves space for worst-case JSON escaping before deterministic repartitioning.
 If a neighbor token is larger than its window, the wrapper omits it.
 The wrapper does not truncate it.
 Context can increase calls or leave no room for a current token.
@@ -240,7 +240,7 @@ All three backends use the same source prompts, chapter validation, omission rul
 Descriptions are never model input.
 Pi keeps the isolated subprocess contract above.
 OpenRouter and DeepSeek use one bounded nonstreaming HTTPS completion per planned call through a supervised Python helper.
-It rejects tool calls, redirects, invalid or oversized responses, and non-stop completions.
+The helper rejects tool calls, redirects, invalid or oversized responses, and non-stop completions.
 The wrapper makes no automatic retry or provider switch and publishes no partial result.
 Direct DeepSeek uses standard-library HTTP at the fixed HTTPS endpoint `https://api.deepseek.com/chat/completions`.
 It requires an explicit model and reads `DEEPSEEK_API_KEY` only from the helper environment.
@@ -249,7 +249,7 @@ OpenRouter also limits HTTP responses to 2 MiB and visible completion text to 1 
 Reasoning still counts toward the HTTP response limit even when it is suppressed from documents.
 Oversized responses fail without truncation or raised limits.
 Private reasoning never becomes document text, notes evidence, diagnostics, cache data, or input to later independent calls.
-Hiding it does not disable reasoning or charges.
+Hiding private reasoning does not disable reasoning or charges.
 DeepSeek sends captions directly to DeepSeek, not through OpenRouter's `data_collection="deny"` route.
 The wrapper gives no equivalent provider retention guarantee.
 A local deadline cannot cancel provider billing or establish factual accuracy.
@@ -306,11 +306,11 @@ The channel URL falls back to the uploader URL.
 The channel ID never falls back to a handle.
 
 The upload date uses UTC.
-A valid timestamp supplies an absent date.
+If the date is absent, a valid timestamp supplies it.
 An explicitly malformed date becomes `null`.
 The wrapper does not guess a date.
 
-Duration keeps zero and fractional seconds.
+Duration preserves zero and fractional seconds.
 Missing or invalid optional values become `null`.
 Caption language keeps the selected key exactly.
 
@@ -328,7 +328,7 @@ CLI raw and Markdown file headers, MCP structured metadata, and compatibility JS
 Descriptions are not included in transcript bodies, model input, or CLI preview.
 SponsorBlock and focused editing do not change descriptions.
 The wrapper does not parse description links or create new chapters from this field.
-Descriptions remain untrusted source data, not instructions.
+Descriptions remain untrusted source data. They are not instructions.
 
 `chapter_status` is `available`, `unavailable`, or `invalid`.
 Each chapter has `title`, `start_seconds`, and nullable `end_seconds`.
@@ -358,7 +358,7 @@ The wrapper selects one track with VTT formats, in this order:
 4. Automatic `en`
 5. Other automatic `en-` keys, in lexical order
 
-Matching ignores case but keeps the original key.
+Track matching ignores case but keeps the original key.
 YouTube-provided translated English is a fallback.
 The wrapper does not translate locally or infer translation provenance.
 
@@ -371,7 +371,7 @@ The parser skips metadata blocks.
 The parser removes supported VTT tags before entity decoding.
 
 Manual captions keep repetition.
-Automatic cleanup removes exact suffix/prefix overlaps only within consecutive rolling cues, with at most a 100 ms gap.
+Automatic cleanup removes exact suffix/prefix overlaps only within consecutive rolling cues with a gap of at most 100 ms.
 
 Larger gaps and backward times reset the overlap comparison.
 Case and punctuation differences remain distinct.
@@ -404,7 +404,7 @@ The wrapper provides no cookies, bypass flags, or token provisioning.
 Version 1.0.0 includes deterministic metadata, segment, search, and page tools.
 They share source-caption snapshots with MCP `get_transcript`, without calling a model.
 Cache rehydration preserves original cues, chapters, descriptions, filtering receipts, and source order.
-A failed effective SponsorBlock lookup is not persisted as a successful filtered snapshot.
+The cache does not store a failed effective SponsorBlock lookup as a successful filtered snapshot.
 The wrapper formats Markdown again on each explicit request.
 The cache stores only source data.
 CLI processing remains unchanged.

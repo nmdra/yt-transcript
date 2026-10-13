@@ -29,7 +29,7 @@ Add this entry to `mcpServers`:
 ```
 
 Replace the command placeholder with the installed path.
-The 330-second client timeout allows time beyond the server's 300-second operation deadline.
+The 330-second client timeout allows more time than the server's 300-second operation deadline.
 `--no-config` uses server defaults instead of your saved CLI TOML settings.
 To use saved SponsorBlock and Pi preferences, omit this flag.
 The `codemode` exposure setting lets Pi's codemode find and call the tool.
@@ -63,10 +63,10 @@ max_output_tokens = 16384
 Launch without `--no-config` and make `OPENROUTER_API_KEY` available in the server environment.
 Do not put the key in tool arguments, private worker JSON, or TOML.
 After an approved configuration or installation update, reconnect the MCP server.
-Explicit Markdown uses OpenRouter without Pi.
-Plain text remains usable without a key or model.
+Explicit Markdown requests use OpenRouter without Pi.
+Plain text remains available without a key or model.
 Pi as an MCP client is separate from the server's formatting backend.
-All three backends retain the POSIX restriction for supervised MCP Markdown.
+All three backends still require POSIX for supervised MCP Markdown.
 Deadlines, one-active-worker behavior, result sizes, metadata, and safe errors remain unchanged.
 See [CLI provider limits](cli.md#providers) for routing, privacy, and output-token limits.
 
@@ -96,21 +96,21 @@ max_output_tokens = 16384
 DeepSeek requires an explicit model and `DEEPSEEK_API_KEY` only in the server/helper environment.
 Do not serialize the key in TOML, worker JSON, command arguments, or tool arguments.
 Launch without `--no-config` and reconnect after an approved configuration change.
-A running client does not inherit a key exported later in another terminal.
+A running client does not inherit a key that you export later in another terminal.
 DeepSeek uses the fixed HTTPS endpoint `https://api.deepseek.com/chat/completions` without Pi.
-The output allowance defaults to 16384 per call and accepts integers from 1 through 393216.
-The selected model must support it.
+The output-token allowance defaults to 16384 per call and accepts integers from 1 through 393216.
+The selected model must support this allowance.
 
 All providers share the same server-owned thinking policy.
-Omitted settings request medium thinking for direct summary, all notes calls, and final synthesis.
-For standard/focused output, omission preserves Pi/OpenRouter defaults and requests DeepSeek off.
+If you omit the settings, direct summary, all notes calls, and final synthesis request medium thinking.
+For standard/focused output, omitted settings preserve Pi/OpenRouter defaults and request DeepSeek off.
 Explicit `thinking = false` always requests off and leaves a valid configured level inactive.
-Explicit true uses the scalar `thinking_level` (`low`, `medium`, or `high`), otherwise medium.
+Explicit true uses the scalar `thinking_level` (`low`, `medium`, or `high`), or medium if you omit the level.
 A level alone is valid for summarized mode; standard/focused require explicit true unless false makes the level inactive.
 DeepSeek normalizes medium to high.
 Pi/OpenRouter can clamp, map, or reject settings; some models always reason.
 
-Thinking can increase cost, latency, and competition for the output-token allowance.
+Thinking can increase cost and latency and use more of the output-token allowance.
 Reasoning suppression does not disable billing.
 There is no automatic token-limit increase, retry, repair, fallback, or partial result.
 This policy does not prove better summary fidelity.
@@ -121,7 +121,7 @@ The five public tool schemas and four primary result fields remain unchanged.
 There are no public thinking, level, or model arguments.
 Plain text and all retrieval tools remain model-free, even with thinking configured.
 The caption cache contains source data, not generated Markdown or private reasoning.
-The existing supervision, total/per-call deadlines, cancellation, and result-size bounds still apply.
+The existing supervision, total/per-call deadlines, cancellation, and result-size limits still apply.
 These changes are not included in the pinned 1.0.0 release.
 
 ## Explicit model-processed Markdown output
@@ -134,7 +134,7 @@ Request model editing explicitly:
 
 Replace `VIDEO_ID` with an 11-character video ID.
 This request authorizes model calls and can incur charges.
-The result has `format="markdown"`, a Markdown document that contains only the transcript body, and structured metadata.
+The result contains `format="markdown"`, a Markdown document with only the transcript body, and structured metadata.
 The character count equals the document length.
 The request uses the shared CLI formatter, source chapter context, and selected SponsorBlock projection.
 Standard and focused modes validate canonical chapter headings.
@@ -146,7 +146,7 @@ Model fidelity is not guaranteed.
 MCP Markdown currently requires POSIX process supervision.
 If server TOML does not supply `formatting.model`, Pi uses its configured default model.
 OpenRouter and DeepSeek always require an explicit model.
-Server `formatting.chunk_chars`, `formatting.summary_synthesis_chars`, and `formatting.editorial_mode` apply.
+The server settings `formatting.chunk_chars`, `formatting.summary_synthesis_chars`, and `formatting.editorial_mode` apply.
 These settings do not add caller-controlled tool arguments.
 `formatting.max_chunks` is finite and defaults to 20 when omitted.
 `formatting.timeout_seconds` is limited to 120 seconds per call.
@@ -167,13 +167,13 @@ There is no caller-controlled `editorial_mode` tool argument.
 The shared formatter targets 400–700 words, with shorter output for short sources.
 One source chunk uses one summary call.
 Multiple chunks use factual notes plus one final synthesis call.
-The cap includes synthesis.
-If synthesis is needed, the default cap allows at most 19 source chunks.
+The call limit includes synthesis.
+If synthesis is needed, the default call limit allows at most 19 source chunks.
 Source chunks use `formatting.chunk_chars`.
-The final notes envelope uses `formatting.summary_synthesis_chars`, default 50,000 characters, allowed range 1,000 through 500,000.
+The final notes envelope uses `formatting.summary_synthesis_chars`. The default is 50,000 characters, and the allowed range is 1,000 through 500,000.
 Both settings count characters, not tokens, and do not guarantee model context compatibility.
 The notes prompt requests compact JSON and targets 75% of each allocated hard response limit.
-An infeasible note budget fails before model calls.
+If the note budget is infeasible, processing fails before model calls.
 The server returns no intermediate notes, private source IDs, partial summary, automatic retry, or fallback.
 Summary notes use strict references from the same call and qualification arrays internally.
 Valid references do not establish factual support.
@@ -206,10 +206,10 @@ If a client disconnects earlier, the work is still canceled.
 
 This setting does not extend the individual model-call deadline or guarantee completion.
 A larger chunk cap permits more calls but does not extend any deadline.
-Smaller `formatting.chunk_chars` can help with model context limits.
-However, smaller chunks increase calls, delay, and possible cost.
+A smaller `formatting.chunk_chars` value can help with model context limits.
+However, smaller chunks increase the number of calls, delay, and possible cost.
 
-The server checks the cap before model calls.
+The server checks the call limit before model calls.
 A formatting failure returns an error.
 The server never returns raw captions as a fallback or partial Markdown after a formatting failure.
 SponsorBlock fallback still keeps source captions before editing.
@@ -274,7 +274,7 @@ get_transcript(url: str, mode: Literal["filtered", "full"] = "filtered",
                output_format: Literal["plain_text", "markdown"] = "plain_text")
 ```
 
-URL is the only required argument.
+The URL is the only required argument.
 If you omit the mode, the server uses `filtered`.
 This mode attempts SponsorBlock unless you explicitly disable it.
 If no usable segments exist or lookup fails, the mode returns full captions.
@@ -289,7 +289,7 @@ Use CLI `--preview` and `--doctor` instead.
 The result returns metadata only in `metadata`, not as YAML frontmatter in `document`.
 CLI file output still includes YAML frontmatter.
 
-Metadata includes an always-present `description` field: extractor text or `null`.
+Metadata always includes a `description` field with extractor text or `null`.
 Both modes and output formats include the same description for the same source snapshot.
 The SDK compatibility JSON also includes the description.
 Descriptions are not included in `document`, `character_count`, or model input.
@@ -357,7 +357,7 @@ The event loop remains responsive during downloads.
 | Serialized tool result, including compatibility text | 1 MiB |
 | Accepted private progress records per operation | 64 KiB |
 
-Descriptions count toward the serialized result limit, including their compatibility JSON copy.
+Descriptions and their compatibility JSON copy count toward the serialized result limit.
 A long description can exceed this limit even when the document fits its own limit.
 Oversized results fail without truncation.
 For Markdown, model calls can finish before a result-size error occurs.
@@ -403,7 +403,7 @@ Segments allow finite, nonnegative times with start less than end and an interva
 The server returns at most 200 cues.
 Larger results fail without silent truncation.
 Each cue has `start_seconds, end_seconds, text, url`.
-Overlap includes the whole cue, with its original start/end times.
+If a cue overlaps the requested range, the result includes the whole cue with its original start/end times.
 Zero-duration cues are included when their timestamp is within the requested interval.
 
 Search allows a nonblank query of up to 200 characters and max_results from 1 through 20.
@@ -413,7 +413,7 @@ Results use earliest timestamps, with source order for ties.
 Each match has `start_seconds, end_seconds, text, context, url`.
 Text preserves the complete covered cues.
 Surrounding context is limited to 500 characters.
-No match returns `matches: []`.
+If there is no match, the result contains `matches: []`.
 
 For example:
 
@@ -432,7 +432,7 @@ Pages retain source order, including backward timestamps, and do not omit or rep
 The final page can be shorter than 1000 characters.
 If one cue cannot fit, the request fails with `MCP_RESPONSE_LIMIT`.
 
-A page result can look like:
+A page result can have this form:
 
 ```json
 {
@@ -444,7 +444,7 @@ A page result can look like:
 ```
 
 Use the returned cursor unchanged for the next request, with the same URL, mode, and server policy.
-The example cursor above is illustrative, not valid input.
+The cursor above is only an example. It is not valid input.
 A final page has `has_more=false` and `next_cursor=null`.
 Malformed or mismatched cursors return `CACHE_CURSOR_INVALID`.
 Expired, evicted, replaced, corrupt, or unreadable snapshots return `CACHE_CURSOR_EXPIRED`.
@@ -454,7 +454,7 @@ The cursor is for stable paging, not authentication.
 Invalid segment ranges return `SEGMENT_RANGE_INVALID`.
 Invalid search queries or result bounds return `SEARCH_QUERY_INVALID`.
 Invalid page-size bounds return `CONFIG_INVALID`.
-All helpers retain the serialized result limit, safe errors, 300-second deadline, and one-active-worker limit.
+All helpers keep the serialized result limit, safe errors, 300-second deadline, and one-active-worker limit.
 
 ## Local source cache
 
@@ -473,13 +473,13 @@ ttl_hours = 24
 max_size_mb = 50
 ```
 
-TTL allows integers from 1 through 168 hours and is measured from snapshot creation.
-Access does not extend expiry.
+TTL allows integers from 1 through 168 hours and is measured from the time the snapshot is created.
+Access does not extend the expiry time.
 The payload budget allows integers from 10 through 500 MiB.
 Physical SQLite files can be larger than that budget.
 Individual snapshots are limited to 5 MiB.
 
-Omitting `cache.path` or setting it to an empty string keeps the existing default location.
+If you omit `cache.path` or set it to an empty string, the cache keeps the existing default location.
 If XDG_CACHE_HOME is absolute, the default is `$XDG_CACHE_HOME/yt-transcript/transcripts.db`.
 Otherwise, the default is `~/.cache/yt-transcript/transcripts.db`.
 To select a different SQLite database file, set an absolute filename in server TOML:
@@ -502,7 +502,7 @@ Source captions and descriptions are untrusted text stored locally.
 They reach a model only for explicitly requested Markdown.
 
 Equivalent video URL forms share a snapshot when mode and resolved SponsorBlock policy match.
-Full and filtered use separate keys.
+Full and filtered modes use separate keys.
 Policy changes, expiry, or eviction can require a new extraction.
 An effective failed SponsorBlock lookup is not cached as a successful filtered result, including a removal that would empty the captions.
 A successful not_found lookup may be cached.
@@ -530,6 +530,6 @@ Source fetching has no estimated percentage.
 Progress does not extend a deadline or create a background task.
 Cancellation and disconnect still stop the supervised worker.
 Malformed worker progress is discarded, and arbitrary stderr is not forwarded.
-Worker progress lines are limited to 512 bytes and accepted records to 64 KiB per operation.
+Worker progress lines are limited to 512 bytes. Accepted records are limited to 64 KiB per operation.
 Notification failure does not produce a partial result or trigger a model retry.
 There are no task IDs, polling tools, or queues.

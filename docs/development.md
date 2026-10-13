@@ -4,7 +4,7 @@
 
 ## Local setup
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) with its official instructions.
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) as specified in its official instructions.
 
 From this project directory, run:
 
@@ -34,7 +34,7 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
 Authenticate directly in Pi through `/login`.
 Select or save a default model through `/model`.
-This wrapper never installs runtimes or changes credentials.
+The wrapper never installs runtimes or changes credentials.
 
 ## Offline fidelity evaluation
 
@@ -51,20 +51,20 @@ The versioned fixtures include deliberate loss, valid omissions, repeated detail
 The report separates annotated expectations from advisory literal differences.
 The report includes source, response, and input hashes, and declared prompt hashes and provenance.
 The report does not include an overall fidelity score.
-Prompt and acquisition declarations are not verified.
+The evaluator does not verify prompt and acquisition declarations.
 Synthetic fixtures are not real-model benchmarks.
 Each input and the report are bounded to 8 MiB.
-Duplicate keys, nonfinite JSON, unknown schemas or IDs, and path aliases cause safe failure.
+The evaluator fails safely for duplicate keys, nonfinite JSON, unknown schemas or IDs, and path aliases.
 The evaluator creates only the requested report's parent directories.
-If the operation fails, atomic publication keeps the old report.
+If the operation fails, atomic publication preserves the old report.
 Report excerpts are untrusted local review data, not MCP output or production sidecars.
-Acquire real responses only with separate backend, call, and spend approval.
+Acquire real responses only after you receive separate backend, call, and spend approval.
 
 ## Offline OpenRouter acceptance
 
 OpenRouter tests mock HTTP and use local helper processes.
 The tests do not need a real API key, model, YouTube request, or SponsorBlock lookup.
-The checkout's CLI doctor can read config and accepts `--provider`, `--model`, and config selection.
+The checkout's CLI doctor can read configuration and accepts `--provider`, `--model`, and configuration selection.
 For OpenRouter, doctor reports only whether an API key and model are present.
 Doctor never reports that authentication is valid.
 Doctor checks Pi only for the Pi backend.
@@ -85,9 +85,10 @@ GitHub releases include a wheel, source archive, and `SHA256SUMS`.
 Releases do not include Python, Deno, Pi, or provider credentials.
 You can download public assets without repository access credentials.
 Authenticate if the GitHub CLI requests authentication or API limits require it.
-Nothing goes to PyPI.
+The releases publish nothing to PyPI.
 
-The tag-triggered `.github/workflows/release.yml` accepts `vX.Y.Z` for stable releases and `vX.Y.Z-dev.N` for development prereleases.
+Tags trigger `.github/workflows/release.yml`.
+The workflow accepts `vX.Y.Z` for stable releases and `vX.Y.Z-dev.N` for development prereleases.
 `N` must be greater than zero.
 
 Before tagging, complete these steps:
@@ -107,10 +108,10 @@ Development releases do not replace the latest stable release.
 The workflow does not overwrite existing releases or assets.
 The publish job verifies artifact checksums.
 Then the job creates a normal GitHub release with the workflow token.
-No private-repository guard or manual public-release exception is required.
+The workflow does not require a private-repository guard or a manual public-release exception.
 
 CI uses the pinned Python version in `.python-version`, uv 0.8.13, Hatchling 1.32.4, Pyright 1.1.412, and locked project dependencies.
-GitHub Actions are pinned to commit hashes.
+CI pins GitHub Actions to commit hashes.
 CI runs no live YouTube, SponsorBlock, or Pi validation.
 
 ## Development and distribution
@@ -135,7 +136,7 @@ Live checks require an operator-supplied public URL:
 YT_TRANSCRIPT_TEST_URL='https://youtu.be/VIDEO_ID' uv run pytest -m integration tests/test_integration.py
 ```
 
-A live Pi check requires new approval for charges.
+Before a live Pi check, obtain new approval for charges.
 Set `YT_TRANSCRIPT_TEST_PI=1`.
 Use `YT_TRANSCRIPT_TEST_EDITORIAL_MODE=standard` or `focused`.
 The check requires a preview-approved `YT_TRANSCRIPT_TEST_MAX_CHUNKS` from 1 through 1000.
@@ -144,7 +145,7 @@ A URL alone never enables a model call.
 
 Chapter checks also require `YT_TRANSCRIPT_TEST_CHAPTERS=1` and a confirmed URL for a video with chapters.
 SponsorBlock checks require a URL for a video with segments.
-These checks also require `YT_TRANSCRIPT_TEST_SPONSORBLOCK=1` and `YT_TRANSCRIPT_TEST_SPONSORBLOCK_LICENSE_OK=1` after operator license confirmation.
+SponsorBlock checks also require `YT_TRANSCRIPT_TEST_SPONSORBLOCK=1` and `YT_TRANSCRIPT_TEST_SPONSORBLOCK_LICENSE_OK=1` after the operator confirms the license.
 Offline tests enable none of these conditions.
 
 The Git source is the public repository [nmdra/yt-transcript](https://github.com/nmdra/yt-transcript).

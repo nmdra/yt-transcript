@@ -2,17 +2,17 @@
 
 [README](../README.md) · [MCP setup](mcp.md) · [Troubleshooting](troubleshooting.md)
 
-These instructions install the tool in an isolated uv tool environment for your user account.
-The instructions do not require sudo.
+Use these instructions to install the tool in an isolated uv tool environment for your user account.
+You do not need sudo.
 The installation does not change the project's development environment.
 
-## OpenRouter requirements
+## Model backend requirements
 
 Pi is the default Markdown backend.
-This release can instead use OpenRouter with an explicit model and `OPENROUTER_API_KEY` in the environment.
-This backend does not require Pi or an additional HTTP dependency.
+OpenRouter and DeepSeek are direct API alternatives. They require explicit models and accept API keys only from the environment.
+Neither direct backend requires Pi or an additional HTTP dependency.
 Python, Deno, and caption-extraction dependencies remain unchanged.
-Before you run requests that can incur charges, read the [provider guide](cli.md#providers).
+Before you run requests that can incur charges, read the [provider guide](providers.md).
 Keep existing credentials and backend settings unless you approve a change.
 
 ## Prerequisites
@@ -24,7 +24,7 @@ Keep existing credentials and backend settings unless you approve a change.
 - [Pi](https://pi.dev) 1.0.4 or a newer compatible release for the Pi Markdown backend or Pi MCP integration
 
 You do not need Pi to process raw captions or extract MCP plain text.
-Explicit MCP Markdown output requires a ready server-selected backend and POSIX worker supervision.
+Explicit MCP Markdown output requires the server-selected backend to be ready. It also requires POSIX worker supervision.
 You need a Pi client to connect the server to Pi.
 First, check the installed runtime versions.
 Then install missing runtimes from their official sources.
@@ -42,7 +42,7 @@ npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
 Set up provider authentication directly in Pi through `/login`.
 Set the default model through `/model`.
-Installation, doctor, and listing MCP tools do not require a model call.
+Installation, doctor, and MCP tool listing do not require a model call.
 Keep credentials out of URLs, shell arguments, and project files.
 
 ## Quick Git-source install
@@ -58,7 +58,7 @@ yt-transcript --doctor
 ```
 
 This command installs `1.1.0` with the MCP extra.
-The command pins the application source to the stable release tag.
+It pins the application source to the stable release tag.
 uv selects compatible dependencies from package metadata.
 uv does not use the repository lockfile for this installation.
 If you need dependency versions that match the release, use the wheel method below.
@@ -68,8 +68,8 @@ Always specify this repository or its verified release wheel.
 
 ## Verified wheel with release-matched dependencies
 
-Use this method for the agent installation prompt in the README.
-The method requires the [GitHub CLI](https://cli.github.com/).
+Use this method for the [agent installation prompt](agent-install.md).
+This method requires the [GitHub CLI](https://cli.github.com/).
 This repository and the approved `v1.1.0` release are public.
 Authenticate if the CLI requests authentication or access is unavailable.
 Do not put tokens in commands or download URLs.
@@ -87,9 +87,9 @@ gh release download v1.1.0 --repo nmdra/yt-transcript --dir "$release_dir"
 ```
 
 On macOS, use `shasum -a 256 --check SHA256SUMS` instead of `sha256sum`.
-Continue only when the wheel and source archive checksums both pass.
+Continue only if the wheel and source archive checksums both pass.
 Checksums detect changed bytes.
-Trust in the release still depends on the authenticated GitHub source.
+You must still trust the authenticated GitHub source to trust the release.
 
 Extract constraints without unpacking or executing the source archive:
 
@@ -130,25 +130,25 @@ yt-transcript --doctor
 
 These constraints select exact versions for required dependencies.
 The constraints do not install every package in the development lockfile.
-`--offline` is optional when all required packages are already cached.
-While the uv tool receipt refers to these files, keep the assets and constraints.
+`--offline` is optional if all required packages are already cached.
+Keep the assets and constraints while the uv tool receipt refers to these files.
 
 ## PATH and MCP setup
 
 uv normally makes the executable available in `~/.local/bin`.
 Check your configured location with `uv tool dir --bin`.
-Make sure that location is on `PATH`.
+Make sure this location is on `PATH`.
 Use `command -v yt-transcript` to find the installed command.
 Then use the installed command's absolute path in [Pi's MCP configuration](mcp.md).
 
-Doctor checks Python, yt-dlp, PyYAML, EJS compatibility, Deno, and selected-backend readiness.
-A healthy report shows local readiness only.
+Doctor checks Python, yt-dlp, PyYAML, EJS compatibility, Deno, and whether the selected backend is ready.
+A healthy report shows only local readiness.
 The report does not verify video access or model authentication.
 Do not run a live video or paid Markdown job as an installation check.
 
 ## Updates and uninstall
 
-Updates are explicit.
+Updates are not automatic.
 Before you replace an existing installation, review the target release and changelog.
 Repeat the selected installation method.
 Use the target version's tag, asset names, and lockfile.

@@ -24,9 +24,9 @@ Stdout contains only the transcript body.
 File output leaves stdout empty.
 All non-VTT bodies end with one newline.
 
-Terminal stderr shows a spinner while the tool retrieves and filters captions.
-Then stderr shows a bar with completed model calls and elapsed time.
-Summarized mode includes the final synthesis call in this count.
+The tool shows a spinner on terminal stderr while it retrieves and filters captions.
+Then the tool shows a bar on stderr with completed model calls and elapsed time.
+In summarized mode, this count includes the final synthesis call.
 Progress does not estimate download bytes, tokens, cost, or completion time.
 The tool disables progress for redirected stderr, `TERM=dumb`, help/version, doctor, and MCP.
 Progress never appears in transcripts or files.
@@ -34,7 +34,7 @@ Progress never appears in transcripts or files.
 Use `-o` for Python-generated YAML metadata.
 Raw and Markdown file headers include the nullable video `description`.
 See [Metadata files](behavior.md#metadata-files) for the field contract.
-Descriptions stay out of stdout bodies, model input, preview, and raw VTT.
+The tool excludes descriptions from stdout bodies, model input, preview, and raw VTT.
 Shell redirection receives only the transcript body:
 
 ```sh
@@ -47,7 +47,7 @@ The URL must contain an 11-character video ID.
 Supported hosts are `youtube.com`, `www.youtube.com`, `m.youtube.com`, and `youtu.be`.
 
 The tool supports watch, shorts, and embed URLs.
-A playlist parameter on a video URL does not enable playlist downloads.
+A playlist parameter in a video URL does not enable playlist downloads.
 
 ## Configuration
 
@@ -117,7 +117,7 @@ There is no `--markdown` or `--quiet` flag.
 Set `chunk_chars` and `summary_synthesis_chars` in `[formatting]` in TOML.
 There is no `--chunk-chars` or `--summary-synthesis-chars` flag.
 
-After schema checks, raw modes ignore saved formatting preferences.
+After the wrapper checks the schema, raw modes ignore saved formatting preferences.
 An explicit model, chunk cap, or editorial-mode flag conflicts with raw output.
 `--editorial-mode` overrides TOML.
 The mutually exclusive `--sponsorblock` / `--no-sponsorblock` flags also override TOML.
@@ -133,116 +133,19 @@ A malformed configuration still blocks raw mode unless you supply `--no-config`.
 
 ## Providers
 
-Pi remains the default.
-To use OpenRouter, select it explicitly:
-
-```sh
-uv run yt-transcript URL --no-config --provider openrouter --model openai/gpt-4o -o transcript.md
-```
-
-Set `OPENROUTER_API_KEY` in the process environment.
-Never put the key in TOML or command arguments.
-OpenRouter requires an explicit model and no Pi installation.
-Raw modes require neither a model nor credentials.
-Preview requires a selected OpenRouter model, but no API key.
-Preview does not make a model request.
-
-**TOML migration:** rename `[pi]` to `[formatting]`.
-The wrapper rejects the old table instead of merging it.
-Add `provider = "openrouter"` or keep the default `"pi"`.
-The `[openrouter]` table accepts only `max_output_tokens`.
-Its default is 16384, and its range is 1–131072.
-The wrapper sends this value as `max_tokens`.
-The supported limits depend on the model.
-Reasoning tokens can use the allowance.
-Truncated or empty output causes failure without repair.
-
-The wrapper sends one nonstreaming HTTPS request per completion through a supervised Python helper.
-It rejects redirects, HTTP error bodies, tool calls, and incomplete output.
-A monotonic deadline applies to the helper and HTTP work.
-Socket timeouts alone do not enforce this deadline.
-The wrapper does not retry or change providers automatically.
-Requests disable OpenRouter upstream fallback, require parameter support, and request providers with `data_collection="deny"`.
-These settings can leave no available route.
-The settings do not guarantee zero retention, accuracy, or a fixed upstream identity.
-Transcript text reaches OpenRouter and its selected upstream provider.
-Calls can incur charges, including work completed after a local timeout.
-
-These features are included in dev8. When updating from dev7, rename `[pi]` to `[formatting]` and keep your existing settings.
-
-### Direct DeepSeek
-
-```sh
-# Set DEEPSEEK_API_KEY in the process environment first.
-yt-transcript URL --no-config --provider deepseek --model deepseek-flash -o transcript.md
-```
-
-DeepSeek requires an explicit model and no Pi installation.
-`deepseek-flash` and `deepseek-v4-pro` are examples, not a fixed model catalog.
-The key comes only from `DEEPSEEK_API_KEY` in the helper environment.
-Never put it in TOML, command arguments, or MCP tool arguments.
-Preview requires an explicit model but no key; doctor checks local model/key presence, not authentication.
-Raw modes need neither.
-
-The fixed endpoint is `https://api.deepseek.com/chat/completions`.
-The supervised helper uses standard-library HTTP with one nonstreaming request per planned call and no new dependency.
-It rejects redirects and makes no retry, repair call, or provider fallback.
-`[deepseek]` accepts only `max_output_tokens`, default 16384, integer range 1–393216.
-The model must support the requested allowance.
-Thinking shares this allowance with visible text; enabling it does not raise the limit.
-Invalid, oversized, empty, or incomplete output fails without partial publication.
-See [byte limits](behavior.md#backend-independent-formatting).
-
-Transcript text reaches DeepSeek directly.
-OpenRouter's `data_collection="deny"` routing request does not apply.
-Consult DeepSeek's privacy policy; the wrapper gives no equivalent retention guarantee.
-A local timeout cannot undo charges already incurred.
+Pi is the default Markdown backend. OpenRouter and DeepSeek are direct API alternatives.
+See the [provider guide](providers.md) for setup, API keys, token limits, privacy, and request behavior.
 
 ### Thinking policy
 
-Configure thinking in TOML only. There are no new CLI thinking flags or public MCP arguments.
-Both settings are optional; keep them commented to use the automatic policy:
-
-```toml
-[formatting]
-# thinking = false
-# thinking_level = "medium"
-```
-
-`thinking` must be a Boolean. `thinking_level` must be one scalar string: `low`, `medium`, or `high`, not an array.
-TOML has no null value; omit the key instead.
-
-| `thinking` | Editorial mode | Requested policy |
-|---|---|---|
-| Omitted | Standard/focused | Preserve Pi/OpenRouter defaults; DeepSeek off |
-| Omitted | Summarized | On at configured level, otherwise medium |
-| `true` | Any | On at configured level, otherwise medium |
-| `false` | Any | Off; a valid configured level stays inactive |
-
-A level alone is valid in summarized mode because automatic thinking enables it.
-In standard/focused mode it requires `thinking = true`, unless explicit false keeps it inactive.
-Otherwise formatting reports a safe configuration error rather than silently enabling paid behavior.
-Raw and model-free MCP operations validate configuration but never call a model because of these settings.
-Direct summaries, each notes call, and final synthesis all use the same requested level.
-
-Pi receives `--thinking off` or the selected level; omission in standard/focused adds no flag.
-OpenRouter receives explicit reasoning enabled/effort settings with response reasoning excluded; default preservation adds no reasoning field.
-DeepSeek receives `thinking.type` enabled or disabled and maps low/medium/high to low/high/high when enabled.
-Medium therefore requests high from DeepSeek.
-These are requested states, not verified provider behavior or equal token budgets.
-Pi and OpenRouter can clamp or map levels or reject unsupported parameters.
-Some models cannot disable reasoning.
-OpenRouter still requires parameter support and disables upstream fallback.
-
-Thinking can increase cost, latency, and token competition with visible output.
-Reasoning exclusion hides response content but does not disable thinking or billing.
-The wrapper does not raise token limits automatically, add calls, retry, repair, or return partial output.
-Automatic summary thinking is application policy, not evidence of improved fidelity.
+Configure thinking in TOML, not through CLI flags.
+Summarized mode requests medium thinking unless you explicitly disable it.
+See the [thinking policy](providers.md#thinking-policy) for the full settings and provider mappings.
 
 ## Editorial modes
 
-`standard` produces an edited transcript and remains the default.
-`focused` produces an edited transcript with separable non-substantive material removed.
+`standard` produces an edited transcript and is the default.
+`focused` produces an edited transcript that excludes separable non-substantive material.
 `summarized` produces one whole-video summary, not an edited transcript.
 
 ```sh
@@ -250,14 +153,15 @@ uv run yt-transcript URL --no-config --editorial-mode summarized --preview
 uv run yt-transcript URL --no-config --editorial-mode summarized --max-chunks 20 -o summary.md
 ```
 
-The summary prompt targets 400–700 words for substantial videos and fewer words for short sources.
+The summary prompt requests 400–700 words for substantial videos and fewer words for short sources.
 It requests `## Summary`, `## Key points`, and an optional `## Conclusions and caveats` section.
 Python checks these headings and requires nonempty section bodies.
 The length target and factual quality are not guaranteed.
 The prompt prioritizes the main ideas, important results, and source qualifications.
 It treats captions, chapter titles, and intermediate notes as untrusted data.
 Video descriptions are not model input.
-The summary body does not retain canonical chapter headings; source chapter metadata stays unchanged.
+The summary body does not retain canonical chapter headings.
+Source chapter metadata stays unchanged.
 
 One input chunk needs one summary call.
 Multiple input chunks need one factual-note call per chunk and one final synthesis call.
@@ -266,17 +170,17 @@ The tool does not return intermediate notes.
 `--max-chunks` counts all these calls.
 For example, three input chunks require a cap of at least four.
 Notes are strict private claims objects with source IDs from the same call and qualification arrays.
-Per-chunk budgets include schema and ID framing and JSON escaping.
+Per-chunk budgets include schema framing, ID framing, and JSON escaping.
 After minimum claim framing, at least 256 usable serialized characters must remain.
 Source chunks must fit `formatting.chunk_chars`.
 The complete final notes envelope must fit the independent `formatting.summary_synthesis_chars` limit.
-The notes prompt requests compact JSON and targets 75% of each allocated hard response limit.
+The notes prompt requests compact JSON and aims for 75% of each allocated hard response limit.
 The hard limit still applies to the raw response and the compact serialized claims.
-An infeasible note budget fails with `PI_CONTEXT_LIMIT`, `OPENROUTER_CONTEXT_LIMIT`, or `DEEPSEEK_CONTEXT_LIMIT` before model calls.
+If the notes budget is insufficient, processing fails with `PI_CONTEXT_LIMIT`, `OPENROUTER_CONTEXT_LIMIT`, or `DEEPSEEK_CONTEXT_LIMIT` before model calls.
 Oversized or invalid notes cause failure without truncation, a repair call, or a partial summary.
 If all evidence is empty, processing fails before synthesis.
 The formatter rejects final output that contains canonical internal IDs.
-Valid references do not prove factual support or complete caveats.
+Valid references do not prove that facts have support or that caveats are complete.
 Small chunks can create too many notes for one bounded synthesis input.
 Use preview to check the plan.
 A larger cap alone does not solve this input limit.
@@ -297,7 +201,7 @@ uv run yt-transcript URL --no-config --editorial-mode focused --boundary-context
 The integer range is 0–1000 characters per neighboring side.
 The default is zero.
 The explicit flag requires standard/focused Markdown, including preview.
-It is invalid with raw output, summarized mode, doctor, or MCP launch, even when set to zero.
+The flag is invalid with raw output, summarized mode, doctor, or MCP launch, even when set to zero.
 There is no TOML key or public MCP argument for context.
 MCP retains zero context.
 
@@ -306,11 +210,11 @@ Only the current payload owns output.
 Do not copy context into the document.
 Before splitting, planning reserves space for JSON framing and worst-case escapes.
 Planning then reports actual serialized sizes and call counts.
-This can increase calls or cause a planning-limit error.
+This planning process can increase calls or cause a planning-limit error.
 Context windows contain only whole words that fit their character limit.
 If an adjacent word does not fit, the tool omits it from that context window instead of truncating it.
 Current text is not omitted this way.
-If a current word cannot fit the remaining source budget after reserved context and framing, planning fails instead of truncating the word.
+If a current word cannot fit the source budget that remains after planning reserves context and framing, planning fails instead of truncating the word.
 At 1000 characters per side, a 12000-character source budget cannot cover worst-case context plus current text.
 A larger chunk limit is not a model capability or completion guarantee.
 Explicit context adds `boundary context characters per side` to preview.
@@ -345,7 +249,7 @@ Preview shows these fields in a fixed order:
 15. Model selection
 16. Editorial mode
 
-Preview also reports requested thinking state/level and the DeepSeek medium-to-high mapping when applicable.
+Preview also reports the requested thinking state/level and the DeepSeek medium-to-high mapping when applicable.
 It does not verify that a model honors the request.
 
 Preview requires Markdown mode and no output path.
@@ -375,16 +279,16 @@ The formatter does not truncate the token.
 Character limits do not guarantee a compatible context window or output limit.
 
 **Default Markdown sends caption text to the configured model/provider.**
-This can incur one paid call per source chunk, plus Pi/provider-internal retries.
-Multi-chunk summarized output can incur one additional paid synthesis call.
+This can cause charges for one call per source chunk, plus Pi/provider-internal retries.
+Multi-chunk summarized output can cause charges for one additional synthesis call.
 
-A repeated run can incur new charges.
+A repeated run can cause new charges.
 A timeout or cancellation cannot undo provider work or billing.
 The wrapper does not retry model calls.
 
 Model-processing failures print a warning on stderr.
 The warning suggests `--raw` for plain text without an AI model.
-The wrapper does not write a partial processed document or automatic fallback.
+The wrapper does not write a partial processed document or an automatic fallback.
 MCP uses `output_format="plain_text"` for the same explicit recovery.
 The total MCP Markdown deadline is separate from CLI per-chunk timeouts.
 
@@ -413,7 +317,7 @@ A healthy report shows local readiness only.
 The report does not verify video access, provider authentication, caption completeness, or model accuracy.
 
 File output uses a completed sibling temporary file.
-By default, publication atomically replaces the destination after success.
+By default, the tool atomically replaces the destination after success.
 Failures before output leave existing files unchanged.
 
 `--no-clobber` requires `-o`.
@@ -423,7 +327,7 @@ Atomic hard-link publication also rejects a destination created during processin
 Filesystems without usable hard links fail closed.
 There is no replacement fallback.
 A cleanup failure after publication produces a warning.
-The cleanup failure is not reported as a publication failure.
+The tool does not report the cleanup failure as a publication failure.
 
 The output parent directory must exist.
 Stdout is not transactional.
