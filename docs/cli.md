@@ -101,7 +101,7 @@ The wrapper does not create configuration files.
 | `formatting.thinking` | Optional strict Boolean; summarized auto-enables when omitted |
 | `formatting.thinking_level` | Optional scalar `low`, `medium`, or `high`; see thinking policy |
 | `formatting.model` | Nonempty selector string, or omit the key |
-| `formatting.chunk_chars` | Integer 1,000 through 50,000; default 12,000; source input limit |
+| `formatting.chunk_chars` | Integer 1,000 through 200,000; default 12,000; source input limit |
 | `formatting.summary_synthesis_chars` | Integer 1,000 through 500,000; default 50,000; multi-chunk summary synthesis input limit |
 | `formatting.timeout_seconds` | Integer 1 through 3,600, per model call |
 | `formatting.max_chunks` | Integer 1 through 1,000, or omit for unlimited; includes summary synthesis |
@@ -116,6 +116,9 @@ The wrapper does not create configuration files.
 There is no `--markdown` or `--quiet` flag.
 Set `chunk_chars` and `summary_synthesis_chars` in `[formatting]` in TOML.
 There is no `--chunk-chars` or `--summary-synthesis-chars` flag.
+Larger source chunks need enough model context, output capacity, and time for the complete response.
+The 200,000-character maximum does not increase token allowances, byte limits, or deadlines.
+`--no-config` still uses the 12,000-character built-in default.
 
 After the wrapper checks the schema, raw modes ignore saved formatting preferences.
 An explicit model, chunk cap, or editorial-mode flag conflicts with raw output.

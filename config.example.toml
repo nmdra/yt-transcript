@@ -49,7 +49,7 @@ editorial_mode = "standard"
 # It does not increase token limits automatically or guarantee summary fidelity.
 # thinking_level = "medium"
 
-# Default: 12000. Allowed: integers from 1000 through 50000.
+# Default: 12000. Allowed: integers from 1000 through 200000.
 # Maximum source payload characters, including chapter/segment or summary-source JSON framing.
 # This is not a token/context-window limit.
 # Smaller values usually increase invocation count, latency, and possible cost.

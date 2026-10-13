@@ -31,7 +31,7 @@ def test_discovery(monkeypatch, tmp_path, xdg):
     [
         "[formatting]\nchunk_chars=true",
         "[formatting]\nchunk_chars=999",
-        "[formatting]\nchunk_chars=50001",
+        "[formatting]\nchunk_chars=200001",
         '[formatting]\nmodel=" "',
         "[formatting]\nmax_chunks=0",
         "[formatting]\ntimeout_seconds=3601",

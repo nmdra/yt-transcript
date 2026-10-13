@@ -41,7 +41,7 @@ def validate_formatting_policy(value: object) -> MCPFormattingPolicy:
     ):
         raise ValueError("Invalid MCP formatting policy.")
     for key, lower, upper in (
-        ("chunk_chars", 1000, 50000),
+        ("chunk_chars", 1000, 200000),
         ("summary_synthesis_chars", 1000, 500000),
         ("timeout_seconds", 1, 120),
         ("max_chunks", 1, 1000),

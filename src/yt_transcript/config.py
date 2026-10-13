@@ -233,7 +233,7 @@ def load_config(path: Path | None = None, *, disabled: bool = False) -> AppConfi
                     value = value.strip()
             else:
                 lo, hi = {
-                    "chunk_chars": (1000, 50000),
+                    "chunk_chars": (1000, 200000),
                     "summary_synthesis_chars": (1000, 500000),
                     "timeout_seconds": (1, 3600),
                     "max_chunks": (1, 1000),

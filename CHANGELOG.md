@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- Raise the maximum `formatting.chunk_chars` from 50,000 to 200,000 for CLI and MCP; keep the 12,000-character default, token allowances, byte limits, and deadlines unchanged
+
 ### Fixed
 
 - Prevent chapter heading-copy failures by validating structured run bodies and inserting canonical headings in Python, without retries, repair, or partial publication
