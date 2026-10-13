@@ -106,14 +106,14 @@ The wrapper does not create configuration files.
 | `formatting.timeout_seconds` | Integer 1 through 3,600, per model call |
 | `formatting.max_chunks` | Integer 1 through 1,000, or omit for unlimited; includes summary synthesis |
 | `formatting.editorial_mode` | `standard` (default), `focused`, or `summarized` |
-| `captions.language` | BCP-47-shaped tag, 2-63 characters, letters and digits separated by hyphens; default `en` |
-| `cache.path` | Empty or omitted keeps the existing cache location; otherwise an absolute SQLite filename with optional `~` expansion |
+| `captions.language` | One BCP-47-shaped tag of 2 through 63 characters, with letters and digits separated by hyphens; default `en` |
+| `cache.path` | Omit the key or set an empty value to keep the current cache location. For a different location, set an absolute SQLite filename. The `~` character expands to the home directory. |
 | `mcp.markdown_timeout_seconds` | Integer 300 through 3,600; total MCP Markdown deadline, default 300; ignored by CLI |
 | `sponsorblock.enabled` | Optional boolean; unset means CLI off, MCP filtered on |
 | `sponsorblock.categories` | Nonempty unique list: `sponsor`, `selfpromo`, `interaction`, `intro`, `outro`, `preview` |
 | `sponsorblock.timeout_seconds` | Integer 1 through 30, per socket operation |
 
-`--raw`, `--raw-vtt`, `--model`, `--max-chunks`, `--language`, and `-v` override their corresponding defaults.
+`--raw`, `--raw-vtt`, `--model`, `--max-chunks`, `--language`, and `-v` each override the corresponding configured value.
 There is no `--markdown` or `--quiet` flag.
 Set `chunk_chars` and `summary_synthesis_chars` in `[formatting]` in TOML.
 There is no `--chunk-chars` or `--summary-synthesis-chars` flag.
@@ -122,10 +122,12 @@ The 200,000-character maximum does not increase token allowances, byte limits, o
 `--no-config` still uses the 12,000-character built-in default.
 
 `--language` selects one caption language for one run.
-`captions.language` sets the default for both CLI and MCP.
-A native track is always preferred.
-When only a YouTube-provided translated track exists, the wrapper uses it and reports the translation in verbose output, in file metadata, and in JSON.
-A region or script tag that has no track falls back to its primary subtag alone, so `--language en-US` accepts `en` and never accepts `en-GB`.
+`captions.language` sets the default for the CLI and for MCP.
+The wrapper always prefers a native track.
+If only a YouTube-provided translated track exists, the wrapper uses that track.
+The wrapper then reports the translation in verbose output, in file metadata, and in JSON.
+If a region or script tag has no track, the wrapper falls back to the primary subtag only.
+Therefore, `--language en-US` accepts `en` and never accepts `en-GB`.
 The wrapper never translates locally.
 See the [caption selection contract](behavior.md#caption-selection-and-cleanup).
 
@@ -270,8 +272,8 @@ If the plan exceeds the cap, preview still returns a successful report.
 Actual formatting rejects a plan that exceeds the cap before any model call.
 
 Preview is not a reservation.
-A later run reuses the shared source-caption snapshot when the video, language, and resolved SponsorBlock policy match.
-A later run downloads captions again when no valid snapshot remains.
+A later run reuses the shared source-caption snapshot if the video, the language, and the resolved SponsorBlock policy match.
+If no valid snapshot remains, a later run downloads the captions again.
 Invocation counts are not token counts, dollar estimates, or exact provider-request counts.
 
 The formatter splits text on sentence boundaries or whitespace.
@@ -317,27 +319,28 @@ yt-transcript URL --no-config --preview --json
 yt-transcript URL --no-config --raw --json
 ```
 
-`--json` prints exactly one JSON document per stream.
+`--json` writes one JSON document to each stream.
 Every document includes `schema_version` (currently `1`) and `command`.
-Stdout carries the result document.
-Stderr carries one error document, or nothing.
-Progress and other stderr text are disabled, so both streams stay parseable.
-A SponsorBlock warning appears inside the document, not on stderr.
+Stdout receives the result document.
+Stderr receives one error document, or no output.
+The wrapper disables progress and all other stderr text.
+Both streams therefore stay parseable.
+A SponsorBlock warning goes in the document, not to stderr.
 Exit codes do not change.
-`--json` is invalid with `--raw-vtt` and with `--mcp`.
+Do not use `--json` with `--raw-vtt` or with `--mcp`.
 
 | Command | Document |
 |---|---|
 | `--doctor` | `healthy`, `checks` with `name`, `status`, and `detail`, and a readiness `note` |
-| `--preview` | Canonical URL, caption language and provenance, cache state, SponsorBlock state, character counts, the plan, provider, model, editorial mode, and requested thinking |
+| `--preview` | The canonical URL, the caption language and provenance, the cache state, the SponsorBlock state, character counts, the plan, and the selected provider, model, editorial mode, and thinking state |
 | `--raw` | The metadata fields below, `body`, `character_count`, and `cues` with original times |
 | Markdown mode | The same metadata fields and `body`; no `cues` |
 | Any failure | `error` with `code`, `phase`, `retryable`, chunk position, `message`, `hint`, and `diagnostic` only with `--verbose` |
 
-Caption text and descriptions never appear in doctor or preview output.
-Transcript output includes the description only with `-o`, matching the file metadata rule.
-With `-o`, the file contains the JSON document instead of the YAML header and body.
-The preview document omits the plan's source chunks.
+Doctor and preview output never contains caption text or descriptions.
+Transcript output contains the description only with `-o`. This rule matches the file metadata rule.
+With `-o`, the file contains the JSON document. It does not contain the YAML header and body.
+The preview document omits the source chunks of the plan.
 
 ## Doctor and file safety
 

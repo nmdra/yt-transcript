@@ -396,8 +396,8 @@ get_transcript_page(url: str, cursor: str | None = None, max_chars: int = 12000,
 | `get_transcript_page` | `video_id, document, has_more, next_cursor` | Whole timestamped cues from one stored snapshot |
 
 A cold metadata request also fetches captions.
-It can fail when usable captions are unavailable for the requested language.
-Its metadata includes the same description, provenance, attribution, and filtering receipts as `get_transcript`.
+That request can fail when the requested language has no usable caption track.
+The response metadata includes the same description, provenance, attribution, and filtering receipts as `get_transcript`.
 
 Segments allow finite, nonnegative times with start less than end and an interval of at most 900 seconds.
 The server returns at most 200 cues.
@@ -458,10 +458,10 @@ All helpers keep the serialized result limit, safe errors, 300-second deadline, 
 
 ## Local source cache
 
-Version 1.1.0 shares one SQLite cache between the CLI and MCP, with one `[cache]` policy and one default database path.
-It stores source cues, original timestamps, complete metadata, caption provenance, and SponsorBlock lookup data.
-It does not store model-generated Markdown or credentials.
-Snapshots are reusable only when the video, requested language, mode, and resolved SponsorBlock policy match.
+In version 1.1.0, the CLI and MCP share one SQLite cache with one `[cache]` policy and one default database path.
+The cache stores source cues, original timestamps, complete metadata, caption provenance, and SponsorBlock lookup data.
+The cache does not store model-generated Markdown or credentials.
+A snapshot is reusable only if the video, the requested language, the mode, and the resolved SponsorBlock policy match.
 
 Default settings:
 
