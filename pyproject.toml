@@ -24,7 +24,7 @@ dependencies = ["yt-dlp[default]>=2026.8.19", "PyYAML>=6.0.3"]
 mcp = ["mcp>=2.3.0"]
 
 [dependency-groups]
-dev = ["pytest>=9.1.1", "ruff>=0.17.1"]
+dev = ["pytest>=9.1.1", "ruff>=0.17.2"]
 
 [project.scripts]
 yt-transcript = "yt_transcript.cli:main"
