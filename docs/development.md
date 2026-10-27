@@ -19,7 +19,7 @@ Deno must be on `PATH`.
 The selected yt-dlp release supports Deno 2.3.0 or newer.
 
 The `yt-dlp[default]` dependency supplies EJS scripts.
-The locked yt-dlp 2026.8.19 release requires yt-dlp-ejs 0.8.0.
+The locked yt-dlp 2026.10.21 release requires yt-dlp-ejs 0.8.0.
 The tool disables automatic remote EJS component downloads.
 
 For Markdown, install [Pi](https://pi.dev) separately.

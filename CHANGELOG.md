@@ -7,6 +7,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-27
+
+### Changed
+
+- Require yt-dlp 2026.10.21 or newer for current YouTube extraction fixes
+- Refresh locked runtime dependencies, including MCP transport and caption retrieval dependencies
+
 ## [1.2.0] - 2026-10-13
 
 ### Added
@@ -162,7 +169,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/nmdra/yt-transcript/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/nmdra/yt-transcript/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/nmdra/yt-transcript/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/nmdra/yt-transcript/compare/v0.2.0-dev.9...v1.0.0
