@@ -23,14 +23,14 @@ The tool uses only captions. It does not download audio or video. It does not re
 
 Requirements: [uv](https://docs.astral.sh/uv/getting-started/installation/), Python **3.14.7 or newer**, and [Deno](https://docs.deno.com/runtime/getting_started/installation/) **2.3.0+**.
 [yt-dlp](https://github.com/yt-dlp/yt-dlp) retrieves captions and video metadata and is installed automatically as a dependency.
-The minimum supported version is **2026.10.21**, also pinned in the v1.2.1 release lockfile.
+The minimum supported version is **2026.10.26**, also pinned in the v1.2.2 release lockfile.
 Markdown also requires a configured model backend. Raw output and MCP plain text do not require one.
 
-Install the pinned **v1.2.1** release with MCP support:
+Install the pinned **v1.2.2** release with MCP support:
 
 ```sh
 uv tool install --python 3.14.7 \
-  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v1.2.1'
+  'yt-transcript[mcp] @ git+https://github.com/nmdra/yt-transcript.git@v1.2.2'
 
 yt-transcript --version
 yt-transcript --doctor
@@ -127,6 +127,7 @@ See [tool contracts and cache settings](docs/mcp.md#retrieval-tools).
 - [Model providers](docs/providers.md): Pi, OpenRouter, DeepSeek, API keys, thinking, and token limits
 - [CLI reference](docs/cli.md): modes, configuration, preview, and file safety
 - [MCP setup](docs/mcp.md): client configuration, tool results, and cache settings
+- [Pi prompt example](docs/pi-prompt.md): `/yt` commands for summaries, concept explanations, and Obsidian notes
 - [Transcript behavior](docs/behavior.md): chapters, cleanup, summaries, metadata, and filtering
 - [Troubleshooting](docs/troubleshooting.md): error codes and recovery
 - [Development and releases](docs/development.md): tests, live-check approval, and release workflow

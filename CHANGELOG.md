@@ -7,6 +7,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-27
+
+### Added
+
+- Add a reusable Pi `/yt` prompt and usage guide for video summaries, concept explanations, and Obsidian notes
+
+### Changed
+
+- Require yt-dlp 2026.10.26 or newer, which drops Python 3.10 support and adds curl-cffi 0.17.x support; yt-transcript still requires Python 3.14.7 or newer
+
 ## [1.2.1] - 2026-10-27
 
 ### Changed
@@ -169,7 +179,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.2.2...HEAD
+[1.2.2]: https://github.com/nmdra/yt-transcript/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/nmdra/yt-transcript/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/nmdra/yt-transcript/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/nmdra/yt-transcript/compare/v1.0.0...v1.1.0

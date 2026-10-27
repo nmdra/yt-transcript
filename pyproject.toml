@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yt-transcript"
-version = "1.2.1"
+version = "1.2.2"
 description = "English YouTube captions with deterministic cleanup and optional model editing"
 readme = "README.md"
 requires-python = ">=3.14.7"
@@ -18,7 +18,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Topic :: Text Processing :: Markup",
 ]
-dependencies = ["yt-dlp[default]>=2026.10.21", "PyYAML>=6.0.3"]
+dependencies = ["yt-dlp[default]>=2026.10.26", "PyYAML>=6.0.3"]
 
 [project.optional-dependencies]
 mcp = ["mcp>=2.3.0"]

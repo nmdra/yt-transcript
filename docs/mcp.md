@@ -45,6 +45,12 @@ Alternatively, initialize the server and list its tools through an MCP client.
 Do not call `get_transcript` during an offline installation check.
 If the installed Pi configuration format differs from this example, read the installed Pi MCP documentation.
 
+## Pi prompt usage example
+
+Use the [Pi `/yt` prompt example](pi-prompt.md) after you configure the MCP connection.
+It includes a reusable template and commands for video summaries, concept explanations, and Obsidian notes.
+The template retrieves plain-text captions and lets the current Pi session produce the answer, without a separate server-side Markdown model call.
+
 ## OpenRouter server backend
 
 Keep `get_transcript` arguments unchanged.
