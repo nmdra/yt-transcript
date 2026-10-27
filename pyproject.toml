@@ -18,7 +18,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Topic :: Text Processing :: Markup",
 ]
-dependencies = ["yt-dlp[default]>=2026.8.19", "PyYAML>=6.0.3"]
+dependencies = ["yt-dlp[default]>=2026.10.21", "PyYAML>=6.0.3"]
 
 [project.optional-dependencies]
 mcp = ["mcp>=2.3.0"]

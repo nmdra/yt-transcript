@@ -1049,7 +1049,7 @@ dev = [
 requires-dist = [
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.3.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "yt-dlp", extras = ["default"], specifier = ">=2026.8.19" },
+    { name = "yt-dlp", extras = ["default"], specifier = ">=2026.10.21" },
 ]
 provides-extras = ["mcp"]
 
