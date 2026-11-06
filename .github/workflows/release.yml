@@ -54,7 +54,7 @@ jobs:
           git diff --exit-code
       - name: Build wheel and source archive
         run: |
-          printf 'hatchling==1.32.4\n' > "$RUNNER_TEMP/build-constraints.txt"
+          printf 'hatchling==1.33.0\n' > "$RUNNER_TEMP/build-constraints.txt"
           uv build --build-constraints "$RUNNER_TEMP/build-constraints.txt"
           (cd dist && sha256sum ./*.whl ./*.tar.gz > SHA256SUMS)
       - name: Upload release artifacts

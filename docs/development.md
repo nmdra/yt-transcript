@@ -110,7 +110,7 @@ The publish job verifies artifact checksums.
 Then the job creates a normal GitHub release with the workflow token.
 The workflow does not require a private-repository guard or a manual public-release exception.
 
-CI uses the pinned Python version in `.python-version`, uv 0.8.13, Hatchling 1.32.4, Pyright 1.1.412, and locked project dependencies.
+CI uses the pinned Python version in `.python-version`, uv 0.8.13, Hatchling 1.33.0, Pyright 1.1.412, and locked project dependencies.
 CI pins GitHub Actions to commit hashes.
 CI runs no live YouTube, SponsorBlock, or Pi validation.
 

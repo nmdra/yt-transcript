@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-06
+
+### Changed
+
+- Refresh locked runtime dependencies used by the optional MCP server
+
 ## [1.2.2] - 2026-10-27
 
 ### Added
@@ -179,7 +185,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/nmdra/yt-transcript/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/nmdra/yt-transcript/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/nmdra/yt-transcript/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/nmdra/yt-transcript/compare/v1.1.0...v1.2.0
