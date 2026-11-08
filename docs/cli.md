@@ -49,6 +49,28 @@ Supported hosts are `youtube.com`, `www.youtube.com`, `m.youtube.com`, and `yout
 The tool supports watch, shorts, and embed URLs.
 A playlist parameter in a video URL does not enable playlist downloads.
 
+### Clipboard output
+
+Use `--copy` or `-c` to also copy the completed output to the system clipboard:
+
+```sh
+yt-transcript URL --copy
+yt-transcript URL --raw -c
+yt-transcript URL -c -o transcript.md
+```
+
+Normal stdout or file output stays unchanged.
+The clipboard receives the same content, including metadata when `-o` is used.
+The flag also supports `--json`, `--raw-vtt`, and `--preview`.
+It cannot be used with `--doctor` or `--mcp`.
+
+Clipboard access requires a local desktop session and a system clipboard tool.
+On Linux, install `wl-copy` (from `wl-clipboard`) for Wayland, or `xclip` or `xsel` for X11.
+macOS uses `pbcopy`. Windows uses PowerShell.
+The tool checks clipboard availability before downloading captions.
+A clipboard write failure returns a nonzero exit code before stdout or file publication.
+Clipboard and file writes are not one transaction. A later file write failure can leave the clipboard updated.
+
 ## Configuration
 
 The wrapper reads `$XDG_CONFIG_HOME/yt-transcript/config.toml` when `XDG_CONFIG_HOME` is an absolute, nonempty path.

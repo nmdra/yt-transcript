@@ -28,6 +28,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--doctor", action="store_true")
     parser.add_argument("--preview", action="store_true")
     parser.add_argument("-o", "--output", type=Path)
+    parser.add_argument(
+        "-c",
+        "--copy",
+        action="store_true",
+        help="Also copy output to the system clipboard",
+    )
     parser.add_argument("--no-clobber", action="store_true")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--raw", dest="mode", action="store_const", const="raw")
@@ -58,7 +64,11 @@ def _invalid(message: str) -> AppError:
     return AppError(ErrorInfo("CONFIG_INVALID", message, phase="config"))
 
 
-def _emit(data: bytes) -> None:
+def _emit(data: bytes, *, copy_command: list[str] | None = None) -> None:
+    if copy_command is not None:
+        from .clipboard import copy_output
+
+        copy_output(data, copy_command)
     # Real stdout uses explicit UTF-8 bytes, independent of terminal locale.
     buffer = getattr(sys.stdout, "buffer", None)
     if buffer is not None:
@@ -168,6 +178,11 @@ def _transcribe(
         raise _invalid("--sponsorblock cannot be used with --raw-vtt.")
     if config.mode == "raw-vtt" and args.json:
         raise _invalid("--json cannot be used with --raw-vtt.")
+    copy_command = None
+    if args.copy:
+        from .clipboard import clipboard_command
+
+        copy_command = clipboard_command()
     progress.stage("fetch")
     if config.mode == "raw-vtt":
         raw_download = download_caption_vtt(
@@ -298,10 +313,14 @@ def _transcribe(
                             thinking_level=thinking_level,
                             boundary_context_chars=args.boundary_context_chars,
                         )
-                    ).encode("utf-8")
+                    ).encode("utf-8"),
+                    copy_command=copy_command,
                 )
             else:
-                _emit(("\n".join(lines) + "\n").encode("utf-8"))
+                _emit(
+                    ("\n".join(lines) + "\n").encode("utf-8"),
+                    copy_command=copy_command,
+                )
             return
         if config.mode == "markdown":
             progress.stage("format")
@@ -364,10 +383,14 @@ def _transcribe(
             data = document.encode("utf-8")
     if args.output:
         progress.stage("output")
+        if copy_command is not None:
+            from .clipboard import copy_output
+
+            copy_output(data, copy_command)
         write_output(args.output, data, no_clobber=args.no_clobber)
     else:
         progress.close()
-        _emit(data)
+        _emit(data, copy_command=copy_command)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -391,7 +414,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     try:
         restricted = (
-            args.url is not None
+            args.copy
+            or args.url is not None
             or args.preview
             or args.output is not None
             or args.no_clobber
@@ -407,7 +431,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if args.doctor:
             if (
-                args.url is not None
+                args.copy
+                or args.url is not None
                 or args.preview
                 or args.output is not None
                 or args.no_clobber

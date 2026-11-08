@@ -7,6 +7,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-08
+
+### Added
+
+- Add `--copy` / `-c` to copy completed CLI output to the system clipboard while preserving normal stdout or file output
+- Support clipboard output on Linux Wayland and X11, macOS, and Windows through installed system tools, with clear errors when clipboard access fails
+
 ## [1.2.3] - 2026-11-06
 
 ### Changed
@@ -185,7 +192,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Parse YouTube VTT captions with space-only payload lines instead of rejecting valid transcripts
 
-[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.2.3...HEAD
+[Unreleased]: https://github.com/nmdra/yt-transcript/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/nmdra/yt-transcript/compare/v1.2.3...v1.3.0
 [1.2.3]: https://github.com/nmdra/yt-transcript/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/nmdra/yt-transcript/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/nmdra/yt-transcript/compare/v1.2.0...v1.2.1

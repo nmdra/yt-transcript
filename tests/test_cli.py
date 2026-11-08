@@ -42,6 +42,97 @@ def pipeline(monkeypatch):
     return calls
 
 
+@pytest.mark.parametrize("flag", ["--copy", "-c"])
+@pytest.mark.parametrize(
+    "mode",
+    [[], ["--raw"], ["--raw-vtt"], ["--json"], ["--preview"], ["--preview", "--json"]],
+)
+def test_copy_matches_stdout(pipeline, monkeypatch, capsys, flag, mode):
+    from yt_transcript import clipboard
+
+    copied = []
+    monkeypatch.setattr(clipboard, "clipboard_command", lambda: ["clipboard-tool"])
+    monkeypatch.setattr(
+        clipboard, "copy_output", lambda data, command: copied.append(data)
+    )
+    assert main([URL, "--no-config", flag, *mode]) == 0
+    captured = capsys.readouterr()
+    assert copied == [captured.out.encode("utf-8")]
+    assert captured.err == ""
+
+
+@pytest.mark.parametrize("mode", [[], ["--raw"], ["--raw-vtt"], ["--json"]])
+def test_copy_matches_file(pipeline, monkeypatch, capsys, tmp_path, mode):
+    from yt_transcript import clipboard
+
+    copied = []
+    monkeypatch.setattr(clipboard, "clipboard_command", lambda: ["clipboard-tool"])
+    monkeypatch.setattr(
+        clipboard, "copy_output", lambda data, command: copied.append(data)
+    )
+    path = tmp_path / "transcript"
+    assert main([URL, "--no-config", "-c", *mode, "-o", str(path)]) == 0
+    assert copied == [path.read_bytes()]
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("stage", ["preflight", "copy"])
+def test_clipboard_failure_is_safe(pipeline, monkeypatch, capsys, tmp_path, stage):
+    from yt_transcript import clipboard
+    from yt_transcript.errors import AppError, ErrorInfo
+
+    def fail(*args):
+        raise AppError(
+            ErrorInfo("OUTPUT_FAILED", "Clipboard unavailable.", phase="output")
+        )
+
+    monkeypatch.setattr(clipboard, "clipboard_command", lambda: ["clipboard-tool"])
+    monkeypatch.setattr(clipboard, "copy_output", fail)
+    if stage == "preflight":
+        monkeypatch.setattr(clipboard, "clipboard_command", fail)
+    path = tmp_path / "existing"
+    path.write_text("old")
+    assert main([URL, "--no-config", "--raw", "-c", "--json", "-o", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err)["error"]["code"] == "OUTPUT_FAILED"
+    assert path.read_text() == "old"
+    if stage == "preflight":
+        assert pipeline == []
+
+
+def test_copy_only_runs_after_success(pipeline, monkeypatch, capsys):
+    from yt_transcript import clipboard
+    from yt_transcript.errors import classify_pi_failure
+
+    def fail(*args, **kwargs):
+        raise classify_pi_failure(code="PI_OUTPUT_INVALID")
+
+    monkeypatch.setattr(clipboard, "clipboard_command", lambda: ["clipboard-tool"])
+    monkeypatch.setattr(
+        clipboard, "copy_output", lambda *a: pytest.fail("must not copy failed output")
+    )
+    monkeypatch.setattr(formatter, "format_transcript", fail)
+    assert main([URL, "--no-config", "--copy"]) == 1
+    assert capsys.readouterr().out == ""
+
+
+def test_clipboard_is_not_used_by_default(pipeline, monkeypatch, capsys):
+    from yt_transcript import clipboard
+
+    monkeypatch.setattr(
+        clipboard, "clipboard_command", lambda: pytest.fail("must not access clipboard")
+    )
+    assert main([URL, "--no-config", "--raw"]) == 0
+    assert capsys.readouterr().out == "hello world\n"
+
+
+@pytest.mark.parametrize("command", ["--mcp", "--doctor"])
+def test_copy_rejects_non_transcript_commands(capsys, command):
+    assert main([command, "--copy", "--no-config"]) == 2
+    assert "CONFIG_INVALID" in capsys.readouterr().err
+
+
 def test_help(capsys):
     assert main(["--help"]) == 0
     assert "YouTube" in capsys.readouterr().out
